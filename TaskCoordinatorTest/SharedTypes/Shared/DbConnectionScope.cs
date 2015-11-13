@@ -7,7 +7,7 @@ using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using System.Linq;
 
-namespace Database.Shared
+namespace Bell.PPS.Database.Shared
 {
     /// <summary>
     /// Options for modifying how DbConnectionScope.Current is affected while constructing a new scope.
@@ -85,32 +85,19 @@ namespace Database.Shared
                 }
                 return null;
             }
-        }
-
-        private static void __setCurrentScope(DbConnectionScope newScope)
-        {
-            Guid? id = newScope == null ? (Guid?)null : newScope.UNIQUE_ID;
-            if (id.HasValue)
-                CallContext.LogicalSetData(SLOT_KEY, id);
-            else
-                CallContext.LogicalSetData(SLOT_KEY, null);
-        }
-
-        private static int __clearScopeGroup(Guid group_id)
-        {
-            int cnt = 0;
-            var scopes = _scopeStore.Values.Where(v => v.GROUP_ID == group_id);
-            DbConnectionScope tmp;
-            foreach (var scope in scopes)
+            set
             {
-                if (_scopeStore.TryRemove(scope.UNIQUE_ID, out tmp))
-                    ++cnt;
-            }
-            return cnt;
-        }
-        #endregion
 
-        #region instance fields
+                Guid? id = value == null ? (Guid?)null : value.UNIQUE_ID;
+                if (id.HasValue)
+                    CallContext.LogicalSetData(SLOT_KEY, id);
+                else
+                    CallContext.LogicalSetData(SLOT_KEY, null);
+            }
+        }
+#endregion
+
+#region instance fields
         internal readonly Guid UNIQUE_ID = Guid.NewGuid();
         //AN ID OF THE GROUP of scopes (top scope and nested ones have the same GROUP_ID)
         internal readonly Guid GROUP_ID;
@@ -118,11 +105,11 @@ namespace Database.Shared
 
         private DbConnectionScope _priorScope;    // previous scope in stack of scopes on this thread
         private ConcurrentDictionary<string, DbConnection> _connections;   // set of connections contained by this scope.
-        private bool _isDisposed;
+        private bool _isDisposed; 
 
-        #endregion
+#endregion
 
-        #region public class methods and properties
+#region public class methods and properties
 
         /// <summary>
         /// Obtain the currently active connection scope
@@ -136,15 +123,14 @@ namespace Database.Shared
             }
         }
 
-        #endregion
+#endregion
 
-        #region public instance methods and properties
+#region public instance methods and properties
 
         /// <summary>
         /// Default Constructor
         /// </summary>
-        public DbConnectionScope()
-            : this(DbConnectionScopeOption.Required)
+        public DbConnectionScope() : this(DbConnectionScopeOption.Required)
         {
         }
 
@@ -154,7 +140,7 @@ namespace Database.Shared
         /// <param name="option">Option for how to modify Current during constructor</param>
         public DbConnectionScope(DbConnectionScopeOption option)
         {
-            lock (this.SyncRoot)
+            lock(this.SyncRoot)
             {
                 _isDisposed = true;  // short circuit Dispose until we're properly set up
                 if (option == DbConnectionScopeOption.RequiresNew || (option == DbConnectionScopeOption.Required && __currentScope == null))
@@ -178,7 +164,7 @@ namespace Database.Shared
                     }
 
                     _scopeStore.TryAdd(this.UNIQUE_ID, this);
-                    __setCurrentScope(this);
+                    __currentScope = this;
                     _isDisposed = false;
                 }
             }
@@ -211,7 +197,7 @@ namespace Database.Shared
                     {
                         DbConnectionScope tmp;
                         _scopeStore.TryRemove(this.UNIQUE_ID, out tmp);
-                        __setCurrentScope(prior);
+                        __currentScope = prior;
                     }
                     finally
                     {
@@ -327,9 +313,9 @@ namespace Database.Shared
             }
         }
 
-        #endregion
+#endregion
 
-        #region private methods and properties
+#region private methods and properties
         /// <summary>
         /// Handle calling API function after instance has been disposed
         /// </summary>
@@ -340,6 +326,6 @@ namespace Database.Shared
                 throw new ObjectDisposedException("DbConnectionScope");
             }
         }
-        #endregion
+#endregion
     }
 }
