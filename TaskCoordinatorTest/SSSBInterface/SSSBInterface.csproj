@@ -8,8 +8,8 @@
     <ProjectGuid>{7EDEED80-C546-4F00-A265-1801BDA72C07}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Bell.PPS.SSSB</RootNamespace>
-    <AssemblyName>Bell.PPS.SSSBInterface</AssemblyName>
+    <RootNamespace>SSSB</RootNamespace>
+    <AssemblyName>SSSBInterface</AssemblyName>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <UpgradeBackupLocation>

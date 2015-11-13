@@ -8,8 +8,8 @@
     <ProjectGuid>{EAF313D1-2C87-4989-B995-84ED8AC94AAA}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>Bell.PPS.Shared</RootNamespace>
-    <AssemblyName>Bell.PPS.SharedTypes</AssemblyName>
+    <RootNamespace>Shared</RootNamespace>
+    <AssemblyName>SharedTypes</AssemblyName>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <UpgradeBackupLocation>
