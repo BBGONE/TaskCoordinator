@@ -279,12 +279,9 @@ namespace TasksCoordinator
                         }
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    this._workingCount = prevWorkingCount;
-                    this._readersCount = prevCount;
-                    this._primaryReader = prevReader;
-                    throw;
+                    _log.Error(ex);
                 }
             }
         }
