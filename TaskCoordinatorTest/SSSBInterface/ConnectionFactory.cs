@@ -7,7 +7,7 @@ using System.Data.SqlClient;
 using System.Threading.Tasks;
 using System.Threading;
 
-namespace Database.Shared
+namespace Shared.Database
 {
     public static class ConnectionFactory
     {

@@ -8,10 +8,8 @@ using System.Threading.Tasks;
 using System.Transactions;
 using Shared;
 using Shared.Errors;
-using Services;
+using Shared.Services;
 using TasksCoordinator;
-using Services.Shared;
-
 
 namespace SSSB
 {

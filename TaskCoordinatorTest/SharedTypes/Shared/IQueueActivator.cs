@@ -1,4 +1,4 @@
-﻿namespace Services.Shared
+﻿namespace Shared.Services
 {
     public interface IQueueActivator
     {

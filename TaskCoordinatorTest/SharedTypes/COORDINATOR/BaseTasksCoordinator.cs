@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Linq;
-using Services.Shared;
+using Shared.Services;
 using System.Collections.Generic;
 
 namespace TasksCoordinator
@@ -70,7 +70,8 @@ namespace TasksCoordinator
                 this._primaryReader = null;
                 if (this.TasksCount > 0 || this._maxReadersCount == 0)
                     return;
-                this.StartNewTask();
+                if (!this.StartNewTask())
+                    throw new Exception("Can not start initial task to process messages");
             }
         }
 
@@ -120,12 +121,22 @@ namespace TasksCoordinator
             }
         }
 
-        private void StartNewTask() {
-            CancellationToken token = this.Cancellation;
-            Interlocked.CompareExchange(ref this._taskIdSeq, 0, MAX_TASK_NUM);
-            int taskId = Interlocked.Increment(ref this._taskIdSeq);
-            Task<Task<int>> task = this.CreateNewTask(token, taskId);
-            this.OnTaskStart(taskId, task);
+        private bool StartNewTask() {
+            try
+            {
+                CancellationToken token = this.Cancellation;
+                Interlocked.CompareExchange(ref this._taskIdSeq, 0, MAX_TASK_NUM);
+                int taskId = Interlocked.Increment(ref this._taskIdSeq);
+                Task<Task<int>> task = this.CreateNewTask(token, taskId);
+                this.OnTaskStart(taskId, task);
+                return true;
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _log.Error(ex);
+            }
+            return false;
         }
 
         protected IMessageReader<M> GetMessageReader(int taskId)
@@ -249,8 +260,6 @@ namespace TasksCoordinator
             {
                 int prevCount = this._readersCount;
                 int newCount = prevCount - 1;
-                int prevWorkingCount = this._workingCount;
-                var prevReader = this._primaryReader;
 
                 if (newCount < 0)
                     throw new PPSException(string.Format("ReadersCount must not be equal to {0}", newCount));
@@ -261,27 +270,20 @@ namespace TasksCoordinator
                 }
 
                 if (newCount == 0 && this._primaryReader != null)
-                    throw new InvalidOperationException("PrimaryReader must not be NULL when no free readers is left");
+                    throw new InvalidOperationException("The PrimaryReader must be NULL when no free readers is left");
 
                 if (isStartedWorking)
                     this._workingCount += 1;
                 this._readersCount = newCount;
 
-                try
+                if (newCount == 0 && !this.Cancellation.IsCancellationRequested)
                 {
-                    if (newCount == 0 && !this.Cancellation.IsCancellationRequested)
+                    int freeCount = this.AvailableCount;
+                    int canCreateCount = this.AvailableToCreateCount;
+                    if (freeCount == 0 && canCreateCount > 0)
                     {
-                        int freeCount = this.AvailableCount;
-                        int canCreateCount = this.AvailableToCreateCount;
-                        if (freeCount == 0 && canCreateCount > 0)
-                        {
-                            this.StartNewTask();
-                        }
+                        this.StartNewTask();
                     }
-                }
-                catch (Exception ex)
-                {
-                    _log.Error(ex);
                 }
             }
         }
@@ -345,17 +347,8 @@ namespace TasksCoordinator
                     return false;
                 if (this.TasksCount > 0 || this._maxReadersCount == 0)
                     return false;
-                try
-                {
-                    this.StartNewTask();
-                }
-                catch(Exception ex)
-                {
-                    _log.Error(ex);
-                    return false;
-                }
+                return this.StartNewTask();
             }
-            return true;
         }
         #endregion
 

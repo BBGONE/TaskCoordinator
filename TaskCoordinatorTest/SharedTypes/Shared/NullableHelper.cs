@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Database.Shared
+namespace Shared.Database
 {
     /// <summary>
     /// ¬спомогательный класс дл€ работы с Nullable-типами

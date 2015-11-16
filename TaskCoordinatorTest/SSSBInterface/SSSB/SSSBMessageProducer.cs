@@ -1,5 +1,5 @@
-﻿using Database.Shared;
-using Shared;
+﻿using Shared;
+using Shared.Database;
 using Shared.Errors;
 using System;
 using System.Collections.Generic;

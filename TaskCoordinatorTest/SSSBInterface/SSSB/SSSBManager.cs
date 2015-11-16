@@ -1,10 +1,10 @@
 using System;
-using Shared.Errors;
 using System.Data.SqlClient;
 using System.Data;
-using Database.Shared;
-using System.Threading;
 using Shared;
+using Shared.Database;
+using Shared.Errors;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
 

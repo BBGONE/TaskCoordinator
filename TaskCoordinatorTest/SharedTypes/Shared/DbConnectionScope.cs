@@ -7,7 +7,7 @@ using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using System.Linq;
 
-namespace Bell.PPS.Database.Shared
+namespace Shared.Database
 {
     /// <summary>
     /// Options for modifying how DbConnectionScope.Current is affected while constructing a new scope.
