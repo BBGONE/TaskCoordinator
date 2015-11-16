@@ -94,7 +94,7 @@ namespace Shared.Database
         }
 #endif
 
-        #region class fields
+#region class fields
         private static ConcurrentDictionary<Guid, WeakReference<DbConnectionScope>> __scopeStore = new ConcurrentDictionary<Guid, WeakReference<DbConnectionScope>>();
 
         private static DbConnectionScope __currentScope
@@ -143,7 +143,18 @@ namespace Shared.Database
         private bool _isDisposed; 
 #endregion
 
-#region public class methods and properties
+#region class methods and properties
+        private static string GetConnectionID(string connectionString)
+        {
+            string transId = string.Empty;
+            var currTran = Transaction.Current;
+            if (currTran != null)
+            {
+                transId = currTran.TransactionInformation.LocalIdentifier;
+            }
+            return string.Format("{0}:{1}", transId, connectionString);
+        }
+
         /// <summary>
         /// Obtain the currently active connection scope
         /// </summary>
@@ -158,7 +169,6 @@ namespace Shared.Database
 #endregion
 
 #region public instance methods and properties
-
         /// <summary>
         /// Default Constructor
         /// </summary>
@@ -212,6 +222,61 @@ namespace Shared.Database
             }
         }
 
+        public DbConnection GetConnection(DbProviderFactory factory, string connectionString)
+        {
+            string id;
+            return GetConnectionInternal(factory, connectionString, out id);
+        }
+
+        public DbConnection GetOpenConnection(DbProviderFactory factory, string connectionString)
+        {
+            string id;
+            DbConnection result = this.GetConnectionInternal(factory, connectionString, out id);
+            try
+            {
+                lock (_namedlocker.GetLock(id))
+                {
+                    if (result.State == ConnectionState.Closed)
+                        result.Open();
+                }
+                _namedlocker.RemoveLock(id);
+                return result;
+            }
+            catch
+            {
+                _namedlocker.RemoveLock(id);
+                TryRemoveConnection(result);
+                throw;
+            }
+        }
+
+        public bool IsDisposed
+        {
+            get
+            {
+                return _isDisposed;
+            }
+        }
+#endregion
+
+#region private methods and properties
+        private DbConnection GetConnectionInternal(DbProviderFactory factory, string connectionString, out string id)
+        {
+            DbConnection result = null;
+            id = null;
+            lock (this.SyncRoot)
+            {
+                id = GetConnectionID(connectionString);
+                if (!TryGetConnectionById(id, out result))
+                {
+                    result = factory.CreateConnection();
+                    result.ConnectionString = connectionString;
+                    _connections.TryAdd(id, result);
+                }
+            }
+            return result;
+        }
+
         private bool TryGetConnectionById(string id, out DbConnection connection)
         {
             connection = null;
@@ -236,7 +301,8 @@ namespace Shared.Database
                         break;
                     }
                 }
-                if (!string.IsNullOrEmpty(key)){
+                if (!string.IsNullOrEmpty(key))
+                {
                     DbConnection tmp;
                     return _connections.TryRemove(key, out tmp);
                 }
@@ -244,70 +310,6 @@ namespace Shared.Database
             }
         }
 
-        private static string GetConnectionID(string connectionString)
-        {
-            string transId = string.Empty;
-            var currTran = Transaction.Current;
-            if (currTran != null)
-            {
-               transId =  currTran.TransactionInformation.LocalIdentifier;
-            }
-            return string.Format("{0}:{1}", transId, connectionString);
-        }
-
-        private DbConnection GetConnectionInternal(DbProviderFactory factory, string connectionString, out string id)
-        {
-            DbConnection result = null;
-            id = null;
-            lock (this.SyncRoot)
-            {
-                id = GetConnectionID(connectionString);
-                if (!TryGetConnectionById(id, out result))
-                {
-                    result = factory.CreateConnection();
-                    result.ConnectionString = connectionString;
-                    _connections.TryAdd(id, result);
-                }
-            }
-            return result;
-        }
-
-        public DbConnection GetConnection(DbProviderFactory factory, string connectionString)
-        {
-            string id;
-            return GetConnectionInternal(factory, connectionString, out id);
-        }
-
-        public DbConnection GetOpenConnection(DbProviderFactory factory, string connectionString)
-        {
-            string id;
-            DbConnection result = this.GetConnectionInternal(factory, connectionString, out id);
-            try
-            {
-                lock (_namedlocker.GetLock(id))
-                {
-                    if (result.State == ConnectionState.Closed)
-                        result.Open();
-                    return result;
-                }
-            }
-            catch
-            {
-                TryRemoveConnection(result);
-                throw;
-            }
-        }
-
-        public bool IsDisposed
-        {
-            get
-            {
-                return _isDisposed;
-            }
-        }
-#endregion
-
-#region private methods and properties
         /// <summary>
         /// Handle calling API function after instance has been disposed
         /// </summary>
