@@ -6,7 +6,7 @@ using System.Transactions;
 using System.Runtime.Remoting.Messaging;
 using System.Threading.Tasks;
 using System.Linq;
-using System.Threading;
+using System.Runtime.CompilerServices;
 
 namespace Shared.Database
 {
@@ -53,40 +53,6 @@ namespace Shared.Database
     public sealed class DbConnectionScope : IDisposable
     {
         private static readonly string SLOT_KEY = Guid.NewGuid().ToString();
-        private static readonly NamedLocker _namedlocker = new NamedLocker();
-
-        private class NamedLocker
-        {
-            private readonly ConcurrentDictionary<string, object> _lockDict = new ConcurrentDictionary<string, object>();
-
-            //get a lock for use with a lock(){} block
-            public object GetLock(string name)
-            {
-                return _lockDict.GetOrAdd(name, s => new object());
-            }
-
-            //run a short lock inline using a lambda
-            public TResult RunWithLock<TResult>(string name, Func<TResult> body)
-            {
-                lock (_lockDict.GetOrAdd(name, s => new object()))
-                    return body();
-            }
-
-            //run a short lock inline using a lambda
-            public void RunWithLock(string name, Action body)
-            {
-                lock (_lockDict.GetOrAdd(name, s => new object()))
-                    body();
-            }
-
-            //remove an old lock object that is no longer needed
-            public void RemoveLock(string name)
-            {
-                object o;
-                _lockDict.TryRemove(name, out o);
-            }
-        }
-
 #if TEST
         //For Testing Purposes
         public static int GetScopeStoreCount() {
@@ -96,7 +62,6 @@ namespace Shared.Database
 
 #region class fields
         private static ConcurrentDictionary<Guid, WeakReference<DbConnectionScope>> __scopeStore = new ConcurrentDictionary<Guid, WeakReference<DbConnectionScope>>();
-
         private static DbConnectionScope __currentScope
         {
             get
@@ -123,7 +88,6 @@ namespace Shared.Database
             }
             set
             {
-
                 Guid? id = value == null ? (Guid?)null : value.UNIQUE_ID;
                 if (id.HasValue)
                 {
@@ -137,9 +101,10 @@ namespace Shared.Database
 
 #region instance fields
         internal readonly Guid UNIQUE_ID = Guid.NewGuid();
-        private object SyncRoot = new object();
-        private DbConnectionScope _outerScope;    // outer scope in stack of scopes on this call context
-        private ConcurrentDictionary<string, DbConnection> _connections;   // set of connections contained by this scope.
+        private readonly object SyncRoot = new object();
+        private DbConnectionScope _outerScope;
+        private ConcurrentDictionary<string, DbConnection> _connections;
+        private Lazy<ConditionalWeakTable<DbConnection, Task<DbConnection>>> _openAsyncTasks = new Lazy<ConditionalWeakTable<DbConnection, Task<DbConnection>>>(() => { return new ConditionalWeakTable<DbConnection, Task<DbConnection>>(); }, true);
         private bool _isDisposed; 
 #endregion
 
@@ -183,7 +148,7 @@ namespace Shared.Database
         public DbConnectionScope(DbConnectionScopeOption option)
         {
             _isDisposed = true;  // short circuit Dispose until we're properly set up
-            if (option == DbConnectionScopeOption.RequiresNew || (option == DbConnectionScopeOption.Required && __currentScope == null))
+            if (option == DbConnectionScopeOption.RequiresNew || (option == DbConnectionScopeOption.Required && CallContext.LogicalGetData(SLOT_KEY) == null))
             {
                 // only bother allocating dictionary if we're going to push
                 _connections = new ConcurrentDictionary<string, DbConnection>();
@@ -234,32 +199,85 @@ namespace Shared.Database
             DbConnection result = this.GetConnectionInternal(factory, connectionString, out id);
             try
             {
-                lock (_namedlocker.GetLock(id))
+                lock (result)
                 {
                     if (result.State == ConnectionState.Closed)
                         result.Open();
                 }
-                _namedlocker.RemoveLock(id);
                 return result;
             }
             catch
             {
-                _namedlocker.RemoveLock(id);
                 TryRemoveConnection(result);
                 throw;
             }
         }
 
-        public bool IsDisposed
+        public Task<DbConnection> GetOpenConnectionAsync(DbProviderFactory factory, string connectionString)
         {
-            get
+            string id;
+            DbConnection result = this.GetConnectionInternal(factory, connectionString, out id);
+            lock (result)
             {
-                return _isDisposed;
+                var openAsyncTasks = this._openAsyncTasks.Value;
+                Task<DbConnection> openAsyncTask;
+                if (openAsyncTasks.TryGetValue(result, out openAsyncTask))
+                {
+                    return openAsyncTask;
+                }
+
+                if (result.State == ConnectionState.Closed)
+                {
+                    TaskCompletionSource<DbConnection> tcs = new TaskCompletionSource<DbConnection>();
+                    var task = result.OpenAsync();
+                    task.ContinueWith((antecedent) =>
+                    {
+                        if (_isDisposed)
+                        {
+                            tcs.SetCanceled();
+                            return;
+                        }
+
+                        try
+                        {
+                            if (antecedent.IsFaulted)
+                            {
+                                TryRemoveConnection(result);
+                                tcs.SetException(antecedent.Exception);
+                            }
+                            else if (antecedent.IsCanceled)
+                            {
+                                tcs.SetCanceled();
+                            }
+                            else
+                            {
+                                tcs.SetResult(result);
+                            }
+                        }
+                        finally
+                        {
+                            lock (this.SyncRoot)
+                            {
+                                if (!_isDisposed)
+                                {
+                                    this._openAsyncTasks.Value.Remove(result);
+                                }
+                            }
+                        }
+                    });
+                    openAsyncTask = tcs.Task;
+                    openAsyncTasks.Add(result, openAsyncTask);
+                    return openAsyncTask;
+                }
+                else
+                {
+                    return Task.FromResult(result);
+                }
             }
         }
-#endregion
+        #endregion
 
-#region private methods and properties
+        #region private methods and properties
         private DbConnection GetConnectionInternal(DbProviderFactory factory, string connectionString, out string id)
         {
             DbConnection result = null;
@@ -304,7 +322,11 @@ namespace Shared.Database
                 if (!string.IsNullOrEmpty(key))
                 {
                     DbConnection tmp;
-                    return _connections.TryRemove(key, out tmp);
+                    if (_connections.TryRemove(key, out tmp))
+                    {
+                        tmp.Dispose();
+                        return true;
+                    }
                 }
                 return false;
             }
@@ -344,6 +366,7 @@ namespace Shared.Database
                     finally
                     {
                         _isDisposed = true;
+                        _openAsyncTasks = null;
                         if (_connections != null)
                         {
                             var connections = _connections.Values.ToArray();
@@ -367,6 +390,6 @@ namespace Shared.Database
                 _isDisposed = true;
             }
         }
-        #endregion
+#endregion
     }
 }
