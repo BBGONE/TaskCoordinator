@@ -93,7 +93,6 @@
     <Compile Include="Errors\ErrorHelper.cs" />
     <Compile Include="Errors\PPSException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Shared\DbConnectionScope.cs" />
     <Compile Include="Shared\IQueueActivator.cs" />
     <Compile Include="Shared\Log\ILog.cs" />
     <Compile Include="Shared\ITaskServiceInterface.cs" />

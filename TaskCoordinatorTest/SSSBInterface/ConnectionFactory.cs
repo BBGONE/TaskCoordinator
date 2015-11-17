@@ -23,30 +23,6 @@ namespace Shared.Database
             return connstrings.ConnectionString;
         }
 
-        public static SqlConnection GetConnection()
-        {
-            SqlConnection cn= (SqlConnection)DbConnectionScope.Current.GetOpenConnection(SqlClientFactory.Instance, ConnectionFactory.GetDefaultConnectionString());
-            if (cn.State == System.Data.ConnectionState.Closed)
-                cn.Open();
-            return cn;
-        }
-
-        public static bool IsDbConnectionOK()
-        {
-            try
-            {
-                using (DbConnectionScope connectionScope = new DbConnectionScope(DbConnectionScopeOption.Required))
-                {
-                    var cn = ConnectionFactory.GetConnection();
-                }
-                return true;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
-
         public static SqlConnection GetNewConnection()
         {
             SqlConnection cn = new SqlConnection(GetDefaultConnectionString());
