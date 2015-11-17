@@ -277,7 +277,7 @@ namespace Shared.Database
         }
         #endregion
 
-        #region private methods and properties
+#region private methods and properties
         private DbConnection GetConnectionInternal(DbProviderFactory factory, string connectionString, out string id)
         {
             DbConnection result = null;

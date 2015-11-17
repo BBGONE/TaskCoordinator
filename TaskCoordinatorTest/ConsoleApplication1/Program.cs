@@ -50,7 +50,7 @@ namespace ConsoleApplication1
             Random rnd = new Random();
             int cnt = 0;
             
-            for (int i = 0; i < 1000; ++i)
+            for (int i = 0; i < 10; ++i)
             {
                 TestMessageProducer.MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
             }

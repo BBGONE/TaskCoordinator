@@ -15,7 +15,7 @@ namespace TasksCoordinator
         public TestMessageProducer(TestTasksCoordinator owner)
         {
             this._owner = owner;
-            this.DefaultWaitForTimeout = this._owner.IsQueueActivationEnabled ? TimeSpan.FromSeconds(5) : TimeSpan.FromSeconds(30);
+            this.DefaultWaitForTimeout = this._owner.IsQueueActivationEnabled ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(30);
         }
 
         public static BlockingCollection<Message> MessageQueue

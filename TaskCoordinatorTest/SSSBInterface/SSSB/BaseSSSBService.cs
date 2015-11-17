@@ -238,6 +238,8 @@ namespace SSSB
         //immitate an activator
         public void StartActivator(int delay)
         {
+            if (!this._tasksCoordinator.IsQueueActivationEnabled)
+                return;
             var task = Activator(delay);
         }
 
