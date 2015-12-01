@@ -8,7 +8,7 @@ on the same thread.<br/>
 This can be achieved by creating a number of long running threads and each thread reads and processes the messages. But this is
 ineffective.<br/>
 So in this implementation one of the tasks (threads) gets a role of a primary task and is different from the other tasks.
-This role moves dynamically from one tasks to the next when the messages are read and procesed.<br/>
+This role moves dynamically from one tasks to the next when the messages are read and processed.<br/>
 Only one task at a time (the primary task) can wait for the messages in the queue, and the other tasks only process them.<br/><br/>
 
 This is implemented like this:<br/>
@@ -19,7 +19,7 @@ the TaskCoordinator creates another task which starts to wait for messages and t
 The TaskCoordinator has a parameter maxReadersCount, which caps the maximum number of created tasks. So after reaching this number of active tasks,
 the TaskCoordinator does not create new ones even if in the queue exists messages.<br/>
 <br/>
-<b>With this implementation one of the tasks acts as an activator (waits for messages)<b/><br/>
+<b>With this implementation one of the tasks acts as an activator (waits for messages)</b><br/>
 <b>This implementation is very good when you need to read and process messages in the same transaction.</b> 
 This is the case with SQL Server Sevice Broker.
 <br/><br/>
