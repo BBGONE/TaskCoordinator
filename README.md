@@ -17,7 +17,7 @@ Once the message is read, the TaskCoordinator creates another task which is wait
 processing of the message which have been read in it. And if the second task also reads a message, 
 the TaskCoordinator creates another task which starts to wait for messages and the second task continues processing of the message.<br/><br/>
 The TaskCoordinator has a parameter maxReadersCount, which caps the maximum number of created tasks. So after reaching this number of active tasks,
-the TaskCoordinator does not create new ones even if in the queue exists messages.<br/>
+the TaskCoordinator does not create new ones even if the queue have unread messages.<br/>
 <br/>
 <b>With this implementation one of the tasks acts as an activator (waits for messages)</b><br/>
 <b>This implementation is very good when you need to read and process messages in the same transaction.</b> 
