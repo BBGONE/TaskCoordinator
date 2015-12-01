@@ -29,4 +29,4 @@ Once one task is activated all that pattern of tasks handling by the TaskCoordin
 The only difference that the TaskCoordinator does not sustain one task to wait for the messages.
 When there are no messages in the queue then all tasks are distroyed (after processing current messages) and then the TaskCoordinator needs a new external activation when in the queue will appear messages (it just need a kick to start).
 <br/><br/>
-LICENCE: Use it as you like!
+LICENSE: Use it as you like!
