@@ -21,7 +21,7 @@ the TaskCoordinator does not create new ones even if the queue have unread messa
 <br/>
 <b>With this implementation one of the tasks acts as an activator (waits for messages)</b><br/>
 <b>This implementation is very usefull when you need to read and process messages in the same transaction.</b> 
-This is the case with SQL Server Sevice Broker.
+(<i>This is the case with SQL Server Sevice Broker</i>)
 <br/><br/>
 In case if you have an external activator, the TaskCoordinator has a parameter <i>isQueueActivationEnabled</i>. 
 If <i>isQueueActivationEnabled = true</i> then the TaskCoordinator does not have one always <b>ON</b> tasks. 
