@@ -16,17 +16,25 @@ at first the TaskCoordinator creates one task (thread), it is waiting for messag
 Once the message is read, the TaskCoordinator creates another task which is waiting for messages, and the first task continues
 processing of the message which have been read in it. And if the second task also reads a message, 
 the TaskCoordinator creates another task which starts to wait for messages and the second task continues processing of the message.<br/><br/>
-The TaskCoordinator has a parameter maxReadersCount, which caps the maximum number of created tasks. So after reaching this number of active tasks,
+The TaskCoordinator has a parameter <i>maxReadersCount</i>, which caps the maximum number of created tasks. So after reaching this number of active tasks,
 the TaskCoordinator does not create new ones even if the queue have unread messages.<br/>
 <br/>
 <b>With this implementation one of the tasks acts as an activator (waits for messages)</b><br/>
-<b>This implementation is very good when you need to read and process messages in the same transaction.</b> 
+<b>This implementation is very usefull when you need to read and process messages in the same transaction.</b> 
 This is the case with SQL Server Sevice Broker.
 <br/><br/>
-In case if you have an external activator, the TaskCoordinator has a parameter isQueueActivationEnabled. When isQueueActivationEnabled = true then
-the TaskCoordinator does not have one always ON tasks. The first task is activated by an external activator. 
-Once one task is activated all that pattern of tasks handling by the TaskCoordinator is repeated as before.
-The only difference that the TaskCoordinator does not sustain one task to wait for the messages.
-When there are no messages in the queue then all tasks are distroyed (after processing current messages) and then the TaskCoordinator needs a new external activation when in the queue will appear messages (it just need a kick to start).
+In case if you have an external activator, the TaskCoordinator has a parameter <i>isQueueActivationEnabled</i>. 
+If <i>isQueueActivationEnabled = true</i> then the TaskCoordinator does not have one always <b>ON</b> tasks. 
+The first task is activated by an external activator. 
+Once one task is activated then all that pattern of tasks handling by the TaskCoordinator is repeated as it is described above.
+The only difference that the TaskCoordinator does not keep one task endlessly to wait for the messages.
+When there are no messages in the queue then all tasks are destroyed (<i>after processing their current messages</i>) and 
+then the TaskCoordinator needs a new external activation when in the queue will appear messages (<i>it just needs a kick to start</i>).
+<br/>
+The TaskCoordinator has one more parameter <i>isEnableParallelReading</i>, which is false by default. It can boost performance when it is enabled
+in cases when the time taken to obtain a message from the queue is on a par with the time taken to process the message. But it rarely happens in  practice.
+<br/>
+The repository contains a console application which uses the TaskCoordinator. It caan be used as a lab and a testing ground for experimenting
+with different parameters.
 <br/><br/>
 LICENSE: Use it as you like!
