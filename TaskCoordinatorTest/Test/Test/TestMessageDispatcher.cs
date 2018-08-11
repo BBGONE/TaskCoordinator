@@ -35,8 +35,8 @@ namespace TasksCoordinator.Test
             switch(workType)
             {
                 case TaskWorkType.LongCPUBound:
-                    Task task = new Task(() => {
-                        CPU_TASK(message, cancellation, 1000000);
+                    Task task = new Task(async () => {
+                        await CPU_TASK(message, cancellation, 1000000);
                     }, cancellation, TaskCreationOptions.LongRunning);
 
                     cancellation.ThrowIfCancellationRequested();
@@ -51,13 +51,13 @@ namespace TasksCoordinator.Test
                     await IO_TASK(message, cancellation, 5000).ConfigureAwait(false);
                     break;
                 case TaskWorkType.ShortCPUBound:
-                    await Task.Run(() => { CPU_TASK(message, cancellation, 10000);  }, cancellation).ConfigureAwait(false);
+                    await  CPU_TASK(message, cancellation, 10000).ConfigureAwait(false); 
                     break;
                 case TaskWorkType.ShortIOBound:
                     await IO_TASK(message, cancellation, 500).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortCPUBound:
-                    await Task.Run(() => { CPU_TASK(message, cancellation, 1000); }, cancellation).ConfigureAwait(false); 
+                    await CPU_TASK(message, cancellation, 1000).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortIOBound:
                     await IO_TASK(message, cancellation, 100).ConfigureAwait(false);
@@ -79,22 +79,17 @@ namespace TasksCoordinator.Test
         }
 
         // Test Task which consumes CPU
-        private static void CPU_TASK(Message message, CancellationToken cancellation, int iterations)
+        private static async Task CPU_TASK(Message message, CancellationToken cancellation, int iterations)
         {
-            try
+            await Task.FromResult(0);
+            // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
+            Random rnd = new Random();
+            int cnt = rnd.Next(iterations / 5, iterations);
+            for (int i = 0; i < cnt; ++i)
             {
-                // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
-                Random rnd = new Random();
-                int cnt = rnd.Next(iterations / 5, iterations);
-                for (int i = 0; i < cnt; ++i)
-                {
-                    cancellation.ThrowIfCancellationRequested();
-                    //rollBack = !rollBack;
-                    message.Body = System.Text.Encoding.UTF8.GetBytes(string.Format("i={0}---cnt={1}", i, cnt));
-                }
-            } catch (OperationCanceledException)
-            {
-
+                cancellation.ThrowIfCancellationRequested();
+                //rollBack = !rollBack;
+                message.Body = System.Text.Encoding.UTF8.GetBytes(string.Format("i={0}---cnt={1}", i, cnt));
             }
         }
 
