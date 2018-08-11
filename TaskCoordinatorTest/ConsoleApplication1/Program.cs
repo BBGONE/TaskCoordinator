@@ -22,9 +22,7 @@ namespace ConsoleApplication1
         {
             MessageQueue = new BlockingCollection<Message>();
             ProcessedMessages = new ConcurrentBag<Message>();
-            var dispatcher = new TestMessageDispatcher(ProcessedMessages);
-            var coordinator = new TestTasksCoordinator(dispatcher, new TestMessageProducer(MessageQueue),
-                new TestMessageReaderFactory(), 4,false, false);
+            var coordinator = TaskCoordinatorFactory.CreateTaskCoordinator(MessageQueue, ProcessedMessages, 8, TaskWorkType.Mixed);
 
             svc = new BaseSSSBService("test", coordinator);
             svc.Start();

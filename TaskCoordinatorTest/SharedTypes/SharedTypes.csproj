@@ -16,7 +16,7 @@
     </UpgradeBackupLocation>
     <OldToolsVersion>3.5</OldToolsVersion>
     <IsWebBootstrapper>true</IsWebBootstrapper>
-    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <SccProjectName>
     </SccProjectName>
     <SccLocalPath>
@@ -80,8 +80,6 @@
     <Compile Include="COORDINATOR\BaseTasksCoordinator.cs" />
     <Compile Include="COORDINATOR\Interface\ITaskCoordinatorAdvanced.cs" />
     <Compile Include="COORDINATOR\Interface\ITaskCoordinator.cs" />
-    <Compile Include="COORDINATOR\Test\TestMessageDispatcher.cs" />
-    <Compile Include="COORDINATOR\Test\TestMessageReaderFactory.cs" />
     <Compile Include="COORDINATOR\Interface\IMessageDispatcher.cs" />
     <Compile Include="COORDINATOR\Interface\IMessageProducer.cs" />
     <Compile Include="COORDINATOR\Interface\IMessageReader.cs" />
@@ -90,8 +88,6 @@
     <Compile Include="COORDINATOR\Message.cs" />
     <Compile Include="COORDINATOR\MessageProcessingResult.cs" />
     <Compile Include="COORDINATOR\MessageReader.cs" />
-    <Compile Include="COORDINATOR\Test\TestMessageProducer.cs" />
-    <Compile Include="COORDINATOR\Test\TestTasksCoordinator.cs" />
     <Compile Include="COORDINATOR\WorkContext.cs" />
     <Compile Include="Errors\ConnectionErrorHandler.cs" />
     <Compile Include="Errors\DBExceptions.cs" />

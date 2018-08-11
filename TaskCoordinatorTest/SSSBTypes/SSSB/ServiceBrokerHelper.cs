@@ -3,7 +3,7 @@ using Shared;
 using Shared.Errors;
 using System.Data.SqlClient;
 using System.Threading.Tasks;
-
+using Bell.PPS.SSSB;
 
 namespace SSSB
 {

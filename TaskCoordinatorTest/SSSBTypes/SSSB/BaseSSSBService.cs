@@ -1,16 +1,11 @@
-﻿using System;
-using System.Linq;
-using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Transactions;
+﻿using Bell.PPS.SSSB;
 using Shared;
 using Shared.Errors;
 using Shared.Services;
-using TasksCoordinator;
-using TasksCoordinator.Test;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using TasksCoordinator.Interface;
 
 namespace SSSB
@@ -132,6 +127,24 @@ namespace SSSB
                     _isStopped = true;
                     _tasksCoordinator.Stop().Wait();
                 }
+            }
+            catch (AggregateException ex)
+            {
+                ex.Flatten().Handle((err) => {
+                    if (err is OperationCanceledException)
+                    {
+                        return true;
+                    } else
+                    {
+                        _log.Error(ex);
+                        return true;
+                    }
+                });
+           
+            }
+            catch (OperationCanceledException )
+            {
+               
             }
             catch (Exception ex)
             {
