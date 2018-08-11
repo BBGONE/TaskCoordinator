@@ -10,6 +10,7 @@ namespace TasksCoordinator.Test
 {
     public class TestMessageDispatcher: IMessageDispatcher<Message>
     {
+        private static volatile int longCount = 0;
         #region TEST RESULTS
         // Work type (category)  for testing message processing
         private TaskWorkType _WorkType;
@@ -36,7 +37,16 @@ namespace TasksCoordinator.Test
             {
                 case TaskWorkType.LongCPUBound:
                     Task task = new Task(async () => {
-                        await CPU_TASK(message, cancellation, 1000000);
+                        try
+                        {
+                            ++longCount;
+                            await CPU_TASK(message, cancellation, 10000000);
+                            --longCount;
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            //OK
+                        }
                     }, cancellation, TaskCreationOptions.LongRunning);
 
                     cancellation.ThrowIfCancellationRequested();
@@ -74,7 +84,7 @@ namespace TasksCoordinator.Test
             }
 
            ProcessedMessages.Add(message);
-            Console.WriteLine($"SEQNUM:{message.SequenceNumber} - THREAD: {Thread.CurrentThread.ManagedThreadId} - TasksCount:{context.Coordinator.TasksCount} WorkType: {workType}");
+            Console.WriteLine($"SEQNUM:{message.SequenceNumber} - THREAD: {Thread.CurrentThread.ManagedThreadId} - TasksCount:{context.Coordinator.TasksCount} WorkType: {workType} LongCount: {longCount}");
             return rollBack;
         }
 
