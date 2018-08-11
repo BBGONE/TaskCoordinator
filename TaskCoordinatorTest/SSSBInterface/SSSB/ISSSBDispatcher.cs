@@ -1,4 +1,5 @@
-﻿using TasksCoordinator;
+﻿using TasksCoordinator.Interface;
+
 namespace SSSB
 {
     public interface ISSSBDispatcher : IMessageDispatcher<SSSBMessage>

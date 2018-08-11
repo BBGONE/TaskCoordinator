@@ -78,15 +78,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="COORDINATOR\BaseTasksCoordinator.cs" />
-    <Compile Include="COORDINATOR\IMessageDispatcher.cs" />
-    <Compile Include="COORDINATOR\IMessageProducer.cs" />
-    <Compile Include="COORDINATOR\IMessageReader.cs" />
-    <Compile Include="COORDINATOR\IMessageWorker.cs" />
+    <Compile Include="COORDINATOR\Interface\ITaskCoordinator.cs" />
+    <Compile Include="COORDINATOR\Test\TestMessageDispatcher.cs" />
+    <Compile Include="COORDINATOR\Test\TestMessageReaderFactory.cs" />
+    <Compile Include="COORDINATOR\Interface\IMessageDispatcher.cs" />
+    <Compile Include="COORDINATOR\Interface\IMessageProducer.cs" />
+    <Compile Include="COORDINATOR\Interface\IMessageReader.cs" />
+    <Compile Include="COORDINATOR\Interface\IMessageReaderFactory.cs" />
+    <Compile Include="COORDINATOR\Interface\IMessageWorker.cs" />
     <Compile Include="COORDINATOR\Message.cs" />
     <Compile Include="COORDINATOR\MessageProcessingResult.cs" />
     <Compile Include="COORDINATOR\MessageReader.cs" />
-    <Compile Include="COORDINATOR\TestMessageProducer.cs" />
-    <Compile Include="COORDINATOR\TestTasksCoordinator.cs" />
+    <Compile Include="COORDINATOR\Test\TestMessageProducer.cs" />
+    <Compile Include="COORDINATOR\Test\TestTasksCoordinator.cs" />
     <Compile Include="COORDINATOR\WorkContext.cs" />
     <Compile Include="Errors\ConnectionErrorHandler.cs" />
     <Compile Include="Errors\DBExceptions.cs" />

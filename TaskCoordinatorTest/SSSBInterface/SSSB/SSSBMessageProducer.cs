@@ -6,22 +6,28 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
 using TasksCoordinator;
+using TasksCoordinator.Interface;
 
 namespace SSSB
 {
     public class SSSBMessageProducer: IMessageProducer<SSSBMessage>
     {
-        private SSSBTasksCoordinator _owner;
         private static ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
 
         /// <summary>
         /// Число сообщений в пакете по умолчанию
         /// </summary>
         public const int DEFAULT_FETCH_SIZE = 1;
-        private readonly TimeSpan DefaultWaitForTimeout;
+        private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
+        private bool _IsQueueActivationEnabled =false;
+        private CancellationToken _cancellation;
+        private readonly string _QueueName;
+        private readonly string _ServiceName;
+
         protected static ILog _log
         {
             get
@@ -30,10 +36,11 @@ namespace SSSB
             }
         }
 
-        public SSSBMessageProducer(SSSBTasksCoordinator owner)
+        public SSSBMessageProducer(string QueueName, string ServiceName)
         {
-            this._owner = owner;
-            this.DefaultWaitForTimeout = this._owner.IsQueueActivationEnabled ? TimeSpan.FromMilliseconds(7000) : TimeSpan.FromSeconds(30);
+            this._QueueName = QueueName;
+            this._ServiceName = ServiceName;
+            this._cancellation = CancellationToken.None;
         }
 
         async Task<int> IMessageProducer<SSSBMessage>.GetMessages(IMessageWorker<SSSBMessage> worker, bool isPrimaryReader)
@@ -54,7 +61,7 @@ namespace SSSB
                     Exception error = null;
                     try
                     {
-                        dbconnection = await ConnectionFactory.GetNewConnectionAsync(this._owner.Cancellation);
+                        dbconnection = await ConnectionFactory.GetNewConnectionAsync(this._cancellation);
                     }
                     catch(Exception ex)
                     {
@@ -63,7 +70,7 @@ namespace SSSB
 
                     if (error != null)
                     {
-                        await _errorHandler.Handle(_log, error, this._owner.Cancellation); 
+                        await _errorHandler.Handle(_log, error, this._cancellation); 
                         return 0;
                     }
 
@@ -100,16 +107,16 @@ namespace SSSB
             try
             {
                 if (isPrimaryReader)
-                    reader = await SSSBManager.ReceiveMessagesAsync(dbconnection, this._owner.QueueName, 
+                    reader = await SSSBManager.ReceiveMessagesAsync(dbconnection, this._QueueName, 
                         DEFAULT_FETCH_SIZE, 
                         (int)DefaultWaitForTimeout.TotalMilliseconds, 
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess, 
-                        this._owner.Cancellation);
+                        this._cancellation);
                 else
-                    reader = await SSSBManager.ReceiveMessagesNoWaitAsync(dbconnection, this._owner.QueueName, 
+                    reader = await SSSBManager.ReceiveMessagesNoWaitAsync(dbconnection, this._QueueName, 
                         DEFAULT_FETCH_SIZE, 
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess,
-                        this._owner.Cancellation);
+                        this._cancellation);
 
                 //no result after cancellation
                 if (reader == null)
@@ -133,7 +140,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                throw new PPSException(string.Format("ReadMessages error on queue: {0}, isPrimaryListener: {1}", this._owner.QueueName, isPrimaryReader), ex);
+                throw new PPSException(string.Format("ReadMessages error on queue: {0}, isPrimaryListener: {1}", this._QueueName, isPrimaryReader), ex);
             }
             finally
             {
@@ -182,9 +189,24 @@ namespace SSSB
             else
                 message.Body = null;
 
-            message.ServiceName = this._owner.ServiceName;
+            message.ServiceName = this._ServiceName;
 
             return message;
+        }
+
+        public bool IsQueueActivationEnabled
+        {
+            get { return _IsQueueActivationEnabled; }
+            set
+            {
+                _IsQueueActivationEnabled = value;
+                this.DefaultWaitForTimeout = this._IsQueueActivationEnabled ? TimeSpan.FromMilliseconds(7000) : TimeSpan.FromSeconds(30);
+            }
+        }
+        public CancellationToken Cancellation
+        {
+            get { return _cancellation; }
+            set { _cancellation = value; }
         }
     }
 }

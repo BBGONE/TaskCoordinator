@@ -10,47 +10,40 @@ using Shared;
 using Shared.Errors;
 using Shared.Services;
 using TasksCoordinator;
+using TasksCoordinator.Test;
+using TasksCoordinator.Interface;
 
 namespace SSSB
 {
     /// <summary>
     /// Message Dispatcher to process messages read from queue.
     /// </summary>
-    public class BaseSSSBService : ITaskService, IMessageDispatcher<Message>
+    public class BaseSSSBService : ITaskService
     {
         #region Private Fields
         internal static ILog _log = Log.GetInstance("SSSB");
         private static ErrorMessages _errorMessages = new ErrorMessages();
         private string _name;
         private string _queueName;
-        private int _queueReadersCount;
         private Dictionary<string, IMessageHandler<ServiceMessageEventArgs>> _messageHandlers;
         private Dictionary<string, IMessageHandler<ErrorMessageEventArgs>> _errorMessageHandlers;
         private volatile bool _isStopped;
-        private volatile bool _isPaused;
-        private TestTasksCoordinator _tasksCoordinator;
+        private ITaskCoordinator _tasksCoordinator;
         #endregion
 
-        #region TEST RESULTS
-        public static ConcurrentBag<Message> _processedMessages = new ConcurrentBag<Message>();
-        public static ConcurrentBag<Message> ProcessedMessages
-        {
-            get { return _processedMessages; }
-        }
-        #endregion
-
-        public BaseSSSBService(string name, int queueReadersCount)
+      
+        public BaseSSSBService(string name, ITaskCoordinator coordinator)
         {
             _name = name;
-            _queueReadersCount = queueReadersCount;
             _messageHandlers = new Dictionary<string, IMessageHandler<ServiceMessageEventArgs>>();
             _errorMessageHandlers = new Dictionary<string, IMessageHandler<ErrorMessageEventArgs>>();
             _isStopped = true;
-            _isPaused = false;
-            this._tasksCoordinator = new TestTasksCoordinator(this, this._queueReadersCount, isQueueActivationEnabled: true, isEnableParallelReading: false);
+            _tasksCoordinator = coordinator;
         }
 
         #region Properties
+        public ITaskCoordinator  TasksCoordinator { get => _tasksCoordinator; }
+
         public bool IsStopped
         {
             get { return _isStopped; }
@@ -60,7 +53,7 @@ namespace SSSB
         {
             get 
             {
-                return _isPaused; 
+                return this._tasksCoordinator.IsPaused; 
             }
         }
 
@@ -79,58 +72,8 @@ namespace SSSB
         {
             get { return _queueName; }
         }
-           
-        /// <summary>
-        /// Число одновременно запускаемых читателей очереди.
-        /// </summary>
-        public int QueueReadersCount
-        {
-            get { return _queueReadersCount; }
-        }
+    
         #endregion
-          
-        private async Task<bool> DispatchMessage(Message message, CancellationToken cancellation)
-        {
-            //возвратить ли сообщение назад в очередь?
-            bool rollBack = false; 
-            
-            bool stress = true;
-            if (stress)
-            {
-                /*
-                //Testing long running task - позволяет запустить длительные задачи
-                Task task = new Task(() => {
-                    CPU_TASK(message, cancellation);
-                }, cancellation, TaskCreationOptions.LongRunning);
-                cancellation.ThrowIfCancellationRequested();
-                if (!task.IsCanceled)
-                {
-                    task.Start();
-                    await task;
-                }
-                */
-
-                CPU_TASK(message, cancellation);
-            }
-            else
-                await Task.Delay(500, cancellation);
-
-            //if (!ProcessedMessages.Contains(message))
-                ProcessedMessages.Add(message);
-            Console.WriteLine(string.Format("{0} - {1} - {2} - {3}", message.SequenceNumber, message.ServiceName, Thread.CurrentThread.ManagedThreadId, this._tasksCoordinator.TasksCount));
-            return rollBack;
-        }
-
-        private static void CPU_TASK(Message message, CancellationToken cancellation) {
-            Random rnd = new Random();
-            int cnt = rnd.Next(1000000, 2000000);
-            for (int i = 0; i < cnt; ++i)
-            {
-                cancellation.ThrowIfCancellationRequested();
-                //rollBack = !rollBack;
-                message.Body = System.Text.Encoding.UTF8.GetBytes(string.Format("i={0}---cnt={1}", i, cnt));
-            }
-        }
 
         internal static int AddError(Guid messageID, Exception err)
         {
@@ -187,8 +130,7 @@ namespace SSSB
                 lock (this)
                 {
                     _isStopped = true;
-                    _isPaused = false;
-                    _tasksCoordinator.Stop();
+                    _tasksCoordinator.Stop().Wait();
                 }
             }
             catch (Exception ex)
@@ -203,7 +145,7 @@ namespace SSSB
         /// </summary>
         public void Pause()
         {
-            this._isPaused = true;
+            this._tasksCoordinator.IsPaused = true;
         }
 
         /// <summary>
@@ -211,7 +153,7 @@ namespace SSSB
         /// </summary>
         public void Resume()
         {
-            this._isPaused = false;
+            this._tasksCoordinator.IsPaused = false;
         }
         #endregion
 
@@ -230,9 +172,10 @@ namespace SSSB
         {
             get
             {
-                return _tasksCoordinator;
+                return _tasksCoordinator as IQueueActivator;
             }
         }
+
         #endregion
 
         //immitate an activator
@@ -264,34 +207,6 @@ namespace SSSB
                     Console.WriteLine("activation occured: " + res.ToString());
                 }
             }
-        }
-
-        async Task<MessageProcessingResult> IMessageDispatcher<Message>.DispatchMessages(IEnumerable<Message> messages, WorkContext context, Action<Message> onProcessStart)
-        {
-            bool rollBack = false;
-            Message currentMessage = null;
-            onProcessStart(currentMessage);
-
-            //SSSBMessageProducer передает Connection в объекте state
-            //var dbconnection = context.state as SqlConnection;
-            try
-            {
-                //Как бы обработка сообщений
-                foreach (Message message in messages)
-                {
-                    currentMessage = message;
-                    onProcessStart(currentMessage);
-                    rollBack = await this.DispatchMessage(message, context.cancellation);
-
-                    if (rollBack)
-                        break;
-                }
-            }
-            finally
-            {
-                onProcessStart(null);
-            }
-            return new MessageProcessingResult() { isRollBack = rollBack };
         }
     }
 }

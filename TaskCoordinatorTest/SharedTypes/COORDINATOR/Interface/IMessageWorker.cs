@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator
+namespace TasksCoordinator.Interface
 {
     public interface IMessageWorker<M>
     {

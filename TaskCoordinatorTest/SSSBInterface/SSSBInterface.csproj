@@ -76,6 +76,7 @@
     <Compile Include="ConnectionFactory.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SSSB\ISSSBDispatcher.cs" />
+    <Compile Include="SSSB\SSSBMessageReaderFactory.cs" />
     <Compile Include="SSSB\SSSBManager.cs" />
     <Compile Include="SSSB\ErrorMessageEventArgs.cs" />
     <Compile Include="SSSB\ErrorMessages.cs" />

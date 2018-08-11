@@ -1,7 +1,7 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator
+namespace TasksCoordinator.Interface
 {
     public interface IMessageReader<M>
     {

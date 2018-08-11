@@ -3,24 +3,40 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using System.Threading;
+using TasksCoordinator.Interface;
 
-namespace TasksCoordinator
+namespace TasksCoordinator.Test
 {
     public class TestMessageProducer: IMessageProducer<Message>
     {
-        private readonly TimeSpan DefaultWaitForTimeout;
-        private TestTasksCoordinator _owner;
-        private static BlockingCollection<Message> _messageQueue = new BlockingCollection<Message>();
+        private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
+        private bool _IsQueueActivationEnabled = false;
+        private CancellationToken _cancellation;
+        private readonly BlockingCollection<Message> _messageQueue;
 
-        public TestMessageProducer(TestTasksCoordinator owner)
+        public TestMessageProducer(BlockingCollection<Message> messageQueue)
         {
-            this._owner = owner;
-            this.DefaultWaitForTimeout = this._owner.IsQueueActivationEnabled ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(30);
+            this._messageQueue = messageQueue;
+            this._cancellation = CancellationToken.None;
         }
 
-        public static BlockingCollection<Message> MessageQueue
+        public BlockingCollection<Message> MessageQueue
         {
             get { return _messageQueue; }
+        }
+
+        public bool IsQueueActivationEnabled {
+            get { return _IsQueueActivationEnabled; }
+            set {
+                _IsQueueActivationEnabled = value;
+                this.DefaultWaitForTimeout = this.IsQueueActivationEnabled ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(30);
+            }
+        }
+
+        public CancellationToken Cancellation {
+            get { return _cancellation; }
+            set { _cancellation = value; }
         }
 
         async Task<int> IMessageProducer<Message>.GetMessages(IMessageWorker<Message> worker, bool isWaitForEnabled)
@@ -41,9 +57,11 @@ namespace TasksCoordinator
 
                     if (res.isRollBack)
                     {
-                        //возврат сообщений в очередь
+                        // returns the Message to the queue
                         foreach (var msg in messages)
-                            _messageQueue.Add(msg);
+                        {
+                            this._messageQueue.Add(msg);
+                        }
                     }
                 }
                 finally
@@ -62,8 +80,10 @@ namespace TasksCoordinator
             if (isWaitForEnabled)
             {
                 try {
-                    if (!_messageQueue.TryTake(out msg, Convert.ToInt32(DefaultWaitForTimeout.TotalMilliseconds), this._owner.Cancellation))
+                    if (!_messageQueue.TryTake(out msg, Convert.ToInt32(DefaultWaitForTimeout.TotalMilliseconds), this.Cancellation))
+                    {
                         msg = null;
+                    }
                     await Task.Delay(50).ConfigureAwait(false);
                    // Console.WriteLine(string.Format("Primary reading {0}", taskId));
                 }
@@ -73,7 +93,7 @@ namespace TasksCoordinator
                 }
                 if (msg != null)
                 {
-                    msg.ServiceName = taskId.ToString();
+                    // msg.ServiceName = $"TaskID:{taskId.ToString()}";
                     messages.AddLast(msg);
                 }
             }
@@ -81,9 +101,9 @@ namespace TasksCoordinator
             {
                 if (_messageQueue.TryTake(out msg))
                 {
+                    // msg.ServiceName = $"TaskID:{taskId.ToString()}";
                     await Task.Delay(50).ConfigureAwait(false);
                     //Console.WriteLine(string.Format("Secondary reading {0}", taskId));
-                    msg.ServiceName = taskId.ToString();
                     messages.AddLast(msg);
                 }
             }

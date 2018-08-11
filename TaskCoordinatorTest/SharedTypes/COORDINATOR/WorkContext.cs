@@ -1,15 +1,16 @@
-﻿
-using System.Threading;
+﻿using System.Threading;
+using TasksCoordinator.Interface;
 
 namespace TasksCoordinator
 {
     public class WorkContext
     {
-        public WorkContext(int taskId, object state, CancellationToken cancellation)
+        public WorkContext(int taskId, object state, CancellationToken cancellation, ITaskCoordinator coordinator)
         {
             this.taskId = taskId;
             this.state = state;
-            this.cancellation = cancellation;
+            this.Cancellation = cancellation;
+            this.Coordinator = coordinator;
         }
 
         public int taskId
@@ -24,7 +25,13 @@ namespace TasksCoordinator
             private set;
         }
 
-        public CancellationToken cancellation
+        public CancellationToken Cancellation
+        {
+            get;
+            private set;
+        }
+
+        public ITaskCoordinator Coordinator
         {
             get;
             private set;

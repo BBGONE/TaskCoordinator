@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Shared;
 using System.Threading.Tasks;
+using TasksCoordinator.Interface;
 
 namespace TasksCoordinator
 {
@@ -14,6 +15,7 @@ namespace TasksCoordinator
         private readonly BaseTasksCoordinator<M, D> _tasksCoordinator;
         private readonly IMessageProducer<M> _messageProducer;
         private M _currentMessage = default(M);
+        private CancellationToken _cancellation;
 
         protected static ILog _log
         {
@@ -24,13 +26,14 @@ namespace TasksCoordinator
         }
         #endregion
 
-        public MessageReader(int taskId, BaseTasksCoordinator<M, D> tasksCoordinator)
+        public MessageReader(int taskId, IMessageProducer<M> messageProducer, BaseTasksCoordinator<M, D> tasksCoordinator)
         {
             this._taskId = taskId;
             this._tasksCoordinator = tasksCoordinator;
-            this._messageProducer = tasksCoordinator.GetMessageProducer();
+            this._messageProducer = messageProducer;
+            this._cancellation = this._tasksCoordinator.Cancellation;
         }
-   
+
         protected virtual void OnProcessMessageException(Exception ex)
         {
         }
@@ -56,8 +59,8 @@ namespace TasksCoordinator
 
         async Task<MessageProcessingResult> IMessageWorker<M>.OnDoWork(IEnumerable<M> messages, object state)
         {
-            WorkContext context = new WorkContext(this.taskId, state, this._tasksCoordinator.Cancellation);
-            var res  = await this._tasksCoordinator.MessageDispatcher.DispatchMessages(messages, context, (msg) => { this._currentMessage = msg; });
+            WorkContext context = new WorkContext(this.taskId, state, this.Cancellation, this._tasksCoordinator);
+            var res = await this._tasksCoordinator.MessageDispatcher.DispatchMessages(messages, context, (msg) => { this._currentMessage = msg; });
             return res;
         }
 
@@ -73,7 +76,7 @@ namespace TasksCoordinator
         async Task<bool> IMessageReader<M>.ProcessMessage()
         {
             bool result = false;
-            if (this._tasksCoordinator.MessageDispatcher.IsPaused)
+            if (this._tasksCoordinator.IsPaused)
             {
                 await Task.Delay(1000);
                 return true;
@@ -135,12 +138,12 @@ namespace TasksCoordinator
             }
         }
 
-      
+
         public CancellationToken Cancellation
         {
             get
             {
-                return this.TasksCoordinator.Cancellation;
+                return this._cancellation;
             }
         }
 
