@@ -6,7 +6,7 @@ namespace TasksCoordinator.Interface
 {
     public interface IMessageProducer<M>
     {
-        Task<int> GetMessages(IMessageWorker<M> worker, bool isWaitForEnabled);
+        Task<int> GetMessages(IMessageWorker<M> worker, bool isPrimaryReader);
 
         bool IsQueueActivationEnabled
         {

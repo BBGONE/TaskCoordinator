@@ -10,6 +10,8 @@ namespace TasksCoordinator.Test
 {
     public class TestMessageProducer: IMessageProducer<Message>
     {
+        // adds a realistic delay - like when the messages are read from the database transport (instead of a local in memory queue)
+        private const int READ_MESSAGE_DELAY = 50;
         private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
         private bool _IsQueueActivationEnabled = false;
         private CancellationToken _cancellation;
@@ -39,11 +41,11 @@ namespace TasksCoordinator.Test
             set { _cancellation = value; }
         }
 
-        async Task<int> IMessageProducer<Message>.GetMessages(IMessageWorker<Message> worker, bool isWaitForEnabled)
+        async Task<int> IMessageProducer<Message>.GetMessages(IMessageWorker<Message> worker, bool isPrimaryReader)
         {
             int cnt = 0;
             //Console.WriteLine(string.Format("begin {0}", worker.taskId));
-            IEnumerable<Message> messages = await this.ReadMessages(isWaitForEnabled, worker.taskId).ConfigureAwait(false);
+            IEnumerable<Message> messages = await this.ReadMessages(isPrimaryReader, worker.taskId).ConfigureAwait(false);
             cnt = messages.Count();
             //Console.WriteLine(string.Format("end {0}", worker.taskId));
           
@@ -72,19 +74,20 @@ namespace TasksCoordinator.Test
             return cnt;
         }
 
-        private async Task<IEnumerable<Message>> ReadMessages(bool isWaitForEnabled, int taskId)
+        private async Task<IEnumerable<Message>> ReadMessages(bool isPrimaryReader, int taskId)
         {
             LinkedList<Message> messages = new LinkedList<Message>();
             Random rnd = new Random();
             Message msg;
-            if (isWaitForEnabled)
+            // for the Primary reader (it waits for messages when the queue is empty)
+            if (isPrimaryReader)
             {
                 try {
                     if (!_messageQueue.TryTake(out msg, Convert.ToInt32(DefaultWaitForTimeout.TotalMilliseconds), this.Cancellation))
                     {
                         msg = null;
                     }
-                    await Task.Delay(50).ConfigureAwait(false);
+                    await Task.Delay(READ_MESSAGE_DELAY).ConfigureAwait(false);
                    // Console.WriteLine(string.Format("Primary reading {0}", taskId));
                 }
                 catch (OperationCanceledException)
@@ -102,7 +105,7 @@ namespace TasksCoordinator.Test
                 if (_messageQueue.TryTake(out msg))
                 {
                     // msg.ServiceName = $"TaskID:{taskId.ToString()}";
-                    await Task.Delay(50).ConfigureAwait(false);
+                    await Task.Delay(READ_MESSAGE_DELAY).ConfigureAwait(false);
                     //Console.WriteLine(string.Format("Secondary reading {0}", taskId));
                     messages.AddLast(msg);
                 }
