@@ -78,6 +78,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="COORDINATOR\BaseTasksCoordinator.cs" />
+    <Compile Include="COORDINATOR\Interface\ITaskCoordinatorAdvanced.cs" />
     <Compile Include="COORDINATOR\Interface\ITaskCoordinator.cs" />
     <Compile Include="COORDINATOR\Test\TestMessageDispatcher.cs" />
     <Compile Include="COORDINATOR\Test\TestMessageReaderFactory.cs" />

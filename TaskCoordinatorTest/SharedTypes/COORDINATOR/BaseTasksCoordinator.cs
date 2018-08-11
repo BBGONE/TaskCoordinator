@@ -14,7 +14,7 @@ namespace TasksCoordinator
     /// используется для регулирования количества слушающих очередь потоков
     /// в случае необходимости освобождает из спячки один поток
     /// </summary>
-    public abstract class BaseTasksCoordinator<M, D>: ITaskCoordinator, IQueueActivator
+    public abstract class BaseTasksCoordinator<M, D>: ITaskCoordinatorAdvanced<M,D>, IQueueActivator
         where D : IMessageDispatcher<M>
     {
         private static readonly int MAX_TASK_NUM = 100000000;
@@ -166,7 +166,7 @@ namespace TasksCoordinator
                 lock (this.SyncRoot)
                 {
                     mr = this.GetMessageReader(taskId);
-                    this.AddReader(mr, false);
+                    (this as ITaskCoordinatorAdvanced<M, D>).AddReader(mr, false);
                     isReaderAdded = true;
                 }
                 try
@@ -182,7 +182,7 @@ namespace TasksCoordinator
                 finally
                 {
                     if (isReaderAdded)
-                        this.RemoveReader(mr, false);
+                        (this as ITaskCoordinatorAdvanced<M, D>).RemoveReader(mr, false);
                 }
             }
             catch (OperationCanceledException)
@@ -249,11 +249,11 @@ namespace TasksCoordinator
             }
         }
 
-        internal bool IsSafeToRemoveReader(IMessageReader<M> reader)
+        bool ITaskCoordinatorAdvanced<M,D>.IsSafeToRemoveReader(IMessageReader<M> reader)
         {
             lock (this.SyncRoot)
             {
-                return this._stopServiceSource.IsCancellationRequested || this._isQueueActivationEnabled || !this.IsPrimaryReader(reader);
+                return this._stopServiceSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M, D>).IsPrimaryReader(reader);
             }
         }
 
@@ -263,7 +263,7 @@ namespace TasksCoordinator
         /// </summary>
         /// <param name="reader"></param>
         /// <param name="isStartedWorking"></param>
-        public void RemoveReader(IMessageReader<M> reader, bool isStartedWorking)
+        void ITaskCoordinatorAdvanced<M, D>.RemoveReader(IMessageReader<M> reader, bool isStartedWorking)
         {
             lock (this.SyncRoot)
             {
@@ -303,7 +303,7 @@ namespace TasksCoordinator
         /// </summary>
         /// <param name="reader"></param>
         /// <param name="isEndedWorking"></param>
-        public void AddReader(IMessageReader<M> reader, bool isEndedWorking)
+        void ITaskCoordinatorAdvanced<M, D>.AddReader(IMessageReader<M> reader, bool isEndedWorking)
         {
             lock (this.SyncRoot)
             {
@@ -328,8 +328,7 @@ namespace TasksCoordinator
             }
         }
       
-
-        public bool IsPrimaryReader(IMessageReader<M> reader)
+        bool ITaskCoordinatorAdvanced<M, D>.IsPrimaryReader(IMessageReader<M> reader)
         {
             lock (this.SyncRoot)
             {
@@ -352,18 +351,6 @@ namespace TasksCoordinator
             }
         }
         #endregion
-
-        /*
-        private bool Lock() {
-            bool res= false;
-            Monitor.Enter(this.SyncRoot, ref res);
-            return res;
-        }
-        private void UnLock() {
-            Monitor.Exit(this.SyncRoot);
-        }
-        */
-
 
         /// <summary>
         /// сколько сейчас потоков может выполнять работу, если понадобится

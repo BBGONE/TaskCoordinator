@@ -31,6 +31,19 @@ namespace TasksCoordinator.Test
             bool stress = true;
             if (stress)
             {
+                /*
+              //Testing long running task - позволяет запустить длительные задачи
+              Task task = new Task(() => {
+                  CPU_TASK(message, cancellation);
+              }, cancellation, TaskCreationOptions.LongRunning);
+              cancellation.ThrowIfCancellationRequested();
+              if (!task.IsCanceled)
+              {
+                  task.Start();
+                  await task;
+              }
+              */
+
                 await CPU_TASK(message, cancellation);
             }
             else

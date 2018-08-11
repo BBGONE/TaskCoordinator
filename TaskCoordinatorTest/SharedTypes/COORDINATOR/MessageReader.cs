@@ -12,7 +12,7 @@ namespace TasksCoordinator
     {
         #region Private Fields
         private int _taskId;
-        private readonly BaseTasksCoordinator<M, D> _tasksCoordinator;
+        private readonly ITaskCoordinatorAdvanced<M, D> _tasksCoordinator;
         private readonly IMessageProducer<M> _messageProducer;
         private M _currentMessage = default(M);
         private CancellationToken _cancellation;
@@ -26,7 +26,7 @@ namespace TasksCoordinator
         }
         #endregion
 
-        public MessageReader(int taskId, IMessageProducer<M> messageProducer, BaseTasksCoordinator<M, D> tasksCoordinator)
+        public MessageReader(int taskId, IMessageProducer<M> messageProducer, ITaskCoordinatorAdvanced<M, D> tasksCoordinator)
         {
             this._taskId = taskId;
             this._tasksCoordinator = tasksCoordinator;
@@ -39,7 +39,7 @@ namespace TasksCoordinator
         }
 
         #region Properties
-        protected BaseTasksCoordinator<M, D> TasksCoordinator
+        protected ITaskCoordinatorAdvanced<M, D> TasksCoordinator
         {
             get
             {
