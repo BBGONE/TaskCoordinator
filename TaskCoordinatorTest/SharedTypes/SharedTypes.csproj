@@ -96,7 +96,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Shared\IQueueActivator.cs" />
     <Compile Include="Shared\Log\ILog.cs" />
-    <Compile Include="Shared\ITaskServiceInterface.cs" />
+    <Compile Include="Shared\ITaskService.cs" />
     <Compile Include="Shared\Log\Log.cs" />
     <Compile Include="Shared\NullableHelper.cs" />
   </ItemGroup>

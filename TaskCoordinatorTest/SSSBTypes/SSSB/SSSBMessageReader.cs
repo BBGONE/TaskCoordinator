@@ -6,10 +6,13 @@ namespace SSSB
 {
     public class SSSBMessageReader : MessageReader<SSSBMessage, ISSSBDispatcher>
     {
+        private ErrorMessages ErrorMessages;
+
         public SSSBMessageReader(int taskId, IMessageProducer<SSSBMessage> messageProducer, 
-            BaseTasksCoordinator<SSSBMessage, ISSSBDispatcher> tasksCoordinator):
+            BaseTasksCoordinator<SSSBMessage, ISSSBDispatcher> tasksCoordinator, ErrorMessages errorMessages):
             base(taskId, messageProducer, tasksCoordinator)
         {
+            this.ErrorMessages = errorMessages;
         }
   
         protected override void OnProcessMessageException(Exception ex)
@@ -17,7 +20,7 @@ namespace SSSB
             var msg = this.CurrentMessage;
             if (msg != null && msg.ConversationHandle.HasValue)
             {
-                BaseSSSBService.AddError(msg.ConversationHandle.Value, ex);
+                this.ErrorMessages.AddError(msg.ConversationHandle.Value, ex);
             }
         }
     }

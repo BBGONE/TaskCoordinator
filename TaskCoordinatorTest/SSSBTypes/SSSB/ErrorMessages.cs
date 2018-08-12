@@ -11,7 +11,7 @@ namespace SSSB
     /// id  сообщения добавляется в словарь
     /// это нужно для проверки-  следует ли снова обрабатывать это сообщение?
     /// </summary>
-    internal class ErrorMessages : Dictionary<Guid, ErrorMessage>
+    public class ErrorMessages : Dictionary<Guid, ErrorMessage>
     {
         System.Threading.Timer cleanUpTimer;
         protected static ReaderWriterLockSlim _dictLock = new ReaderWriterLockSlim(LockRecursionPolicy.SupportsRecursion);

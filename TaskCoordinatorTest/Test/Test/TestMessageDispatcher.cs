@@ -13,7 +13,7 @@ namespace TasksCoordinator.Test
         private static volatile int longCount = 0;
         #region TEST RESULTS
         // Work type (category)  for testing message processing
-        private TaskWorkType _WorkType;
+        private TaskWorkType _workType;
         private ConcurrentBag<Message> _processedMessages;
         public ConcurrentBag<Message> ProcessedMessages
         {
@@ -24,7 +24,7 @@ namespace TasksCoordinator.Test
         public TestMessageDispatcher(ConcurrentBag<Message> processedMessages, TaskWorkType workType)
         {
             this._processedMessages = processedMessages;
-            this._WorkType = workType;
+            this._workType = workType;
         }
 
         private async Task<bool> DispatchMessage(Message message, WorkContext context, TaskWorkType workType)
@@ -84,7 +84,7 @@ namespace TasksCoordinator.Test
             }
 
            ProcessedMessages.Add(message);
-            Console.WriteLine($"SEQNUM:{message.SequenceNumber} - THREAD: {Thread.CurrentThread.ManagedThreadId} - TasksCount:{context.Coordinator.TasksCount} WorkType: {workType} LongCount: {longCount}");
+            Console.WriteLine($"SEQNUM:{message.SequenceNumber} - THREAD: {Thread.CurrentThread.ManagedThreadId} - TasksCount:{context.Coordinator.TasksCount} LongCount: {longCount} WorkType: {workType}");
             return rollBack;
         }
 
@@ -129,7 +129,7 @@ namespace TasksCoordinator.Test
                 {
                     currentMessage = message;
                     onProcessStart(currentMessage);
-                    rollBack = await this.DispatchMessage(message, context, this._WorkType);
+                    rollBack = await this.DispatchMessage(message, context, this._workType);
 
                     if (rollBack)
                         break;

@@ -16,6 +16,7 @@ namespace SSSB
 {
     public class SSSBMessageProducer: IMessageProducer<SSSBMessage>
     {
+        internal static ILog _log = Log.GetInstance("SSSBMessageProducer");
         private static ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
 
         /// <summary>
@@ -27,14 +28,6 @@ namespace SSSB
         private CancellationToken _cancellation;
         private readonly string _QueueName;
         private readonly string _ServiceName;
-
-        protected static ILog _log
-        {
-            get
-            {
-                return BaseSSSBService._log;
-            }
-        }
 
         public SSSBMessageProducer(string QueueName, string ServiceName)
         {

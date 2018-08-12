@@ -9,7 +9,7 @@ namespace ConsoleApplication1
 {
     class Program
     {
-        private static BaseSSSBService svc;
+        private static TestSSSBService svc;
         private static BlockingCollection<Message> MessageQueue;
         private static ConcurrentBag<Message> ProcessedMessages;
 
@@ -24,7 +24,7 @@ namespace ConsoleApplication1
             ProcessedMessages = new ConcurrentBag<Message>();
             var coordinator = TaskCoordinatorFactory.CreateTaskCoordinator(MessageQueue, ProcessedMessages, 8, TaskWorkType.Mixed);
 
-            svc = new BaseSSSBService("test", coordinator);
+            svc = new TestSSSBService("test", coordinator);
             svc.Start();
             var producerTask = QueueData();
             Console.WriteLine(string.Format("messages processed: {0}", ProcessedMessages.Count));

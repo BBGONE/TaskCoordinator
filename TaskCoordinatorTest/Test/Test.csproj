@@ -42,6 +42,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Test\TestSSSBService.cs" />
     <Compile Include="Test\TaskCoordinatorFactory.cs" />
     <Compile Include="Test\TaskWorkType.cs" />
     <Compile Include="Test\TestMessageDispatcher.cs" />
@@ -53,6 +54,10 @@
     <ProjectReference Include="..\SharedTypes\SharedTypes.csproj">
       <Project>{eaf313d1-2c87-4989-b995-84ed8ac94aaa}</Project>
       <Name>SharedTypes</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\SSSBTypes\SSSBTypes.csproj">
+      <Project>{7edeed80-c546-4f00-a265-1801bda72c07}</Project>
+      <Name>SSSBTypes</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

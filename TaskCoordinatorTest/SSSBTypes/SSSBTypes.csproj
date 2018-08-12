@@ -75,14 +75,14 @@
   <ItemGroup>
     <Compile Include="ConnectionFactory.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SSSB\ISSSBDispatcher.cs" />
+    <Compile Include="SSSB\Interface\ISSSBDispatcher.cs" />
+    <Compile Include="SSSB\Interface\ISSSBService.cs" />
     <Compile Include="SSSB\SSSBMessageReaderFactory.cs" />
     <Compile Include="SSSB\SSSBManager.cs" />
     <Compile Include="SSSB\ErrorMessageEventArgs.cs" />
     <Compile Include="SSSB\ErrorMessages.cs" />
-    <Compile Include="SSSB\IMessageHandler.cs" />
+    <Compile Include="SSSB\Interface\IMessageHandler.cs" />
     <Compile Include="SSSB\ErrorMessage.cs" />
-    <Compile Include="SSSB\BaseSSSBService.cs" />
     <Compile Include="SSSB\ServiceBrokerHelper.cs" />
     <Compile Include="SSSB\ServiceBrokerResources.Designer.cs">
       <AutoGen>True</AutoGen>

@@ -2,7 +2,7 @@
 
 namespace SSSB
 {
-    internal class ErrorMessage
+    public class ErrorMessage
     {
         public Guid MessageID;
         public int ErrorCount;

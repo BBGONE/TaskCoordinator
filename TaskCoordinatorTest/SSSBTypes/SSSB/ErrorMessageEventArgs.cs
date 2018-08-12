@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Shared.Services;
+using System;
 using System.Threading;
 
 namespace SSSB
@@ -8,12 +9,12 @@ namespace SSSB
     /// </summary>
     public class ErrorMessageEventArgs : EventArgs
     {
-        private BaseSSSBService _service;
+        private ITaskService _service;
         private SSSBMessage _message;
         private Exception _processingException;
         private CancellationToken _cancellation;
 
-        public ErrorMessageEventArgs(SSSBMessage message, BaseSSSBService svc, Exception processingException, CancellationToken cancellation)
+        public ErrorMessageEventArgs(SSSBMessage message, ISSSBService svc, Exception processingException, CancellationToken cancellation)
         {
             this._message = message;
             this._service = svc;
@@ -41,7 +42,7 @@ namespace SSSB
             }
         }
 
-        public BaseSSSBService SSSBService
+        public ITaskService SSSBService
         {
             get
             {

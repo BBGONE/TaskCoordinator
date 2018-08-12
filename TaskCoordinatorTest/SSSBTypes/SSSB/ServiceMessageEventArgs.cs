@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Shared.Services;
+using System;
 using System.Threading;
 
 namespace SSSB
@@ -8,7 +9,7 @@ namespace SSSB
     /// </summary>
     public class ServiceMessageEventArgs : EventArgs
     {
-        private BaseSSSBService _service;
+        private ITaskService _service;
         private SSSBMessage _message;
         private bool _endConversationAfterProcessing;
         private bool _rollbackQue;
@@ -17,7 +18,7 @@ namespace SSSB
         private int _taskID;
         private CancellationToken _cancellation;
 
-        public ServiceMessageEventArgs(SSSBMessage message, BaseSSSBService svc, CancellationToken cancellation)
+        public ServiceMessageEventArgs(SSSBMessage message, ITaskService svc, CancellationToken cancellation)
         {
             _message = message;
             _service = svc;
@@ -81,7 +82,7 @@ namespace SSSB
             }
         }
 
-        public BaseSSSBService SSSBService
+        public ITaskService SSSBService
         {
             get
             {

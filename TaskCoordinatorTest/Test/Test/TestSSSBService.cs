@@ -1,5 +1,4 @@
-﻿using Bell.PPS.SSSB;
-using Shared;
+﻿using Shared;
 using Shared.Errors;
 using Shared.Services;
 using System;
@@ -13,11 +12,10 @@ namespace SSSB
     /// <summary>
     /// Message Dispatcher to process messages read from queue.
     /// </summary>
-    public class BaseSSSBService : ITaskService
+    public class TestSSSBService : ISSSBService
     {
         #region Private Fields
         internal static ILog _log = Log.GetInstance("SSSB");
-        private static ErrorMessages _errorMessages = new ErrorMessages();
         private string _name;
         private string _queueName;
         private Dictionary<string, IMessageHandler<ServiceMessageEventArgs>> _messageHandlers;
@@ -27,7 +25,7 @@ namespace SSSB
         #endregion
 
       
-        public BaseSSSBService(string name, ITaskCoordinator coordinator)
+        public TestSSSBService(string name, ITaskCoordinator coordinator)
         {
             _name = name;
             _messageHandlers = new Dictionary<string, IMessageHandler<ServiceMessageEventArgs>>();
@@ -70,11 +68,6 @@ namespace SSSB
     
         #endregion
 
-        internal static int AddError(Guid messageID, Exception err)
-        {
-            return BaseSSSBService._errorMessages.AddError(messageID, err);
-        }
-
         internal void InternalStart()
         {
             try
@@ -85,7 +78,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                throw new PPSException(ServiceBrokerResources.StartErrMsg, ex, _log);
+                throw new PPSException($"The Service to handle messages from the queue: {this.QueueName} failed to start", ex, _log);
             }
         }
 
