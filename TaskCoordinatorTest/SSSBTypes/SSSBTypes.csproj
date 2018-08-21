@@ -75,8 +75,10 @@
   <ItemGroup>
     <Compile Include="ConnectionFactory.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SSSB\BaseSSSBService.cs" />
     <Compile Include="SSSB\Interface\ISSSBDispatcher.cs" />
     <Compile Include="SSSB\Interface\ISSSBService.cs" />
+    <Compile Include="SSSB\SSSBMessageDispatcher.cs" />
     <Compile Include="SSSB\SSSBMessageReaderFactory.cs" />
     <Compile Include="SSSB\SSSBManager.cs" />
     <Compile Include="SSSB\ErrorMessageEventArgs.cs" />

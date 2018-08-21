@@ -1,41 +1,60 @@
-﻿using Shared;
-using Shared.Database;
+﻿using Database.Shared;
+using Shared;
 using Shared.Errors;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
 using TasksCoordinator;
 using TasksCoordinator.Interface;
+using System.Threading;
 
 namespace SSSB
 {
     public class SSSBMessageProducer: IMessageProducer<SSSBMessage>
     {
-        internal static ILog _log = Log.GetInstance("SSSBMessageProducer");
+        private bool _IsQueueActivationEnabled = false;
+        private CancellationToken _cancellation;
         private static ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
-
+        private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
         /// <summary>
         /// Число сообщений в пакете по умолчанию
         /// </summary>
         public const int DEFAULT_FETCH_SIZE = 1;
-        private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
-        private bool _IsQueueActivationEnabled =false;
-        private CancellationToken _cancellation;
-        private readonly string _QueueName;
-        private readonly string _ServiceName;
+        private ISSSBService _sssbService;
 
-        public SSSBMessageProducer(string QueueName, string ServiceName)
+        protected static ILog _log
         {
-            this._QueueName = QueueName;
-            this._ServiceName = ServiceName;
+            get
+            {
+                return BaseSSSBService._log;
+            }
+        }
+
+        public SSSBMessageProducer(ISSSBService sssbService)
+        {
+            this._sssbService = sssbService;
             this._cancellation = CancellationToken.None;
         }
 
+        public bool IsQueueActivationEnabled
+        {
+            get { return _IsQueueActivationEnabled; }
+            set
+            {
+                _IsQueueActivationEnabled = value;
+                this.DefaultWaitForTimeout = this.IsQueueActivationEnabled ? TimeSpan.FromSeconds(7) : TimeSpan.FromSeconds(30);
+            }
+        }
+
+        public CancellationToken Cancellation
+        {
+            get { return _cancellation; }
+            set { _cancellation = value; }
+        }
         async Task<int> IMessageProducer<SSSBMessage>.GetMessages(IMessageWorker<SSSBMessage> worker, bool isPrimaryReader)
         {
             SSSBMessage[] messages = new SSSBMessage[0];
@@ -54,7 +73,7 @@ namespace SSSB
                     Exception error = null;
                     try
                     {
-                        dbconnection = await ConnectionFactory.GetNewConnectionAsync(this._cancellation);
+                        dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(this.Cancellation);
                     }
                     catch(Exception ex)
                     {
@@ -63,7 +82,7 @@ namespace SSSB
 
                     if (error != null)
                     {
-                        await _errorHandler.Handle(_log, error, this._cancellation); 
+                        await _errorHandler.Handle(_log, error, this.Cancellation); 
                         return 0;
                     }
 
@@ -100,16 +119,16 @@ namespace SSSB
             try
             {
                 if (isPrimaryReader)
-                    reader = await SSSBManager.ReceiveMessagesAsync(dbconnection, this._QueueName, 
+                    reader = await SSSBManager.ReceiveMessagesAsync(dbconnection, this._sssbService.QueueName, 
                         DEFAULT_FETCH_SIZE, 
                         (int)DefaultWaitForTimeout.TotalMilliseconds, 
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess, 
-                        this._cancellation);
+                        this.Cancellation);
                 else
-                    reader = await SSSBManager.ReceiveMessagesNoWaitAsync(dbconnection, this._QueueName, 
+                    reader = await SSSBManager.ReceiveMessagesNoWaitAsync(dbconnection, this._sssbService.QueueName, 
                         DEFAULT_FETCH_SIZE, 
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess,
-                        this._cancellation);
+                        this.Cancellation);
 
                 //no result after cancellation
                 if (reader == null)
@@ -133,7 +152,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                throw new PPSException(string.Format("ReadMessages error on queue: {0}, isPrimaryListener: {1}", this._QueueName, isPrimaryReader), ex);
+                throw new PPSException(string.Format("ReadMessages error on queue: {0}, isPrimaryListener: {1}", this._sssbService.QueueName, isPrimaryReader), ex);
             }
             finally
             {
@@ -182,24 +201,9 @@ namespace SSSB
             else
                 message.Body = null;
 
-            message.ServiceName = this._ServiceName;
+            message.ServiceName = this._sssbService.Name;
 
             return message;
-        }
-
-        public bool IsQueueActivationEnabled
-        {
-            get { return _IsQueueActivationEnabled; }
-            set
-            {
-                _IsQueueActivationEnabled = value;
-                this.DefaultWaitForTimeout = this._IsQueueActivationEnabled ? TimeSpan.FromMilliseconds(7000) : TimeSpan.FromSeconds(30);
-            }
-        }
-        public CancellationToken Cancellation
-        {
-            get { return _cancellation; }
-            set { _cancellation = value; }
         }
     }
 }

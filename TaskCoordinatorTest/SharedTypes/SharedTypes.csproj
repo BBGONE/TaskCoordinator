@@ -89,6 +89,13 @@
     <Compile Include="COORDINATOR\MessageProcessingResult.cs" />
     <Compile Include="COORDINATOR\MessageReader.cs" />
     <Compile Include="COORDINATOR\WorkContext.cs" />
+    <Compile Include="Database\ConnectionManager.cs" />
+    <Compile Include="Database\DbConnectionFactory.cs" />
+    <Compile Include="Database\DbConnectionScope.cs" />
+    <Compile Include="Database\DbNameConnectionFactory.cs" />
+    <Compile Include="Database\DbScope.cs" />
+    <Compile Include="Database\IDbConnectionFactory.cs" />
+    <Compile Include="Database\NullableHelper.cs" />
     <Compile Include="Errors\ConnectionErrorHandler.cs" />
     <Compile Include="Errors\DBExceptions.cs" />
     <Compile Include="Errors\ErrorHelper.cs" />

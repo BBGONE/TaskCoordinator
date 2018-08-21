@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using TasksCoordinator;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace TasksCoordinator.Interface

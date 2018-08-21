@@ -1,12 +1,12 @@
-﻿using Shared;
-using Shared.Errors;
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Linq;
-using Shared.Services;
 using TasksCoordinator.Interface;
+using Shared.Services;
+using Shared;
+using Shared.Errors;
 
 namespace TasksCoordinator
 {
@@ -98,7 +98,7 @@ namespace TasksCoordinator
                     Task[] taskarr = new Task[tasks.Length + 1];
                     tasks.CopyTo(taskarr, 0);
                     taskarr[tasks.Length] = Task.Delay(30000);
-                    await Task.WhenAll(taskarr);
+                    await Task.WhenAll(taskarr).ConfigureAwait(false);
                 }
             }
             catch(OperationCanceledException) { 

@@ -1,34 +1,28 @@
-﻿using System;
+﻿using SSSB;
+using System;
 using System.Threading.Tasks;
-using SSSB;
 using TasksCoordinator;
 using TasksCoordinator.Test;
-using System.Collections.Concurrent;
 
 namespace ConsoleApplication1
 {
     class Program
     {
         private static TestSSSBService svc;
-        private static BlockingCollection<Message> MessageQueue;
-        private static ConcurrentBag<Message> ProcessedMessages;
 
         static void Main(string[] args)
         {
-            Program.Start();
+            Program.Start().Wait();
         }
 
-        private static void Start()
+        private static async Task Start()
         {
-            MessageQueue = new BlockingCollection<Message>();
-            ProcessedMessages = new ConcurrentBag<Message>();
-            var coordinator = TaskCoordinatorFactory.CreateTaskCoordinator(MessageQueue, ProcessedMessages, 8, TaskWorkType.Mixed);
 
-            svc = new TestSSSBService("test", coordinator);
-            svc.Start();
+            svc = new TestSSSBService("test", 6, true, true, TaskWorkType.Mixed);
+            await svc.Start();
             var producerTask = QueueData();
-            Console.WriteLine(string.Format("messages processed: {0}", ProcessedMessages.Count));
-            Console.WriteLine(string.Format("messages in queue: {0}", MessageQueue.Count));
+            Console.WriteLine(string.Format("messages processed: {0}", svc.ProcessedMessages.Count));
+            Console.WriteLine(string.Format("messages in queue: {0}", svc.MessageQueue.Count));
             svc.StartActivator(500);
             var stopTask = Stop(30);
             Console.ReadLine();
@@ -41,8 +35,8 @@ namespace ConsoleApplication1
             svc.Stop();
             Console.WriteLine("**************************************");
             Console.WriteLine("Service is stopped.");
-            Console.WriteLine(string.Format("messages processed: {0}", ProcessedMessages.Count));
-            Console.WriteLine(string.Format("messages in queue: {0}", MessageQueue.Count));
+            Console.WriteLine(string.Format("messages processed: {0}", svc.ProcessedMessages.Count));
+            Console.WriteLine(string.Format("messages in queue: {0}", svc.MessageQueue.Count));
         }
         
     
@@ -56,18 +50,26 @@ namespace ConsoleApplication1
 
             for (int i = 0; i < 10; ++i)
             {
-                MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
+                svc.MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
             }
+            await Task.Delay(10000);
+
+            for (int i = 0; i < 10; ++i)
+            {
+                svc.MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
+            }
+
             svc.Activate();
 
             while (true)
             {
-                await Task.Delay(7000);
-                int num = 100; // rnd.Next(0, 1000) % 1;
+                await Task.Delay(3000);
+                int num = 50;
                 for (int i = 0; i < num; ++i)
                 {
-                    MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
+                    svc.MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
                 }
+
                 svc.Activate();
             }
         }

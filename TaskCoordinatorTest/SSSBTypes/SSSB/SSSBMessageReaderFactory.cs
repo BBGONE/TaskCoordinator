@@ -5,16 +5,16 @@ namespace SSSB
 {
     public class SSSBMessageReaderFactory : IMessageReaderFactory<SSSBMessage, ISSSBDispatcher>
     {
-        private ErrorMessages ErrorMessages;
+        private ISSSBService _service;
 
-        public SSSBMessageReaderFactory(ErrorMessages errorMessages)
+        public SSSBMessageReaderFactory(ISSSBService service)
         {
-            this.ErrorMessages = errorMessages;
+            this._service = service;
         }
 
         public IMessageReader<SSSBMessage> CreateReader(int taskId, IMessageProducer<SSSBMessage> messageProducer, BaseTasksCoordinator<SSSBMessage, ISSSBDispatcher> coordinator)
         {
-            return new SSSBMessageReader(taskId, messageProducer, coordinator, this.ErrorMessages);
+            return new SSSBMessageReader(this._service, taskId, messageProducer, coordinator);
         }
     }
 }

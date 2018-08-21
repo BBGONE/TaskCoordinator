@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
-using Shared;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
+using Shared;
 
 namespace TasksCoordinator
 {

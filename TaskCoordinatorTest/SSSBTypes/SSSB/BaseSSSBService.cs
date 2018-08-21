@@ -1,0 +1,285 @@
+﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Shared;
+using Shared.Errors;
+using Shared.Services;
+using Bell.PPS.SSSB;
+using Database.Shared;
+
+namespace SSSB
+{
+    /// <summary>
+    /// Сервис для обработки сообщений.
+    /// </summary>
+    public class BaseSSSBService : ISSSBService
+    {
+        internal static ILog _log = Log.GetInstance("BaseSSSBService");
+        private static ErrorMessages _errorMessages = new ErrorMessages();
+
+        #region Private Fields
+        private string _name;
+        private string _queueName;
+        private volatile bool _isStopped;
+        private CancellationTokenSource _stopStartingSource;
+        private SSSBTasksCoordinator _tasksCoordinator;
+        #endregion
+
+        public BaseSSSBService(string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false)
+        {
+            _name = name;
+            _isStopped = true;
+            var dispatcher = new SSSBMessageDispatcher(this);
+            var producer = new SSSBMessageProducer(this);
+            var readerFactory = new SSSBMessageReaderFactory(this);
+            _tasksCoordinator = new SSSBTasksCoordinator(dispatcher, producer, readerFactory, 
+                maxReadersCount, isQueueActivationEnabled, isEnableParallelReading);
+        }
+
+        public EventHandler OnStartedEvent;
+        public EventHandler OnStoppedEvent;
+
+    
+        internal async Task InternalStart()
+        {
+            try
+            {
+                _queueName = await ServiceBrokerHelper.GetServiceQueueName(_name);
+                if (_queueName == null)
+                    throw new PPSException(string.Format(ServiceBrokerResources.ServiceInitializationErrMsg, _name), _log);
+                this._tasksCoordinator.Start();
+                this.OnStarted();
+            }
+            catch (Exception ex)
+            {
+                throw new PPSException(ServiceBrokerResources.StartErrMsg, ex, _log);
+            }
+        }
+
+        #region OnEvent Methods
+        protected virtual void OnStarting()
+        {
+        }
+
+        protected virtual void OnStarted()
+        {
+            if (this.OnStartedEvent != null)
+                this.OnStartedEvent(this, EventArgs.Empty);
+        }
+
+        protected virtual void OnStopped()
+        {
+            if (this.OnStoppedEvent != null)
+                this.OnStoppedEvent(this, EventArgs.Empty);
+        }
+        #endregion
+
+        #region Windows Service Public Methods
+        /// <summary>
+		/// Запуск сервиса.
+		/// Запускается QueueReadersCount читателей очереди сообщений с бесконечным циклом обработки.
+		/// </summary>
+		public async Task Start()
+        {
+            if (!this.IsStopped)
+                throw new InvalidOperationException(string.Format("Service: {0} has not finished the execution", this.Name));
+            this.OnStarting();
+            this._isStopped = false;
+
+            this._stopStartingSource = new CancellationTokenSource();
+            CancellationToken ct = this._stopStartingSource.Token;
+
+            var svc = this;
+            try
+            {
+                int i = 0;
+                while (!ct.IsCancellationRequested && !ConnectionManager.IsDbConnectionOK())
+                {
+                    ++i;
+                    if (i >= 3 && i <= 7)
+                        _log.Error(string.Format("Can not connect to the the Database in the SSSB service: {0}", this.Name));
+                    if ((i % 20) == 0)
+                        throw new Exception(string.Format("After 20 attempts can not connect to the Database on starting service: {0}!", this.Name));
+                    await Task.Delay(10000).ConfigureAwait(false);
+                }
+
+                ct.ThrowIfCancellationRequested();
+                this._stopStartingSource = null;
+                await this.InternalStart().ConfigureAwait(false);
+            }
+            catch(OperationCanceledException)
+            {
+                this._isStopped = true;
+                this._stopStartingSource = null;
+            }
+            catch (Exception ex)
+            {
+                _log.Critical(ex);
+                this._stopStartingSource.Cancel();
+                this._isStopped = true;
+                this._stopStartingSource = null;
+            }
+        }
+
+		/// <summary>
+		/// Остановка сервиса.
+		/// </summary>
+		public void Stop()
+		{
+            try
+            {
+                lock (this)
+                {
+                    if (this._stopStartingSource != null)
+                    {
+                        this._stopStartingSource.Cancel();
+                        this._stopStartingSource = null;
+                        return;
+                    }
+                    _isStopped = true;
+                    this.OnStopped();
+                    this._tasksCoordinator.Stop().Wait();
+                }
+            }
+            catch (AggregateException ex)
+            {
+                ex.Flatten().Handle((err) => {
+                    if (err is OperationCanceledException)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        _log.Error(ex);
+                        return true;
+                    }
+                });
+
+            }
+            catch (OperationCanceledException)
+            {
+
+            }
+            catch (Exception ex)
+            {
+                _log.Error(ex);
+            }
+		}
+
+        /// <summary>
+        /// приостанавливает обработку сообщений
+        /// </summary>
+        public void Pause()
+        {
+            this._tasksCoordinator.IsPaused = true;
+        }
+
+        /// <summary>
+        /// возобновляет обработку сообщений, если была приостановлена
+        /// </summary>
+        public void Resume()
+        {
+            this._tasksCoordinator.IsPaused = false;
+        }
+        #endregion
+
+        #region Public Methods
+        /// <summary>
+		/// Регистрация обработчика сообщений заданного типа.
+		/// </summary>
+		/// <param name="messageType"></param>
+		/// <param name="handler"></param>
+		public void RegisterMessageHandler(string messageType, IMessageHandler<ServiceMessageEventArgs> handler)
+		{
+            _tasksCoordinator.MessageDispatcher.RegisterMessageHandler(messageType, handler);
+		}
+
+        /// <summary>
+        /// Регистрация обработчика ошибок обработки сообщений заданного типа.
+        /// </summary>
+        /// <param name="messageType"></param>
+        /// <param name="handler"></param>
+        public void RegisterErrorMessageHandler(string messageType, IMessageHandler<ErrorMessageEventArgs> handler)
+        {
+            _tasksCoordinator.MessageDispatcher.RegisterErrorMessageHandler(messageType, handler);
+        }
+
+		/// <summary>
+		/// Отмена регистрации обработчика сообщений заданного типа.
+		/// </summary>
+		/// <param name="messageType"></param>
+		public void UnregisterMessageHandler(string messageType)
+		{
+            _tasksCoordinator.MessageDispatcher.UnregisterMessageHandler(messageType);
+        }
+
+        /// <summary>
+        /// Отмена регистрации обработчика сообщений заданного типа.
+        /// </summary>
+        /// <param name="messageType"></param>
+        public void UnregisterErrorMessageHandler(string messageType)
+        {
+            _tasksCoordinator.MessageDispatcher.UnregisterErrorMessageHandler(messageType);
+        }
+        #endregion
+
+      
+        #region ITaskService Members
+        string ITaskService.Name
+        {
+            get
+            {
+                return this.Name;
+            }
+        }
+
+        public IQueueActivator QueueActivator
+        {
+            get
+            {
+                return _tasksCoordinator as IQueueActivator;
+            }
+        }
+
+        ErrorMessage ISSSBService.GetError(Guid messageID)
+        {
+            return _errorMessages.GetError(messageID);
+        }
+
+        int ISSSBService.AddError(Guid messageID, Exception err) {
+            return _errorMessages.AddError(messageID, err);
+        }
+        #endregion
+
+        #region Properties
+        public bool IsStopped
+        {
+            get { return _isStopped; }
+        }
+
+        public bool IsPaused
+        {
+            get
+            {
+                return this._tasksCoordinator.IsPaused;
+            }
+        }
+
+        /// <summary>
+        /// Название сервиса.
+        /// </summary>
+        public string Name
+        {
+            get { return _name; }
+        }
+
+        /// <summary>
+        /// Название очереди.
+        /// </summary>
+        public string QueueName
+        {
+            get { return _queueName; }
+        }
+        #endregion
+    }
+}

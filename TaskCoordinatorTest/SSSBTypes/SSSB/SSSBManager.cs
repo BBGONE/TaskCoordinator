@@ -1,10 +1,10 @@
 using System;
+using Shared.Errors;
 using System.Data.SqlClient;
 using System.Data;
-using Shared;
-using Shared.Database;
-using Shared.Errors;
+using Database.Shared;
 using System.Threading;
+using Shared;
 using System.Threading.Tasks;
 using System.Transactions;
 
@@ -251,7 +251,7 @@ namespace SSSB
             string queueName = string.Empty;
             using (TransactionScope transactionScope = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
             {
-                var dbconnection = await ConnectionFactory.GetNewConnectionAsync();
+                var dbconnection = await ConnectionManager.GetNewPPSConnectionAsync();
                 try
                 {
                     using (dbconnection)
@@ -285,7 +285,7 @@ namespace SSSB
         {
             using (TransactionScope transactionScope = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
             {
-                var dbconnection = await ConnectionFactory.GetNewConnectionAsync();
+                var dbconnection = await ConnectionManager.GetNewPPSConnectionAsync();
                 try
                 {
                     using (dbconnection)
@@ -322,7 +322,7 @@ namespace SSSB
         {
             using (TransactionScope transactionScope = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
             {
-                var dbconnection = await ConnectionFactory.GetNewConnectionAsync();
+                var dbconnection = await ConnectionManager.GetNewPPSConnectionAsync();
                 try
                 {
                     using (dbconnection)

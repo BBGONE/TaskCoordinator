@@ -2,10 +2,13 @@
 using Shared.Errors;
 using Shared.Services;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using TasksCoordinator;
 using TasksCoordinator.Interface;
+using TasksCoordinator.Test;
 
 namespace SSSB
 {
@@ -14,24 +17,35 @@ namespace SSSB
     /// </summary>
     public class TestSSSBService : ISSSBService
     {
+        private static ErrorMessages _errorMessages = new ErrorMessages();
+        internal static ILog _log = Log.GetInstance("TestSSSBService");
+
         #region Private Fields
-        internal static ILog _log = Log.GetInstance("SSSB");
         private string _name;
         private string _queueName;
         private Dictionary<string, IMessageHandler<ServiceMessageEventArgs>> _messageHandlers;
         private Dictionary<string, IMessageHandler<ErrorMessageEventArgs>> _errorMessageHandlers;
         private volatile bool _isStopped;
         private ITaskCoordinator _tasksCoordinator;
+
+        private BlockingCollection<Message> _MessageQueue;
+        private ConcurrentBag<Message> _ProcessedMessages;
         #endregion
 
-      
-        public TestSSSBService(string name, ITaskCoordinator coordinator)
+
+        public TestSSSBService(string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false, TaskWorkType workType = TaskWorkType.LongCPUBound)
         {
             _name = name;
             _messageHandlers = new Dictionary<string, IMessageHandler<ServiceMessageEventArgs>>();
             _errorMessageHandlers = new Dictionary<string, IMessageHandler<ErrorMessageEventArgs>>();
             _isStopped = true;
-            _tasksCoordinator = coordinator;
+            _MessageQueue = new BlockingCollection<Message>();
+            _ProcessedMessages = new ConcurrentBag<Message>();
+            var dispatcher = new TestMessageDispatcher(ProcessedMessages, workType);
+            var producer = new TestMessageProducer(MessageQueue);
+            var readerFactory = new TestMessageReaderFactory();
+            _tasksCoordinator = new TestTasksCoordinator(dispatcher, producer, readerFactory,
+                maxReadersCount, isQueueActivationEnabled, isEnableParallelReading);
         }
 
         #region Properties
@@ -102,7 +116,7 @@ namespace SSSB
         /// Запуск сервиса.
         /// Запускается QueueReadersCount читателей очереди сообщений с бесконечным циклом обработки.
         /// </summary>
-        public void Start()
+        public async Task Start()
         {
             this.OnStarting();
             this.InternalStart();
@@ -182,9 +196,21 @@ namespace SSSB
             }
         }
 
+        public BlockingCollection<Message> MessageQueue { get => _MessageQueue; set => _MessageQueue = value; }
+        public ConcurrentBag<Message> ProcessedMessages { get => _ProcessedMessages; set => _ProcessedMessages = value; }
+
+        ErrorMessage ISSSBService.GetError(Guid messageID)
+        {
+            return _errorMessages.GetError(messageID);
+        }
+
+        int ISSSBService.AddError(Guid messageID, Exception err)
+        {
+            return _errorMessages.AddError(messageID, err);
+        }
         #endregion
 
-        //immitate an activator
+        // immitate an activator
         public void StartActivator(int delay)
         {
             if (!this._tasksCoordinator.IsQueueActivationEnabled)
@@ -200,7 +226,7 @@ namespace SSSB
             Interlocked.CompareExchange(ref this._isActivate, 1, 0);
         }
 
-        //immitate an activator
+        // immitate an activator
         private async Task Activator(int delay)
         {
             while (true)
