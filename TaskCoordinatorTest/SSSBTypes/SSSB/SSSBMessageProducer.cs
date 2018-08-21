@@ -16,7 +16,7 @@ namespace SSSB
 {
     public class SSSBMessageProducer: IMessageProducer<SSSBMessage>
     {
-        private bool _IsQueueActivationEnabled = false;
+        internal static readonly ILog _log = Log.GetInstance("SSSBMessageDispatcher");
         private CancellationToken _cancellation;
         private static ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
         private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
@@ -26,28 +26,16 @@ namespace SSSB
         public const int DEFAULT_FETCH_SIZE = 1;
         private ISSSBService _sssbService;
 
-        protected static ILog _log
-        {
-            get
-            {
-                return BaseSSSBService._log;
-            }
-        }
-
         public SSSBMessageProducer(ISSSBService sssbService)
         {
             this._sssbService = sssbService;
             this._cancellation = CancellationToken.None;
+            this.DefaultWaitForTimeout = sssbService.isQueueActivationEnabled ? TimeSpan.FromSeconds(7) : TimeSpan.FromSeconds(30);
         }
 
         public bool IsQueueActivationEnabled
         {
-            get { return _IsQueueActivationEnabled; }
-            set
-            {
-                _IsQueueActivationEnabled = value;
-                this.DefaultWaitForTimeout = this.IsQueueActivationEnabled ? TimeSpan.FromSeconds(7) : TimeSpan.FromSeconds(30);
-            }
+            get { return _sssbService.isQueueActivationEnabled; }
         }
 
         public CancellationToken Cancellation
@@ -55,6 +43,7 @@ namespace SSSB
             get { return _cancellation; }
             set { _cancellation = value; }
         }
+
         async Task<int> IMessageProducer<SSSBMessage>.GetMessages(IMessageWorker<SSSBMessage> worker, bool isPrimaryReader)
         {
             SSSBMessage[] messages = new SSSBMessage[0];

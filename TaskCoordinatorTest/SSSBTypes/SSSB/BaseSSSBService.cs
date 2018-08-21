@@ -14,7 +14,7 @@ namespace SSSB
     /// </summary>
     public class BaseSSSBService : ISSSBService
     {
-        internal static ILog _log = Log.GetInstance("BaseSSSBService");
+        internal static readonly ILog _log = Log.GetInstance("BaseSSSBService");
         private static ErrorMessages _errorMessages = new ErrorMessages();
 
         #region Private Fields
@@ -29,11 +29,12 @@ namespace SSSB
         {
             _name = name;
             _isStopped = true;
+            this.isQueueActivationEnabled = isQueueActivationEnabled;
             var dispatcher = new SSSBMessageDispatcher(this);
             var producer = new SSSBMessageProducer(this);
             var readerFactory = new SSSBMessageReaderFactory(this);
             _tasksCoordinator = new SSSBTasksCoordinator(dispatcher, producer, readerFactory, 
-                maxReadersCount, isQueueActivationEnabled, isEnableParallelReading);
+                maxReadersCount, isEnableParallelReading);
         }
 
         public EventHandler OnStartedEvent;
@@ -249,6 +250,8 @@ namespace SSSB
         int ISSSBService.AddError(Guid messageID, Exception err) {
             return _errorMessages.AddError(messageID, err);
         }
+
+        public bool isQueueActivationEnabled { get; private set; }
         #endregion
 
         #region Properties

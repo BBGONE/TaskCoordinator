@@ -12,5 +12,6 @@
             get;
         }
 
+        bool isQueueActivationEnabled { get; }
     }
 }

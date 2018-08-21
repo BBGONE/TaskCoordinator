@@ -16,7 +16,7 @@ namespace SSSB
     public static class SSSBManager
     {
         public const string RETURN_VALUE_PARAMETER_NAME = "@RETURN_VALUE";
-        private static ILog _log = Log.GetInstance("SSSB");
+        private static readonly ILog _log = Log.GetInstance("SSSBManager");
 
         public static int BeginDialogConversation(
                 SqlConnection dbconnection,

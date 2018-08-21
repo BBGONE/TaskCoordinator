@@ -10,7 +10,6 @@ namespace TasksCoordinator.Interface
         bool IsQueueActivationEnabled
         {
             get;
-            set;
         }
 
         CancellationToken Cancellation

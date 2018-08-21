@@ -15,7 +15,7 @@ namespace SSSB
 {
     public class SSSBMessageDispatcher : ISSSBDispatcher
     {
-        internal static ILog _log = Log.GetInstance("SSSBMessageDispatcher");
+        internal static readonly ILog _log = Log.GetInstance("SSSBMessageDispatcher");
 
         private ISSSBService _sssbService;
         private ConcurrentDictionary<string, IMessageHandler<ServiceMessageEventArgs>> _messageHandlers;
@@ -34,22 +34,6 @@ namespace SSSB
             this._sssbService = sssbService;
             this._messageHandlers = new ConcurrentDictionary<string, IMessageHandler<ServiceMessageEventArgs>>();
             this._errorMessageHandlers = new ConcurrentDictionary<string, IMessageHandler<ErrorMessageEventArgs>>();
-        }
-
-        string ISSSBDispatcher.Name
-        {
-            get
-            {
-                return this._sssbService.Name;
-            }
-        }
-
-        string ISSSBDispatcher.QueueName
-        {
-            get
-            {
-                return this._sssbService.QueueName;
-            }
         }
 
         protected virtual ServiceMessageEventArgs CreateServiceMessageEventArgs(SSSBMessage message, CancellationToken cancellation)

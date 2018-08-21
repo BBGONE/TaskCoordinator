@@ -38,7 +38,7 @@ namespace TasksCoordinator
 
         public BaseTasksCoordinator(D messageDispatcher, IMessageProducer<M> messageProducer, 
             IMessageReaderFactory<M, D> messageReaderFactory,
-            int maxReadersCount, bool isQueueActivationEnabled = false, bool isEnableParallelReading = false)
+            int maxReadersCount, bool isEnableParallelReading = false)
         {
             this.SyncRoot = new object();
             this._stopServiceSource = null;
@@ -46,7 +46,7 @@ namespace TasksCoordinator
             this._messageProducer = messageProducer;
             this._messagerReaderFactory = messageReaderFactory;
             this._maxReadersCount = maxReadersCount;
-            this._isQueueActivationEnabled = isQueueActivationEnabled;
+            this._isQueueActivationEnabled =  this._messageProducer.IsQueueActivationEnabled;
             this._isEnableParallelReading = isEnableParallelReading;
             this._taskIdSeq = 0;
             this._readersCount = 0;
@@ -54,7 +54,6 @@ namespace TasksCoordinator
             this._primaryReader = null;
             this._tasks = new ConcurrentDictionary<int, Task>();
             this._isStarted = false;
-            this._messageProducer.IsQueueActivationEnabled = this._isQueueActivationEnabled;
         }
 
         public void Start()

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Collections.Concurrent;
 using System.Threading;
 using TasksCoordinator.Interface;
+using Shared.Services;
 
 namespace TasksCoordinator.Test
 {
@@ -13,14 +14,16 @@ namespace TasksCoordinator.Test
         // adds a realistic delay - like when the messages are read from the database transport (instead of a local in memory queue)
         private const int READ_MESSAGE_DELAY = 50;
         private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
-        private bool _IsQueueActivationEnabled = false;
+        private ITaskService _service;
         private CancellationToken _cancellation;
         private readonly BlockingCollection<Message> _messageQueue;
 
-        public TestMessageProducer(BlockingCollection<Message> messageQueue)
+        public TestMessageProducer(ITaskService service, BlockingCollection<Message> messageQueue)
         {
+            this._service = service;
             this._messageQueue = messageQueue;
             this._cancellation = CancellationToken.None;
+            this.DefaultWaitForTimeout = this._service.isQueueActivationEnabled ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(30);
         }
 
         public BlockingCollection<Message> MessageQueue
@@ -29,11 +32,7 @@ namespace TasksCoordinator.Test
         }
 
         public bool IsQueueActivationEnabled {
-            get { return _IsQueueActivationEnabled; }
-            set {
-                _IsQueueActivationEnabled = value;
-                this.DefaultWaitForTimeout = this.IsQueueActivationEnabled ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(30);
-            }
+            get { return this._service.isQueueActivationEnabled; }
         }
 
         public CancellationToken Cancellation {

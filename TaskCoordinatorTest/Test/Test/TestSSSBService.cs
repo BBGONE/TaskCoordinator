@@ -39,13 +39,14 @@ namespace SSSB
             _messageHandlers = new Dictionary<string, IMessageHandler<ServiceMessageEventArgs>>();
             _errorMessageHandlers = new Dictionary<string, IMessageHandler<ErrorMessageEventArgs>>();
             _isStopped = true;
+            this.isQueueActivationEnabled = isQueueActivationEnabled;
             _MessageQueue = new BlockingCollection<Message>();
             _ProcessedMessages = new ConcurrentBag<Message>();
             var dispatcher = new TestMessageDispatcher(ProcessedMessages, workType);
-            var producer = new TestMessageProducer(MessageQueue);
+            var producer = new TestMessageProducer(this, MessageQueue);
             var readerFactory = new TestMessageReaderFactory();
             _tasksCoordinator = new TestTasksCoordinator(dispatcher, producer, readerFactory,
-                maxReadersCount, isQueueActivationEnabled, isEnableParallelReading);
+                maxReadersCount, isEnableParallelReading);
         }
 
         #region Properties
@@ -195,6 +196,8 @@ namespace SSSB
                 return _tasksCoordinator as IQueueActivator;
             }
         }
+
+        public bool isQueueActivationEnabled { get; private set; }
 
         public BlockingCollection<Message> MessageQueue { get => _MessageQueue; set => _MessageQueue = value; }
         public ConcurrentBag<Message> ProcessedMessages { get => _ProcessedMessages; set => _ProcessedMessages = value; }
