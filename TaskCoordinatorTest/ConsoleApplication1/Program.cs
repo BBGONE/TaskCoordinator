@@ -18,12 +18,12 @@ namespace ConsoleApplication1
         private static async Task Start()
         {
 
-            svc = new TestSSSBService("test", 6, true, true, TaskWorkType.Mixed);
+            svc = new TestSSSBService("test", 6,true,false, TaskWorkType.Mixed);
             await svc.Start();
             var producerTask = QueueData();
             Console.WriteLine(string.Format("messages processed: {0}", svc.ProcessedMessages.Count));
             Console.WriteLine(string.Format("messages in queue: {0}", svc.MessageQueue.Count));
-            svc.StartActivator(500);
+            svc.StartActivator(50);
             var stopTask = Stop(30);
             Console.ReadLine();
             svc.Stop();
