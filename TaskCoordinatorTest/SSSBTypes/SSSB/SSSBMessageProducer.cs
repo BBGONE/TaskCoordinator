@@ -16,7 +16,7 @@ namespace SSSB
 {
     public class SSSBMessageProducer: IMessageProducer<SSSBMessage>
     {
-        internal static readonly ILog _log = Log.GetInstance("SSSBMessageDispatcher");
+        internal static readonly ILog _log = Log.GetInstance("SSSBMessageProducer");
         private CancellationToken _cancellation;
         private static ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
         private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
