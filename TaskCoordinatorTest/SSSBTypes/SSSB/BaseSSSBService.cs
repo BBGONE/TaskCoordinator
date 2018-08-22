@@ -45,7 +45,7 @@ namespace SSSB
         {
             try
             {
-                _queueName = await ServiceBrokerHelper.GetServiceQueueName(_name);
+                _queueName = await ServiceBrokerHelper.GetServiceQueueName(_name).ConfigureAwait(false);
                 if (_queueName == null)
                     throw new PPSException(string.Format(ServiceBrokerResources.ServiceInitializationErrMsg, _name), _log);
                 this._tasksCoordinator.Start();

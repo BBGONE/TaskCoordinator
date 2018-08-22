@@ -201,7 +201,7 @@ namespace SSSB
                     command.Parameters.Add(new SqlParameter("@queueName", SqlDbType.NVarChar, 128, ParameterDirection.Input, true, 0, 0, "queueName", DataRowVersion.Current, NullableHelper.DBNullConvertFrom(queueName)));
                     command.Parameters.Add(new SqlParameter("@fetchSize", SqlDbType.Int, 0, ParameterDirection.Input, true, 0, 0, "fetchSize", DataRowVersion.Current, NullableHelper.DBNullConvertFrom(fetchSize)));
                     command.Parameters.Add(new SqlParameter("@waitTimeout", SqlDbType.Int, 0, ParameterDirection.Input, true, 0, 0, "waitTimeout", DataRowVersion.Current, NullableHelper.DBNullConvertFrom(waitTimeout)));
-                    return await command.ExecuteReaderAsync(procedureResultBehaviour, cancellation);
+                    return await command.ExecuteReaderAsync(procedureResultBehaviour, cancellation).ConfigureAwait(false);
                 }
             }
             catch (SqlException ex)
@@ -232,7 +232,7 @@ namespace SSSB
                     command.Parameters.Add(new SqlParameter("@queueName", SqlDbType.NVarChar, 128, ParameterDirection.Input, true, 0, 0, "queueName", DataRowVersion.Current, NullableHelper.DBNullConvertFrom(queueName)));
                     command.Parameters.Add(new SqlParameter("@fetchSize", SqlDbType.Int, 0, ParameterDirection.Input, true, 0, 0, "fetchSize", DataRowVersion.Current, NullableHelper.DBNullConvertFrom(fetchSize)));
 
-                    return await command.ExecuteReaderAsync(procedureResultBehaviour, cancellation);
+                    return await command.ExecuteReaderAsync(procedureResultBehaviour, cancellation).ConfigureAwait(false);
                 }
             }
             catch (SqlException ex)
@@ -251,7 +251,7 @@ namespace SSSB
             string queueName = string.Empty;
             using (TransactionScope transactionScope = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
             {
-                var dbconnection = await ConnectionManager.GetNewPPSConnectionAsync();
+                var dbconnection = await ConnectionManager.GetNewPPSConnectionAsync().ConfigureAwait(false);
                 try
                 {
                     using (dbconnection)
@@ -265,7 +265,7 @@ namespace SSSB
                         command.Parameters.Add(new SqlParameter("@serviceName", SqlDbType.NVarChar, 128, ParameterDirection.Input, true, 0, 0, "serviceName", DataRowVersion.Current, NullableHelper.DBNullConvertFrom(serviceName)));
                         command.Parameters.Add(new SqlParameter("@queueName", SqlDbType.NVarChar, 128, ParameterDirection.InputOutput, true, 0, 0, "queueName", DataRowVersion.Current, NullableHelper.DBNullConvertFrom(queueName)));
 
-                        await command.ExecuteNonQueryAsync();
+                        await command.ExecuteNonQueryAsync().ConfigureAwait(false);
                         if (command.Parameters["@queueName"].Value == DBNull.Value)
                             queueName = null;
                         else
@@ -296,7 +296,7 @@ namespace SSSB
                         SqlParameter qnParam = command.Parameters.Add(new SqlParameter("@queueName", SqlDbType.NVarChar, 128));
                         qnParam.Value = queueName;
 
-                        SqlDataReader dr = await command.ExecuteReaderAsync();
+                        SqlDataReader dr = await command.ExecuteReaderAsync().ConfigureAwait(false);
                         try
                         {
                             if (dr.Read())
@@ -331,7 +331,7 @@ namespace SSSB
                         string sql = string.Format("alter queue {0} with status = on", queueName);
                         command.Connection = dbconnection;
                         command.CommandText = sql;
-                        await command.ExecuteNonQueryAsync();
+                        await command.ExecuteNonQueryAsync().ConfigureAwait(false);
                     }
                 }
                 catch (SqlException ex)

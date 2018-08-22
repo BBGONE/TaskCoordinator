@@ -213,6 +213,8 @@ namespace SSSB
         }
         #endregion
 
+        #region Immitate Queue Activation
+
         // immitate an activator
         public void StartActivator(int delay)
         {
@@ -222,7 +224,7 @@ namespace SSSB
         }
 
 
-        private int _isActivate = 0;
+        private volatile int _isActivate = 0;
 
         public void Activate()
         {
@@ -236,6 +238,7 @@ namespace SSSB
             {
                 await Task.Delay(delay);
                 int isActivated = Interlocked.CompareExchange(ref this._isActivate, 0, 1);
+                // Console.WriteLine("isActivated: " + isActivated.ToString());
                 if (isActivated == 1)
                 {
                     bool res = this.QueueActivator.ActivateQueue();
@@ -243,5 +246,7 @@ namespace SSSB
                 }
             }
         }
+
+        #endregion
     }
 }

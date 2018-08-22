@@ -48,7 +48,7 @@ namespace ConsoleApplication1
             int cnt = 0;
             Console.WriteLine($"Initial TasksCount: {svc.TasksCoordinator.TasksCount}");
 
-            for (int i = 0; i < 10; ++i)
+            for (int i = 0; i < 15; ++i)
             {
                 svc.MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
             }

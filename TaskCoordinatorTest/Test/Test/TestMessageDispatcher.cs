@@ -40,7 +40,7 @@ namespace TasksCoordinator.Test
                         try
                         {
                             ++longCount;
-                            await CPU_TASK(message, cancellation, 10000000);
+                            await CPU_TASK(message, cancellation, 10000000).ConfigureAwait(false);
                             --longCount;
                         }
                         catch (OperationCanceledException)
@@ -77,7 +77,7 @@ namespace TasksCoordinator.Test
                     Random rnd = new Random();
                     int val = rnd.Next(workTypes.Length-1);
                     TaskWorkType wrkType = (TaskWorkType)workTypes[val];
-                    var unused =await this.DispatchMessage(message, context, wrkType);
+                    var unused =await this.DispatchMessage(message, context, wrkType).ConfigureAwait(false);
                     return false;
                 default:
                     throw new InvalidOperationException("Unknown WorkType");
@@ -129,7 +129,7 @@ namespace TasksCoordinator.Test
                 {
                     currentMessage = message;
                     onProcessStart(currentMessage);
-                    rollBack = await this.DispatchMessage(message, context, this._workType);
+                    rollBack = await this.DispatchMessage(message, context, this._workType).ConfigureAwait(false);
 
                     if (rollBack)
                         break;

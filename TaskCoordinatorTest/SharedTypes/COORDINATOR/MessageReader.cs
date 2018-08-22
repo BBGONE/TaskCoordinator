@@ -49,7 +49,7 @@ namespace TasksCoordinator
         async Task<MessageProcessingResult> IMessageWorker<M>.OnDoWork(IEnumerable<M> messages, object state)
         {
             WorkContext context = new WorkContext(this.taskId, state, this.Cancellation, this._coordinator);
-            var res = await this._coordinator.Dispatcher.DispatchMessages(messages, context, (msg) => { this._currentMessage = msg; });
+            var res = await this._coordinator.Dispatcher.DispatchMessages(messages, context, (msg) => { this._currentMessage = msg; }).ConfigureAwait(false);
             return res;
         }
 
@@ -67,7 +67,7 @@ namespace TasksCoordinator
             bool result = false;
             if (this._coordinator.IsPaused)
             {
-                await Task.Delay(1000);
+                await Task.Delay(1000).ConfigureAwait(false);
                 return true;
             }
 
@@ -78,7 +78,9 @@ namespace TasksCoordinator
                 bool isPrimaryReader = this.IsPrimaryReader;
                 bool canRead = (isPrimaryReader || this._coordinator.IsEnableParallelReading);
                 if (canRead)
-                    isDidWork = await this._producer.GetMessages(this, isPrimaryReader) > 0;
+                {
+                    isDidWork = await this._producer.GetMessages(this, isPrimaryReader).ConfigureAwait(false) > 0;
+                }
             }
             catch (OperationCanceledException)
             {

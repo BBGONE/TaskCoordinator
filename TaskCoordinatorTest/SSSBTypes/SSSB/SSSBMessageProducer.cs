@@ -62,7 +62,7 @@ namespace SSSB
                     Exception error = null;
                     try
                     {
-                        dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(this.Cancellation);
+                        dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(this.Cancellation).ConfigureAwait(false);
                     }
                     catch(Exception ex)
                     {
@@ -71,7 +71,7 @@ namespace SSSB
 
                     if (error != null)
                     {
-                        await _errorHandler.Handle(_log, error, this.Cancellation); 
+                        await _errorHandler.Handle(_log, error, this.Cancellation).ConfigureAwait(false); 
                         return 0;
                     }
 
@@ -83,7 +83,7 @@ namespace SSSB
                         beforeWorkCalled = worker.OnBeforeDoWork();
                         if (cnt > 0)
                         {
-                            res = await worker.OnDoWork(messages, dbconnection);
+                            res = await worker.OnDoWork(messages, dbconnection).ConfigureAwait(false);
                         }
                         if (!res.isRollBack && cnt > 0)
                         {
@@ -112,12 +112,12 @@ namespace SSSB
                         DEFAULT_FETCH_SIZE, 
                         (int)DefaultWaitForTimeout.TotalMilliseconds, 
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess, 
-                        this.Cancellation);
+                        this.Cancellation).ConfigureAwait(false);
                 else
                     reader = await SSSBManager.ReceiveMessagesNoWaitAsync(dbconnection, this._sssbService.QueueName, 
                         DEFAULT_FETCH_SIZE, 
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess,
-                        this.Cancellation);
+                        this.Cancellation).ConfigureAwait(false);
 
                 //no result after cancellation
                 if (reader == null)

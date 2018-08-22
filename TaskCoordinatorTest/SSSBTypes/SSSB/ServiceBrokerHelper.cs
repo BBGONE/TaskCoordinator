@@ -184,7 +184,7 @@ namespace SSSB
 			_log.Info("Выполнение метода GetServiceQueueName(serviceName)");
 			try
 			{
-                return await SSSBManager.GetServiceQueueName(serviceName);
+                return await SSSBManager.GetServiceQueueName(serviceName).ConfigureAwait(false);
             }
             catch (SqlException ex)
             {

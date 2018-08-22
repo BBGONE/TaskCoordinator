@@ -106,7 +106,7 @@ namespace Database.Shared
         public static async Task<TConnection> GetOpenConnectionAsync<TConnection>(IDbConnectionFactory factory, string connectionName)
             where TConnection : DbConnection
         {
-            return (TConnection) await DbConnectionScope.Current.GetOpenConnectionAsync(factory, connectionName);
+            return (TConnection) await DbConnectionScope.Current.GetOpenConnectionAsync(factory, connectionName).ConfigureAwait(false);
         }
 
         private static string CurrentTransactionId

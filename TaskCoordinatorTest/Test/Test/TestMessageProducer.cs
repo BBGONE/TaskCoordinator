@@ -54,7 +54,7 @@ namespace TasksCoordinator.Test
                 try
                 {
                     //обработка сообщений
-                    MessageProcessingResult res = await worker.OnDoWork(messages, null);
+                    MessageProcessingResult res = await worker.OnDoWork(messages, null).ConfigureAwait(false);
 
                     if (res.isRollBack)
                     {

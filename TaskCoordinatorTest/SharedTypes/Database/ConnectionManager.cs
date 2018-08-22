@@ -45,7 +45,7 @@ namespace Database.Shared
 
         public static async Task<SqlConnection> GetSqlConnectionByNameAsync(string connectionName)
         {
-            return await DbConnectionScope.GetOpenConnectionAsync<SqlConnection>(DbConnectionFactory.Instance, connectionName);
+            return await DbConnectionScope.GetOpenConnectionAsync<SqlConnection>(DbConnectionFactory.Instance, connectionName).ConfigureAwait(false);
         }
 
         public static SqlConnection GetPPSConnection()
@@ -55,7 +55,7 @@ namespace Database.Shared
 
         public static async Task<SqlConnection> GetPPSConnectionAsync()
         {
-            return await GetSqlConnectionByNameAsync(CONNECTION_STRING_NAME);
+            return await GetSqlConnectionByNameAsync(CONNECTION_STRING_NAME).ConfigureAwait(false);
         }
 
         public static SqlConnection GetSqlConnectionByDbName(string dbname)
@@ -65,7 +65,7 @@ namespace Database.Shared
 
         public static async Task<SqlConnection> GetSqlConnectionByDbNameAsync(string dbname)
         {
-            return await DbConnectionScope.GetOpenConnectionAsync<SqlConnection>(DbNameFactory, dbname);
+            return await DbConnectionScope.GetOpenConnectionAsync<SqlConnection>(DbNameFactory, dbname).ConfigureAwait(false);
         }
 
         public static bool IsDbConnectionOK()
@@ -101,7 +101,7 @@ namespace Database.Shared
         {
             try
             {
-                using (var conn = await GetNewPPSConnectionAsync())
+                using (var conn = await GetNewPPSConnectionAsync().ConfigureAwait(false))
                 {
                 }
                 return true;
@@ -114,14 +114,14 @@ namespace Database.Shared
 
         public static async Task<SqlConnection> GetNewPPSConnectionAsync()
         {
-            return await GetNewPPSConnectionAsync(CancellationToken.None);
+            return await GetNewPPSConnectionAsync(CancellationToken.None).ConfigureAwait(false);
         }
 
         public static async Task<SqlConnection> GetNewPPSConnectionAsync(CancellationToken token)
         {
             SqlConnection cn = (SqlConnection)DbConnectionFactory.Instance.CreateConnection(CONNECTION_STRING_NAME);
             if (cn.State == System.Data.ConnectionState.Closed)
-                await cn.OpenAsync(token);
+                await cn.OpenAsync(token).ConfigureAwait(false);
             return cn;
         }
     }

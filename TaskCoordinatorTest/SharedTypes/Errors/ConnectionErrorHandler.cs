@@ -32,7 +32,7 @@ namespace Shared.Errors
                 }
                 else if (_counter % MAX_COUNT == 0)
                 {
-                    _log.Critical(new Exception(string.Format("NO connection to the Database after {0} tries", this._counter), ex));
+                    _log.Critical(new Exception(string.Format("NO connection to the Database after {0} attempts", this._counter), ex));
                 }
                 if (age.TotalSeconds > MAX_AGE_SEC)
                     this._counter = 0;
@@ -41,7 +41,7 @@ namespace Shared.Errors
                 this._lastTime = now;
             }
             int delay = (_counter % MAX_COUNT) * 1000;
-            await Task.Delay(delay, cancelation);
+            await Task.Delay(delay, cancelation).ConfigureAwait(false);
         }
     
     }
