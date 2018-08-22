@@ -18,7 +18,7 @@ namespace ConsoleApplication1
         private static async Task Start()
         {
 
-            svc = new TestSSSBService("test", 6,false,false, TaskWorkType.Mixed);
+            svc = new TestSSSBService("test", 4,false,false, TaskWorkType.Mixed);
             await svc.Start();
             var producerTask = QueueData();
             Console.WriteLine(string.Format("messages processed: {0}", svc.ProcessedMessages.Count));

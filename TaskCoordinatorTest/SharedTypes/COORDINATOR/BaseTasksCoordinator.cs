@@ -15,9 +15,9 @@ namespace TasksCoordinator
     /// используется для регулирования количества слушающих очередь потоков
     /// в случае необходимости освобождает из спячки один поток
     /// </summary>
-    public abstract class BaseTasksCoordinator<M>: ITaskCoordinatorAdvanced<M>, IQueueActivator
+    public abstract class BaseTasksCoordinator<M> : ITaskCoordinatorAdvanced<M>, IQueueActivator
     {
-        private static readonly int MAX_TASK_NUM = 100000000;
+        private const int MAX_TASK_NUM = int.MaxValue;
         internal static ILog _log = Log.GetInstance("TasksCoordinator");
 
         private readonly object SyncRoot;
@@ -28,25 +28,25 @@ namespace TasksCoordinator
         private readonly bool _isQueueActivationEnabled;
         private readonly bool _isEnableParallelReading;
         private IMessageReader<M> _primaryReader;
-        private readonly IMessageDispatcher<M> _messageDispatcher;
+        private readonly IMessageDispatcher<M> _dispatcher;
         private readonly ConcurrentDictionary<int, Task> _tasks;
         private CancellationTokenSource _stopServiceSource;
         private bool _isStarted;
         private volatile bool _isPaused;
-        protected readonly IMessageReaderFactory<M> _messagerReaderFactory;
-        protected  readonly IMessageProducer<M> _messageProducer;
+        protected readonly IMessageReaderFactory<M> _readerFactory;
+        protected readonly IMessageProducer<M> _producer;
 
-        public BaseTasksCoordinator(IMessageDispatcher<M> messageDispatcher, IMessageProducer<M> messageProducer, 
+        public BaseTasksCoordinator(IMessageDispatcher<M> messageDispatcher, IMessageProducer<M> messageProducer,
             IMessageReaderFactory<M> messageReaderFactory,
             int maxReadersCount, bool isEnableParallelReading = false)
         {
             this.SyncRoot = new object();
             this._stopServiceSource = null;
-            this._messageDispatcher = messageDispatcher;
-            this._messageProducer = messageProducer;
-            this._messagerReaderFactory = messageReaderFactory;
+            this._dispatcher = messageDispatcher;
+            this._producer = messageProducer;
+            this._readerFactory = messageReaderFactory;
             this._maxReadersCount = maxReadersCount;
-            this._isQueueActivationEnabled = this._messageProducer.IsQueueActivationEnabled;
+            this._isQueueActivationEnabled = this._producer.IsQueueActivationEnabled;
             this._isEnableParallelReading = isEnableParallelReading;
             this._taskIdSeq = 0;
             this._readersCount = 0;
@@ -64,7 +64,7 @@ namespace TasksCoordinator
                     return;
                 this._isStarted = true;
                 this._stopServiceSource = new CancellationTokenSource();
-                this._messageProducer.Cancellation = this._stopServiceSource.Token;
+                this._producer.Cancellation = this._stopServiceSource.Token;
                 this._taskIdSeq = 0;
                 this._readersCount = 0;
                 this._workingCount = 0;
@@ -87,21 +87,19 @@ namespace TasksCoordinator
             {
                 lock (this.SyncRoot)
                 {
-                   this._stopServiceSource.Cancel();
+                    this._stopServiceSource.Cancel();
                 }
                 this.IsPaused = false;
                 await Task.Delay(1000).ConfigureAwait(false);
                 var tasks = this._tasks.ToArray().Select(p => p.Value).ToArray();
                 if (tasks.Length > 0)
                 {
-                    Task[] taskarr = new Task[tasks.Length + 1];
-                    tasks.CopyTo(taskarr, 0);
-                    taskarr[tasks.Length] = Task.Delay(30000);
-                    await Task.WhenAll(taskarr).ConfigureAwait(false);
+                    await Task.WhenAny(Task.WhenAll(tasks), Task.Delay(30000)).ConfigureAwait(false);
                 }
             }
-            catch(OperationCanceledException) { 
-               //NOOP
+            catch (OperationCanceledException)
+            {
+                //NOOP
             }
             catch (Exception ex)
             {
@@ -109,7 +107,7 @@ namespace TasksCoordinator
             }
             finally
             {
-                try 
+                try
                 {
                     this._isStarted = false;
                     if (this._stopServiceSource != null)
@@ -126,7 +124,8 @@ namespace TasksCoordinator
             }
         }
 
-        private bool StartNewTask() {
+        private bool StartNewTask()
+        {
             try
             {
                 CancellationToken token = this.Cancellation;
@@ -146,12 +145,12 @@ namespace TasksCoordinator
 
         protected IMessageReader<M> GetMessageReader(int taskId)
         {
-           return this._messagerReaderFactory.CreateReader(taskId, this._messageProducer, this);
+            return this._readerFactory.CreateReader(taskId, this._producer, this);
         }
 
         private Task<Task<int>> CreateNewTask(CancellationToken token, int taskId)
         {
-            var res = new Task<Task<int>>(()=> JobRunner(token, taskId), token);
+            var res = new Task<Task<int>>(() => JobRunner(token, taskId), token);
             return res;
         }
 
@@ -326,7 +325,7 @@ namespace TasksCoordinator
                 }
             }
         }
-      
+
         bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader<M> reader)
         {
             lock (this.SyncRoot)
@@ -335,9 +334,12 @@ namespace TasksCoordinator
             }
         }
 
-        Task<MessageProcessingResult> IMessageDispatcher<M>.DispatchMessages(IEnumerable<M> messages, WorkContext context, Action<M> onProcessStart)
+        IMessageDispatcher<M> ITaskCoordinatorAdvanced<M>.Dispatcher
         {
-            return this._messageDispatcher.DispatchMessages(messages, context, onProcessStart);
+            get
+            {
+                return this._dispatcher;
+            }
         }
 
         #region IQueueActivator
@@ -347,11 +349,19 @@ namespace TasksCoordinator
                 return false;
             lock (this.SyncRoot)
             {
-                if (this._stopServiceSource.IsCancellationRequested)
+                if (this._stopServiceSource == null || this._stopServiceSource.IsCancellationRequested)
                     return false;
                 if (this.TasksCount > 0 || this._maxReadersCount == 0)
                     return false;
                 return this.StartNewTask();
+            }
+        }
+
+        public bool IsQueueActivationEnabled
+        {
+            get
+            {
+                return _isQueueActivationEnabled;
             }
         }
         #endregion
@@ -393,7 +403,7 @@ namespace TasksCoordinator
         {
             get { return this._maxReadersCount; }
         }
-        
+
         /// <summary>
         /// сколько сечас задач создано
         /// </summary>
@@ -404,20 +414,12 @@ namespace TasksCoordinator
                 return this._tasks.Count;
             }
         }
-      
+
         public CancellationToken Cancellation
         {
             get
             {
                 return this._stopServiceSource.Token;
-            }
-        }
-
-        public bool IsQueueActivationEnabled
-        {
-            get
-            {
-                return _isQueueActivationEnabled;
             }
         }
 
