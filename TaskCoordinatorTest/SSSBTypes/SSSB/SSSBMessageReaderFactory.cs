@@ -3,7 +3,7 @@ using TasksCoordinator.Interface;
 
 namespace SSSB
 {
-    public class SSSBMessageReaderFactory : IMessageReaderFactory<SSSBMessage, ISSSBDispatcher>
+    public class SSSBMessageReaderFactory : IMessageReaderFactory<SSSBMessage>
     {
         private ISSSBService _service;
 
@@ -12,7 +12,7 @@ namespace SSSB
             this._service = service;
         }
 
-        public IMessageReader<SSSBMessage> CreateReader(int taskId, IMessageProducer<SSSBMessage> messageProducer, BaseTasksCoordinator<SSSBMessage, ISSSBDispatcher> coordinator)
+        public IMessageReader<SSSBMessage> CreateReader(int taskId, IMessageProducer<SSSBMessage> messageProducer, BaseTasksCoordinator<SSSBMessage> coordinator)
         {
             return new SSSBMessageReader(this._service, taskId, messageProducer, coordinator);
         }

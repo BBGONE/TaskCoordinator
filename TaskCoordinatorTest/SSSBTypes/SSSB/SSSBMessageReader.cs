@@ -4,12 +4,12 @@ using TasksCoordinator.Interface;
 
 namespace SSSB
 {
-    public class SSSBMessageReader : MessageReader<SSSBMessage, ISSSBDispatcher>
+    public class SSSBMessageReader : MessageReader<SSSBMessage>
     {
         private ISSSBService _service;
 
         public SSSBMessageReader(ISSSBService service, int taskId, IMessageProducer<SSSBMessage> messageProducer,
-            BaseTasksCoordinator<SSSBMessage, ISSSBDispatcher> tasksCoordinator) :
+            BaseTasksCoordinator<SSSBMessage> tasksCoordinator) :
             base(taskId, messageProducer, tasksCoordinator)
         {
             this._service = service;

@@ -2,7 +2,7 @@
 
 namespace SSSB
 {
-    public class SSSBTasksCoordinator: BaseTasksCoordinator<SSSBMessage, ISSSBDispatcher>
+    public class SSSBTasksCoordinator: BaseTasksCoordinator<SSSBMessage>
     {
         public SSSBTasksCoordinator(ISSSBDispatcher messageDispatcher, 
              SSSBMessageProducer messageProducer,

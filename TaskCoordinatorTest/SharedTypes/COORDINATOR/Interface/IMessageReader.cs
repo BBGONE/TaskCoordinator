@@ -9,6 +9,5 @@ namespace TasksCoordinator.Interface
         Task<bool> ProcessMessage();
         bool IsPrimaryReader { get; }
         CancellationToken Cancellation { get; }
-        IMessageProducer<M> MessageProducer { get; }
     }
 }

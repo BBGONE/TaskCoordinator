@@ -2,11 +2,11 @@
 
 namespace TasksCoordinator.Test
 {
-    public class TestMessageReaderFactory : IMessageReaderFactory<Message, IMessageDispatcher<Message>>
+    public class TestMessageReaderFactory : IMessageReaderFactory<Message>
     {
-        public IMessageReader<Message> CreateReader(int taskId, IMessageProducer<Message> messageProducer, BaseTasksCoordinator<Message, IMessageDispatcher<Message>> coordinator)
+        public IMessageReader<Message> CreateReader(int taskId, IMessageProducer<Message> messageProducer, BaseTasksCoordinator<Message> coordinator)
         {
-            return new MessageReader<Message, IMessageDispatcher<Message>>(taskId, messageProducer, coordinator);
+            return new MessageReader<Message>(taskId, messageProducer, coordinator);
         }
     }
 }

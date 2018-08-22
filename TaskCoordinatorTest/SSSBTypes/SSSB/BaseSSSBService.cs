@@ -23,6 +23,7 @@ namespace SSSB
         private volatile bool _isStopped;
         private CancellationTokenSource _stopStartingSource;
         private SSSBTasksCoordinator _tasksCoordinator;
+        private ISSSBDispatcher _dispatcher;
         #endregion
 
         public BaseSSSBService(string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false)
@@ -30,17 +31,16 @@ namespace SSSB
             _name = name;
             _isStopped = true;
             this.isQueueActivationEnabled = isQueueActivationEnabled;
-            var dispatcher = new SSSBMessageDispatcher(this);
+            this._dispatcher = new SSSBMessageDispatcher(this);
             var producer = new SSSBMessageProducer(this);
             var readerFactory = new SSSBMessageReaderFactory(this);
-            _tasksCoordinator = new SSSBTasksCoordinator(dispatcher, producer, readerFactory, 
-                maxReadersCount, isEnableParallelReading);
+            _tasksCoordinator = new SSSBTasksCoordinator(this._dispatcher, producer, readerFactory, maxReadersCount, isEnableParallelReading);
         }
 
         public EventHandler OnStartedEvent;
         public EventHandler OnStoppedEvent;
 
-    
+
         internal async Task InternalStart()
         {
             try
@@ -98,9 +98,9 @@ namespace SSSB
                 {
                     ++i;
                     if (i >= 3 && i <= 7)
-                        _log.Error(string.Format("Can not connect to the the Database in the SSSB service: {0}", this.Name));
+                        _log.Error(string.Format("Не удается установить соединение с БД в SSSB сервисе: {0}", this.Name));
                     if ((i % 20) == 0)
-                        throw new Exception(string.Format("After 20 attempts can not connect to the Database on starting service: {0}!", this.Name));
+                        throw new Exception(string.Format("После 20 попыток не удается установить соединение с БД при запуске сервиса: {0}!", this.Name));
                     await Task.Delay(10000).ConfigureAwait(false);
                 }
 
@@ -108,7 +108,7 @@ namespace SSSB
                 this._stopStartingSource = null;
                 await this.InternalStart().ConfigureAwait(false);
             }
-            catch(OperationCanceledException)
+            catch (OperationCanceledException)
             {
                 this._isStopped = true;
                 this._stopStartingSource = null;
@@ -122,11 +122,11 @@ namespace SSSB
             }
         }
 
-		/// <summary>
-		/// Остановка сервиса.
-		/// </summary>
-		public void Stop()
-		{
+        /// <summary>
+        /// Остановка сервиса.
+        /// </summary>
+        public void Stop()
+        {
             try
             {
                 lock (this)
@@ -165,7 +165,7 @@ namespace SSSB
             {
                 _log.Error(ex);
             }
-		}
+        }
 
         /// <summary>
         /// приостанавливает обработку сообщений
@@ -191,9 +191,9 @@ namespace SSSB
 		/// <param name="messageType"></param>
 		/// <param name="handler"></param>
 		public void RegisterMessageHandler(string messageType, IMessageHandler<ServiceMessageEventArgs> handler)
-		{
-            _tasksCoordinator.MessageDispatcher.RegisterMessageHandler(messageType, handler);
-		}
+        {
+            this._dispatcher.RegisterMessageHandler(messageType, handler);
+        }
 
         /// <summary>
         /// Регистрация обработчика ошибок обработки сообщений заданного типа.
@@ -202,16 +202,16 @@ namespace SSSB
         /// <param name="handler"></param>
         public void RegisterErrorMessageHandler(string messageType, IMessageHandler<ErrorMessageEventArgs> handler)
         {
-            _tasksCoordinator.MessageDispatcher.RegisterErrorMessageHandler(messageType, handler);
+            this._dispatcher.RegisterErrorMessageHandler(messageType, handler);
         }
 
-		/// <summary>
-		/// Отмена регистрации обработчика сообщений заданного типа.
-		/// </summary>
-		/// <param name="messageType"></param>
-		public void UnregisterMessageHandler(string messageType)
-		{
-            _tasksCoordinator.MessageDispatcher.UnregisterMessageHandler(messageType);
+        /// <summary>
+        /// Отмена регистрации обработчика сообщений заданного типа.
+        /// </summary>
+        /// <param name="messageType"></param>
+        public void UnregisterMessageHandler(string messageType)
+        {
+            this._dispatcher.UnregisterMessageHandler(messageType);
         }
 
         /// <summary>
@@ -220,11 +220,11 @@ namespace SSSB
         /// <param name="messageType"></param>
         public void UnregisterErrorMessageHandler(string messageType)
         {
-            _tasksCoordinator.MessageDispatcher.UnregisterErrorMessageHandler(messageType);
+            this._dispatcher.UnregisterErrorMessageHandler(messageType);
         }
         #endregion
 
-      
+
         #region ITaskService Members
         string ITaskService.Name
         {
@@ -242,16 +242,17 @@ namespace SSSB
             }
         }
 
+        public bool isQueueActivationEnabled { get; private set; }
+
         ErrorMessage ISSSBService.GetError(Guid messageID)
         {
             return _errorMessages.GetError(messageID);
         }
 
-        int ISSSBService.AddError(Guid messageID, Exception err) {
+        int ISSSBService.AddError(Guid messageID, Exception err)
+        {
             return _errorMessages.AddError(messageID, err);
         }
-
-        public bool isQueueActivationEnabled { get; private set; }
         #endregion
 
         #region Properties

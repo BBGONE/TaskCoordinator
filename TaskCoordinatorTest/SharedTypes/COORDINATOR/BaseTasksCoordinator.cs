@@ -1,12 +1,13 @@
-﻿using System;
+﻿using Shared;
+using Shared.Errors;
+using Shared.Services;
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
-using System.Linq;
 using TasksCoordinator.Interface;
-using Shared.Services;
-using Shared;
-using Shared.Errors;
 
 namespace TasksCoordinator
 {
@@ -14,8 +15,7 @@ namespace TasksCoordinator
     /// используется для регулирования количества слушающих очередь потоков
     /// в случае необходимости освобождает из спячки один поток
     /// </summary>
-    public abstract class BaseTasksCoordinator<M, D>: ITaskCoordinatorAdvanced<M,D>, IQueueActivator
-        where D : IMessageDispatcher<M>
+    public abstract class BaseTasksCoordinator<M>: ITaskCoordinatorAdvanced<M>, IQueueActivator
     {
         private static readonly int MAX_TASK_NUM = 100000000;
         internal static ILog _log = Log.GetInstance("TasksCoordinator");
@@ -28,16 +28,16 @@ namespace TasksCoordinator
         private readonly bool _isQueueActivationEnabled;
         private readonly bool _isEnableParallelReading;
         private IMessageReader<M> _primaryReader;
-        private readonly D _messageDispatcher;
+        private readonly IMessageDispatcher<M> _messageDispatcher;
         private readonly ConcurrentDictionary<int, Task> _tasks;
         private CancellationTokenSource _stopServiceSource;
         private bool _isStarted;
         private volatile bool _isPaused;
-        protected readonly IMessageReaderFactory<M, D> _messagerReaderFactory;
+        protected readonly IMessageReaderFactory<M> _messagerReaderFactory;
         protected  readonly IMessageProducer<M> _messageProducer;
 
-        public BaseTasksCoordinator(D messageDispatcher, IMessageProducer<M> messageProducer, 
-            IMessageReaderFactory<M, D> messageReaderFactory,
+        public BaseTasksCoordinator(IMessageDispatcher<M> messageDispatcher, IMessageProducer<M> messageProducer, 
+            IMessageReaderFactory<M> messageReaderFactory,
             int maxReadersCount, bool isEnableParallelReading = false)
         {
             this.SyncRoot = new object();
@@ -46,7 +46,7 @@ namespace TasksCoordinator
             this._messageProducer = messageProducer;
             this._messagerReaderFactory = messageReaderFactory;
             this._maxReadersCount = maxReadersCount;
-            this._isQueueActivationEnabled =  this._messageProducer.IsQueueActivationEnabled;
+            this._isQueueActivationEnabled = this._messageProducer.IsQueueActivationEnabled;
             this._isEnableParallelReading = isEnableParallelReading;
             this._taskIdSeq = 0;
             this._readersCount = 0;
@@ -165,7 +165,7 @@ namespace TasksCoordinator
                 lock (this.SyncRoot)
                 {
                     mr = this.GetMessageReader(taskId);
-                    (this as ITaskCoordinatorAdvanced<M, D>).AddReader(mr, false);
+                    (this as ITaskCoordinatorAdvanced<M>).AddReader(mr, false);
                     isReaderAdded = true;
                 }
                 try
@@ -181,7 +181,7 @@ namespace TasksCoordinator
                 finally
                 {
                     if (isReaderAdded)
-                        (this as ITaskCoordinatorAdvanced<M, D>).RemoveReader(mr, false);
+                        (this as ITaskCoordinatorAdvanced<M>).RemoveReader(mr, false);
                 }
             }
             catch (OperationCanceledException)
@@ -248,11 +248,11 @@ namespace TasksCoordinator
             }
         }
 
-        bool ITaskCoordinatorAdvanced<M,D>.IsSafeToRemoveReader(IMessageReader<M> reader)
+        bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader<M> reader)
         {
             lock (this.SyncRoot)
             {
-                return this._stopServiceSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M, D>).IsPrimaryReader(reader);
+                return this._stopServiceSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader);
             }
         }
 
@@ -262,7 +262,7 @@ namespace TasksCoordinator
         /// </summary>
         /// <param name="reader"></param>
         /// <param name="isStartedWorking"></param>
-        void ITaskCoordinatorAdvanced<M, D>.RemoveReader(IMessageReader<M> reader, bool isStartedWorking)
+        void ITaskCoordinatorAdvanced<M>.RemoveReader(IMessageReader<M> reader, bool isStartedWorking)
         {
             lock (this.SyncRoot)
             {
@@ -302,7 +302,7 @@ namespace TasksCoordinator
         /// </summary>
         /// <param name="reader"></param>
         /// <param name="isEndedWorking"></param>
-        void ITaskCoordinatorAdvanced<M, D>.AddReader(IMessageReader<M> reader, bool isEndedWorking)
+        void ITaskCoordinatorAdvanced<M>.AddReader(IMessageReader<M> reader, bool isEndedWorking)
         {
             lock (this.SyncRoot)
             {
@@ -327,12 +327,17 @@ namespace TasksCoordinator
             }
         }
       
-        bool ITaskCoordinatorAdvanced<M, D>.IsPrimaryReader(IMessageReader<M> reader)
+        bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader<M> reader)
         {
             lock (this.SyncRoot)
             {
                 return this._primaryReader != null && object.ReferenceEquals(this._primaryReader, reader);
             }
+        }
+
+        Task<MessageProcessingResult> IMessageDispatcher<M>.DispatchMessages(IEnumerable<M> messages, WorkContext context, Action<M> onProcessStart)
+        {
+            return this._messageDispatcher.DispatchMessages(messages, context, onProcessStart);
         }
 
         #region IQueueActivator
@@ -421,14 +426,6 @@ namespace TasksCoordinator
             get
             {
                 return _isEnableParallelReading;
-            }
-        }
-
-        public D MessageDispatcher
-        {
-            get
-            {
-                return _messageDispatcher;
             }
         }
 

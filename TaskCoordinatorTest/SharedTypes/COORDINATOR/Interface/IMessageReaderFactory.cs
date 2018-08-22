@@ -1,8 +1,7 @@
 ﻿namespace TasksCoordinator.Interface
 {
-    public interface IMessageReaderFactory<M, D>
-         where D : IMessageDispatcher<M>
+    public interface IMessageReaderFactory<M>
     {
-        IMessageReader<M> CreateReader(int taskId, IMessageProducer<M> messageProducer, BaseTasksCoordinator<M, D> coordinator);
+        IMessageReader<M> CreateReader(int taskId, IMessageProducer<M> messageProducer, BaseTasksCoordinator<M> coordinator);
     }
 }

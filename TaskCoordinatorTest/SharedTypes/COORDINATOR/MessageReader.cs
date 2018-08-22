@@ -7,12 +7,11 @@ using Shared;
 
 namespace TasksCoordinator
 {
-    public class MessageReader<M, D> : IMessageReader<M>, IMessageWorker<M>
-        where D : IMessageDispatcher<M>
+    public class MessageReader<M> : IMessageReader<M>, IMessageWorker<M>
     {
         #region Private Fields
         private int _taskId;
-        private readonly ITaskCoordinatorAdvanced<M, D> _tasksCoordinator;
+        private readonly ITaskCoordinatorAdvanced<M> _tasksCoordinator;
         private readonly IMessageProducer<M> _messageProducer;
         private M _currentMessage = default(M);
         private CancellationToken _cancellation;
@@ -21,12 +20,12 @@ namespace TasksCoordinator
         {
             get
             {
-                return BaseTasksCoordinator<M, D>._log;
+                return BaseTasksCoordinator<M>._log;
             }
         }
         #endregion
 
-        public MessageReader(int taskId, IMessageProducer<M> messageProducer, ITaskCoordinatorAdvanced<M, D> tasksCoordinator)
+        public MessageReader(int taskId, IMessageProducer<M> messageProducer, ITaskCoordinatorAdvanced<M> tasksCoordinator)
         {
             this._taskId = taskId;
             this._tasksCoordinator = tasksCoordinator;
@@ -38,35 +37,25 @@ namespace TasksCoordinator
         {
         }
 
-        #region Properties
-        protected ITaskCoordinatorAdvanced<M, D> TasksCoordinator
-        {
-            get
-            {
-                return this._tasksCoordinator;
-            }
-        }
-        #endregion
-
         bool IMessageWorker<M>.OnBeforeDoWork()
         {
             //пока обрабатывается сообщение
             //очередь не прослушивается этим потоком
             //пробуем передать эту роль другому свободному потоку
-            this.TasksCoordinator.RemoveReader(this, true);
+            this._tasksCoordinator.RemoveReader(this, true);
             return true;
         }
 
         async Task<MessageProcessingResult> IMessageWorker<M>.OnDoWork(IEnumerable<M> messages, object state)
         {
             WorkContext context = new WorkContext(this.taskId, state, this.Cancellation, this._tasksCoordinator);
-            var res = await this._tasksCoordinator.MessageDispatcher.DispatchMessages(messages, context, (msg) => { this._currentMessage = msg; });
+            var res = await this._tasksCoordinator.DispatchMessages(messages, context, (msg) => { this._currentMessage = msg; });
             return res;
         }
 
         void IMessageWorker<M>.OnAfterDoWork()
         {
-            this.TasksCoordinator.AddReader(this, true);
+            this._tasksCoordinator.AddReader(this, true);
         }
 
         /// <summary>
@@ -118,7 +107,7 @@ namespace TasksCoordinator
             }
             else if (!workDone)
             {
-                isRemoved = this.TasksCoordinator.IsSafeToRemoveReader(this);
+                isRemoved = this._tasksCoordinator.IsSafeToRemoveReader(this);
             }
         }
 
@@ -134,10 +123,9 @@ namespace TasksCoordinator
         {
             get
             {
-                return this.TasksCoordinator.IsPrimaryReader(this);
+                return this._tasksCoordinator.IsPrimaryReader(this);
             }
         }
-
 
         public CancellationToken Cancellation
         {
@@ -145,11 +133,6 @@ namespace TasksCoordinator
             {
                 return this._cancellation;
             }
-        }
-
-        public IMessageProducer<M> MessageProducer
-        {
-            get { return _messageProducer; }
         }
 
         public M CurrentMessage
