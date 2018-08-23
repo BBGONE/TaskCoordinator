@@ -3,7 +3,6 @@ using Shared.Errors;
 using Shared.Services;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,21 +17,21 @@ namespace TasksCoordinator
     public abstract class BaseTasksCoordinator<M> : ITaskCoordinatorAdvanced<M>, IQueueActivator
     {
         private const int MAX_TASK_NUM = int.MaxValue;
-        internal static ILog _log = Log.GetInstance("TasksCoordinator");
+        internal static ILog _log = Log.GetInstance("BaseTasksCoordinator");
 
-        private readonly object SyncRoot;
-        private readonly int _maxReadersCount;
-        private int _readersCount;
-        private int _workingCount;
-        private int _taskIdSeq;
+        private readonly object _SyncRoot;
         private readonly bool _isQueueActivationEnabled;
         private readonly bool _isEnableParallelReading;
-        private IMessageReader<M> _primaryReader;
+        private readonly int _maxReadersCount;
+        private volatile int _readersCount;
+        private volatile int _workingCount;
+        private volatile int _taskIdSeq;
+        private volatile IMessageReader<M> _primaryReader;
+        private volatile bool _isStarted;
+        private volatile bool _isPaused;
+        private CancellationTokenSource _stopServiceSource;
         private readonly IMessageDispatcher<M> _dispatcher;
         private readonly ConcurrentDictionary<int, Task> _tasks;
-        private CancellationTokenSource _stopServiceSource;
-        private bool _isStarted;
-        private volatile bool _isPaused;
         protected readonly IMessageReaderFactory<M> _readerFactory;
         protected readonly IMessageProducer<M> _producer;
 
@@ -40,7 +39,7 @@ namespace TasksCoordinator
             IMessageReaderFactory<M> messageReaderFactory,
             int maxReadersCount, bool isEnableParallelReading = false)
         {
-            this.SyncRoot = new object();
+            this._SyncRoot = new object();
             this._stopServiceSource = null;
             this._dispatcher = messageDispatcher;
             this._producer = messageProducer;
@@ -58,7 +57,7 @@ namespace TasksCoordinator
 
         public void Start()
         {
-            lock (this.SyncRoot)
+            lock (this._SyncRoot)
             {
                 if (this._isStarted)
                     return;
@@ -78,14 +77,14 @@ namespace TasksCoordinator
 
         public async Task Stop()
         {
-            lock (this.SyncRoot)
+            lock (this._SyncRoot)
             {
                 if (!this._isStarted)
                     return;
             }
             try
             {
-                lock (this.SyncRoot)
+                lock (this._SyncRoot)
                 {
                     this._stopServiceSource.Cancel();
                 }
@@ -161,7 +160,7 @@ namespace TasksCoordinator
             {
                 token.ThrowIfCancellationRequested();
                 IMessageReader<M> mr = null;
-                lock (this.SyncRoot)
+                lock (this._SyncRoot)
                 {
                     mr = this.GetMessageReader(taskId);
                     (this as ITaskCoordinatorAdvanced<M>).AddReader(mr, false);
@@ -180,7 +179,9 @@ namespace TasksCoordinator
                 finally
                 {
                     if (isReaderAdded)
+                    {
                         (this as ITaskCoordinatorAdvanced<M>).RemoveReader(mr, false);
+                    }
                 }
             }
             catch (OperationCanceledException)
@@ -209,7 +210,7 @@ namespace TasksCoordinator
                 {
                     var badStartAsync = task.ContinueWith((antecedent) =>
                     {
-                        lock (this.SyncRoot)
+                        lock (this._SyncRoot)
                         {
                             this.OnTaskExit(taskId);
                         }
@@ -240,7 +241,7 @@ namespace TasksCoordinator
 
         private void OnTaskExit(int taskId)
         {
-            lock (this.SyncRoot)
+            lock (this._SyncRoot)
             {
                 Task res;
                 this._tasks.TryRemove(taskId, out res);
@@ -249,7 +250,7 @@ namespace TasksCoordinator
 
         bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader<M> reader)
         {
-            lock (this.SyncRoot)
+            lock (this._SyncRoot)
             {
                 return this._stopServiceSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader);
             }
@@ -263,7 +264,7 @@ namespace TasksCoordinator
         /// <param name="isStartedWorking"></param>
         void ITaskCoordinatorAdvanced<M>.RemoveReader(IMessageReader<M> reader, bool isStartedWorking)
         {
-            lock (this.SyncRoot)
+            lock (this._SyncRoot)
             {
                 int prevCount = this._readersCount;
                 int newCount = prevCount - 1;
@@ -303,7 +304,7 @@ namespace TasksCoordinator
         /// <param name="isEndedWorking"></param>
         void ITaskCoordinatorAdvanced<M>.AddReader(IMessageReader<M> reader, bool isEndedWorking)
         {
-            lock (this.SyncRoot)
+            lock (this._SyncRoot)
             {
                 int prevCount = this._readersCount;
                 int newCount = prevCount + 1;
@@ -328,7 +329,7 @@ namespace TasksCoordinator
 
         bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader<M> reader)
         {
-            lock (this.SyncRoot)
+            lock (this._SyncRoot)
             {
                 return this._primaryReader != null && object.ReferenceEquals(this._primaryReader, reader);
             }
@@ -347,7 +348,7 @@ namespace TasksCoordinator
         {
             if (!this._isQueueActivationEnabled)
                 return false;
-            lock (this.SyncRoot)
+            lock (this._SyncRoot)
             {
                 if (this._stopServiceSource == null || this._stopServiceSource.IsCancellationRequested)
                     return false;
