@@ -9,7 +9,7 @@ namespace ConsoleApplication1
     class Program
     {
         private static TestService svc;
-        private static string messageType = Enum.GetName(typeof(TaskWorkType), TaskWorkType.ShortCPUBound);
+        private static string messageType = Enum.GetName(typeof(TaskWorkType), TaskWorkType.UltraShortCPUBound);
         private static volatile int SEQUENCE_NUM = 0;
 
         static void Main(string[] args)
@@ -22,7 +22,7 @@ namespace ConsoleApplication1
             SEQUENCE_NUM = 0;
             svc = new TestService("TestService", 4, false, true);
 
-            for (int i = 0; i < 50000; ++i)
+            for (int i = 0; i < 1100000; ++i)
             {
                 svc.MessageQueue.Add(new Message() { SequenceNumber = Interlocked.Increment(ref SEQUENCE_NUM), MessageType= messageType });
             }

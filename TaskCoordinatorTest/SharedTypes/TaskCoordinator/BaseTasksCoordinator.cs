@@ -120,10 +120,10 @@ namespace TasksCoordinator
             try
             {
                 CancellationToken token = CancellationToken.None;
-                var dummy = Task.FromResult(0);
                 semaphoreOK = await this._semaphore.WaitAsync(0, this._stopSource.Token);
                 if (semaphoreOK)
                 {
+                    var dummy = Task.FromResult(0);
                     try
                     {
                         token = this.Cancellation;
