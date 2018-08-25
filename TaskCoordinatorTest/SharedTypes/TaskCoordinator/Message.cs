@@ -1,4 +1,4 @@
-namespace TasksCoordinator
+п»їnamespace TasksCoordinator
 {
     public class Message
     {
@@ -8,7 +8,7 @@ namespace TasksCoordinator
         private string _serviceName;
 
         /// <summary>
-        /// Данные сообщения.
+        /// Р”Р°РЅРЅС‹Рµ СЃРѕРѕР±С‰РµРЅРёСЏ.
         /// </summary>
         public byte[] Body
         {
@@ -17,7 +17,7 @@ namespace TasksCoordinator
         }
 
         /// <summary>
-        /// Тип сообщения.
+        /// РўРёРї СЃРѕРѕР±С‰РµРЅРёСЏ.
         /// </summary>
         public string MessageType
         {
@@ -26,7 +26,7 @@ namespace TasksCoordinator
         }
 
         /// <summary>
-        /// Порядковый номер сообщения в очереди.
+        /// РџРѕСЂСЏРґРєРѕРІС‹Р№ РЅРѕРјРµСЂ СЃРѕРѕР±С‰РµРЅРёСЏ РІ РѕС‡РµСЂРµРґРё.
         /// </summary>
         public long SequenceNumber
         {
@@ -35,7 +35,7 @@ namespace TasksCoordinator
         }
 
         /// <summary>
-        /// Название сервиса, которому было направлено сообщение.
+        /// РќР°Р·РІР°РЅРёРµ СЃРµСЂРІРёСЃР°, РєРѕС‚РѕСЂРѕРјСѓ Р±С‹Р»Рѕ РЅР°РїСЂР°РІР»РµРЅРѕ СЃРѕРѕР±С‰РµРЅРёРµ.
         /// </summary>
         public string ServiceName
         {
