@@ -19,7 +19,8 @@ namespace TasksCoordinator
         private const int MAX_TASK_NUM = int.MaxValue;
         internal static ILog _log = Log.GetInstance("BaseTasksCoordinator");
 
-        private readonly object _SyncRoot;
+        private readonly object _readerLock = new object();
+        private readonly object _semaphoreLock = new object();
         private readonly bool _isQueueActivationEnabled;
         private readonly bool _isEnableParallelReading;
         private readonly int _maxReadersCount;
@@ -27,7 +28,7 @@ namespace TasksCoordinator
         private volatile IMessageReader _primaryReader;
         private volatile bool _isStarted;
         private volatile bool _isPaused;
-        private SemaphoreSlim _semaphore;
+        private int _semaphore;
         private CancellationTokenSource _stopSource;
         private readonly IMessageDispatcher<M> _dispatcher;
         private readonly ConcurrentDictionary<int, Task> _tasks;
@@ -38,8 +39,7 @@ namespace TasksCoordinator
             IMessageReaderFactory<M> messageReaderFactory,
             int maxReadersCount, bool isEnableParallelReading = false)
         {
-            this._semaphore = null;
-            this._SyncRoot = new object();
+            this._semaphore = 0;
             this._stopSource = null;
             this._dispatcher = messageDispatcher;
             this._producer = messageProducer;
@@ -58,16 +58,19 @@ namespace TasksCoordinator
             if (this._maxReadersCount == 0)
                 return;
 
-            lock (this._SyncRoot)
+            lock (this._readerLock)
             {
                 if (this._isStarted)
                     return;
-                this._semaphore = new SemaphoreSlim(this.MaxReadersCount, this.MaxReadersCount);
                 this._stopSource = new CancellationTokenSource();
                 this._producer.Cancellation = this._stopSource.Token;
                 this._taskIdSeq = 0;
                 this._primaryReader = null;
                 this._isStarted = true;
+            }
+            lock (this._semaphoreLock)
+            {
+                this._semaphore = this.MaxReadersCount;
             }
 
             if (!await this.StartNewTask())
@@ -76,7 +79,7 @@ namespace TasksCoordinator
 
         public async Task Stop()
         {
-            lock (this._SyncRoot)
+            lock (this._readerLock)
             {
                 if (!this._isStarted)
                     return;
@@ -106,9 +109,8 @@ namespace TasksCoordinator
             {
                 this._tasks.Clear();
                 this._stopSource.Dispose();
-                this._semaphore.Dispose();
+                this._semaphore = 0;
                 this._stopSource = null;
-                this._semaphore = null;
             }
         }
 
@@ -120,7 +122,16 @@ namespace TasksCoordinator
             try
             {
                 CancellationToken token = CancellationToken.None;
-                semaphoreOK = await this._semaphore.WaitAsync(0, this._stopSource.Token);
+                lock (this._semaphoreLock)
+                {
+                    var newcount = this._semaphore - 1;
+                    if (newcount >= 0)
+                    {
+                        semaphoreOK = true;
+                        this._semaphore = newcount;
+                    }
+                }
+
                 if (semaphoreOK)
                 {
                     var dummy = Task.FromResult(0);
@@ -133,7 +144,10 @@ namespace TasksCoordinator
                     }
                     catch (Exception)
                     {
-                        this._semaphore.Release();
+                        lock (this._semaphoreLock)
+                        {
+                            this._semaphore += 1;
+                        }
                         Task res;
                         if (result)
                         {
@@ -153,7 +167,10 @@ namespace TasksCoordinator
                 Task res;
                 if (this._tasks.TryRemove(taskId, out res))
                 {
-                    this._semaphore.Release();
+                    lock (this._semaphoreLock)
+                    {
+                        this._semaphore += 1;
+                    }
                 }
                 if (!(ex is OperationCanceledException))
                 {
@@ -213,7 +230,10 @@ namespace TasksCoordinator
                 Task res;
                 if (this._tasks.TryRemove(taskId, out res))
                 {
-                    this._semaphore.Release();
+                    lock (this._semaphoreLock)
+                    {
+                        this._semaphore += 1;
+                    }
                 }
             }
   
@@ -228,7 +248,7 @@ namespace TasksCoordinator
 
         bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader reader)
         {
-            lock (this._SyncRoot)
+            lock (this._readerLock)
             {
                 return  this._stopSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader);
             }
@@ -242,7 +262,7 @@ namespace TasksCoordinator
         /// <param name="isStartedWorking"></param>
         void ITaskCoordinatorAdvanced<M>.RemoveReader(IMessageReader reader)
         {
-            lock (this._SyncRoot)
+            lock (this._readerLock)
             {
                 if (Object.ReferenceEquals(this._primaryReader, reader))
                 {
@@ -259,7 +279,7 @@ namespace TasksCoordinator
         /// <param name="isEndedWorking"></param>
         void ITaskCoordinatorAdvanced<M>.AddReader(IMessageReader reader)
         {
-            lock (this._SyncRoot)
+            lock (this._readerLock)
             {
                 if (this._primaryReader == null)
                 {
@@ -270,7 +290,7 @@ namespace TasksCoordinator
 
         bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader reader)
         {
-            lock (this._SyncRoot)
+            lock (this._readerLock)
             {
                 return this._primaryReader != null && object.ReferenceEquals(this._primaryReader, reader);
             }
@@ -289,7 +309,7 @@ namespace TasksCoordinator
         {
             if (!this._isQueueActivationEnabled)
                 return false;
-            lock (this._SyncRoot)
+            lock (this._readerLock)
             {
                 if (!this._isStarted)
                     return false;
