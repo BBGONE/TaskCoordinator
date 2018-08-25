@@ -6,7 +6,7 @@ namespace TasksCoordinator.Interface
     public interface IMessageReader<M>
     {
         int taskId { get; }
-        Task<bool> ProcessMessage();
+        Task<MessageReaderResult> ProcessMessage();
         bool IsPrimaryReader { get; }
         CancellationToken Cancellation { get; }
     }

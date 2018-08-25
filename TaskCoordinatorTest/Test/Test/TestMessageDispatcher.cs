@@ -32,8 +32,7 @@ namespace TasksCoordinator.Test
             CancellationToken cancellation = context.Cancellation;
             //возвратить ли сообщение назад в очередь?
             bool rollBack = false;
-
-            switch(workType)
+            switch (workType)
             {
                 case TaskWorkType.LongCPUBound:
                     Task task = new Task(async () => {
@@ -67,7 +66,7 @@ namespace TasksCoordinator.Test
                     await IO_TASK(message, cancellation, 500).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortCPUBound:
-                    await CPU_TASK(message, cancellation, 1000).ConfigureAwait(false);
+                    await CPU_TASK(message, cancellation, 100).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortIOBound:
                     await IO_TASK(message, cancellation, 100).ConfigureAwait(false);
@@ -93,8 +92,7 @@ namespace TasksCoordinator.Test
         {
             await Task.FromResult(0);
             // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
-            Random rnd = new Random();
-            int cnt = rnd.Next(iterations / 5, iterations);
+            int cnt = iterations;
             for (int i = 0; i < cnt; ++i)
             {
                 cancellation.ThrowIfCancellationRequested();

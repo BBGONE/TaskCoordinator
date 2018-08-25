@@ -5,7 +5,7 @@ namespace TasksCoordinator.Interface
 {
     public interface ITaskCoordinator
     {
-        void Start();
+        Task Start();
         Task Stop();
         bool IsPaused { get; set; }
         int MaxReadersCount { get; }

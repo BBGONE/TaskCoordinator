@@ -44,7 +44,7 @@ namespace SSSB
             set { _cancellation = value; }
         }
 
-        async Task<int> IMessageProducer<SSSBMessage>.GetMessages(IMessageWorker<SSSBMessage> worker, bool isPrimaryReader)
+        async Task<int> IMessageProducer<SSSBMessage>.DoWork(IMessageWorker<SSSBMessage> worker, bool isPrimaryReader)
         {
             SSSBMessage[] messages = new SSSBMessage[0];
             bool beforeWorkCalled = false;

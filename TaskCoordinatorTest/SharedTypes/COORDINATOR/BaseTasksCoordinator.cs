@@ -23,13 +23,12 @@ namespace TasksCoordinator
         private readonly bool _isQueueActivationEnabled;
         private readonly bool _isEnableParallelReading;
         private readonly int _maxReadersCount;
-        private volatile int _readersCount;
-        private volatile int _workingCount;
         private volatile int _taskIdSeq;
         private volatile IMessageReader<M> _primaryReader;
         private volatile bool _isStarted;
         private volatile bool _isPaused;
-        private CancellationTokenSource _stopServiceSource;
+        private SemaphoreSlim _semaphore;
+        private CancellationTokenSource _stopSource;
         private readonly IMessageDispatcher<M> _dispatcher;
         private readonly ConcurrentDictionary<int, Task> _tasks;
         protected readonly IMessageReaderFactory<M> _readerFactory;
@@ -39,8 +38,9 @@ namespace TasksCoordinator
             IMessageReaderFactory<M> messageReaderFactory,
             int maxReadersCount, bool isEnableParallelReading = false)
         {
+            this._semaphore = null;
             this._SyncRoot = new object();
-            this._stopServiceSource = null;
+            this._stopSource = null;
             this._dispatcher = messageDispatcher;
             this._producer = messageProducer;
             this._readerFactory = messageReaderFactory;
@@ -48,31 +48,30 @@ namespace TasksCoordinator
             this._isQueueActivationEnabled = this._producer.IsQueueActivationEnabled;
             this._isEnableParallelReading = isEnableParallelReading;
             this._taskIdSeq = 0;
-            this._readersCount = 0;
-            this._workingCount = 0;
             this._primaryReader = null;
             this._tasks = new ConcurrentDictionary<int, Task>();
             this._isStarted = false;
         }
 
-        public void Start()
+        public async Task Start()
         {
+            if (this._maxReadersCount == 0)
+                return;
+
             lock (this._SyncRoot)
             {
                 if (this._isStarted)
                     return;
-                this._isStarted = true;
-                this._stopServiceSource = new CancellationTokenSource();
-                this._producer.Cancellation = this._stopServiceSource.Token;
+                this._semaphore = new SemaphoreSlim(this.MaxReadersCount, this.MaxReadersCount);
+                this._stopSource = new CancellationTokenSource();
+                this._producer.Cancellation = this._stopSource.Token;
                 this._taskIdSeq = 0;
-                this._readersCount = 0;
-                this._workingCount = 0;
                 this._primaryReader = null;
-                if (this.TasksCount > 0 || this._maxReadersCount == 0)
-                    return;
-                if (!this.StartNewTask())
-                    throw new Exception("Can not start initial task to process messages");
+                this._isStarted = true;
             }
+
+            if (!await this.StartNewTask())
+                throw new Exception("Can not start initial task to process messages");
         }
 
         public async Task Stop()
@@ -81,13 +80,12 @@ namespace TasksCoordinator
             {
                 if (!this._isStarted)
                     return;
+                this._isStarted = false;
             }
+
             try
             {
-                lock (this._SyncRoot)
-                {
-                    this._stopServiceSource.Cancel();
-                }
+                this._stopSource.Cancel();
                 this.IsPaused = false;
                 await Task.Delay(1000).ConfigureAwait(false);
                 var tasks = this._tasks.ToArray().Select(p => p.Value).ToArray();
@@ -106,51 +104,69 @@ namespace TasksCoordinator
             }
             finally
             {
-                try
-                {
-                    this._isStarted = false;
-                    if (this._stopServiceSource != null)
-                    {
-                        this._stopServiceSource.Dispose();
-                        this._stopServiceSource = null;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _log.Error(ex);
-                }
-                _tasks.Clear();
+                this._tasks.Clear();
+                this._stopSource.Dispose();
+                this._semaphore.Dispose();
+                this._stopSource = null;
+                this._semaphore = null;
             }
         }
 
-        private bool StartNewTask()
+        private async Task<bool> StartNewTask()
         {
+            bool result = false;
+            bool semaphoreOK = false;
+            int taskId = -1;
             try
             {
-                CancellationToken token = this.Cancellation;
-                Interlocked.CompareExchange(ref this._taskIdSeq, 0, MAX_TASK_NUM);
-                int taskId = Interlocked.Increment(ref this._taskIdSeq);
-                Task<Task<int>> task = this.CreateNewTask(token, taskId);
-                this.OnTaskStart(taskId, task);
-                return true;
+                CancellationToken token = CancellationToken.None;
+                var dummy = Task.FromResult(0);
+                semaphoreOK = await this._semaphore.WaitAsync(0, this._stopSource.Token);
+                if (semaphoreOK)
+                {
+                    try
+                    {
+                        token = this.Cancellation;
+                        Interlocked.CompareExchange(ref this._taskIdSeq, 0, MAX_TASK_NUM);
+                        taskId = Interlocked.Increment(ref this._taskIdSeq);
+                        result = this._tasks.TryAdd(taskId, dummy);
+                    }
+                    catch (Exception)
+                    {
+                        this._semaphore.Release();
+                        Task res;
+                        if (result)
+                        {
+                            this._tasks.TryRemove(taskId, out res);
+                        }
+                        throw;
+                    }
+                    var startTask = Task<Task<int>>.Factory.StartNew(() => { return JobRunner(token, taskId);  }, token);
+                    this._tasks.TryUpdate(taskId, startTask, dummy);
+                    var task = await startTask;
+                    this._tasks.TryUpdate(taskId, task, startTask);
+                }
             }
-            catch (OperationCanceledException) { }
             catch (Exception ex)
             {
-                _log.Error(ex);
+                result = false;
+                Task res;
+                if (this._tasks.TryRemove(taskId, out res))
+                {
+                    this._semaphore.Release();
+                }
+                if (!(ex is OperationCanceledException))
+                {
+                    _log.Error(ex);
+                }
             }
-            return false;
+ 
+            return result;
         }
 
         protected IMessageReader<M> GetMessageReader(int taskId)
         {
             return this._readerFactory.CreateReader(taskId, this._producer, this);
-        }
-
-        private Task<Task<int>> CreateNewTask(CancellationToken token, int taskId)
-        {
-            var res = new Task<Task<int>>(() => JobRunner(token, taskId), token);
-            return res;
         }
 
         private async Task<int> JobRunner(CancellationToken token, int taskId)
@@ -159,28 +175,25 @@ namespace TasksCoordinator
             try
             {
                 token.ThrowIfCancellationRequested();
-                IMessageReader<M> mr = null;
-                lock (this._SyncRoot)
-                {
-                    mr = this.GetMessageReader(taskId);
-                    (this as ITaskCoordinatorAdvanced<M>).AddReader(mr, false);
-                    isReaderAdded = true;
-                }
+                IMessageReader<M> mr = this.GetMessageReader(taskId);
+                (this as ITaskCoordinatorAdvanced<M>).AddReader(mr);
+                isReaderAdded = true;
+                MessageReaderResult readerResult = new MessageReaderResult() { IsRemoved = false, IsWorkDone = false };
                 try
                 {
-                    bool doLoop = true;
                     //Цикл обработки сообщений
-                    while (doLoop && !token.IsCancellationRequested)
+                    while (!readerResult.IsRemoved && !token.IsCancellationRequested)
                     {
-                        doLoop = await mr.ProcessMessage().ConfigureAwait(false);
+                        readerResult = await mr.ProcessMessage().ConfigureAwait(false);
                     } // while
+
                     token.ThrowIfCancellationRequested();
                 }
                 finally
                 {
                     if (isReaderAdded)
                     {
-                        (this as ITaskCoordinatorAdvanced<M>).RemoveReader(mr, false);
+                        (this as ITaskCoordinatorAdvanced<M>).RemoveReader(mr);
                     }
                 }
             }
@@ -197,62 +210,27 @@ namespace TasksCoordinator
             }
             finally
             {
-                this.OnTaskExit(taskId);
+                Task res;
+                if (this._tasks.TryRemove(taskId, out res))
+                {
+                    this._semaphore.Release();
+                }
             }
+  
             return taskId;
         }
 
-        private void OnTaskStart(int taskId, Task<Task<int>> task)
+        void ITaskCoordinatorAdvanced<M>.StartNewTask()
         {
-            if (this._tasks.TryAdd(taskId, task))
-            {
-                try
-                {
-                    var badStartAsync = task.ContinueWith((antecedent) =>
-                    {
-                        lock (this._SyncRoot)
-                        {
-                            this.OnTaskExit(taskId);
-                        }
-                    }, TaskContinuationOptions.NotOnRanToCompletion);
-                    var goodStartAsync = task.ContinueWith((antecedent) =>
-                    {
-                        this._tasks.TryUpdate(taskId, antecedent.Result, task);
-                    }, TaskContinuationOptions.OnlyOnRanToCompletion);
-
-                    if (!task.IsCanceled)
-                    {
-                        task.Start();
-                    }
-                    else
-                    {
-                        Task tmp;
-                        this._tasks.TryRemove(taskId, out tmp);
-                    }
-                }
-                catch (Exception)
-                {
-                    Task tmp;
-                    this._tasks.TryRemove(taskId, out tmp);
-                    throw;
-                }
-            }
+            this.StartNewTask();
         }
 
-        private void OnTaskExit(int taskId)
-        {
-            lock (this._SyncRoot)
-            {
-                Task res;
-                this._tasks.TryRemove(taskId, out res);
-            }
-        }
 
         bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader<M> reader)
         {
             lock (this._SyncRoot)
             {
-                return this._stopServiceSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader);
+                return  this._stopSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader);
             }
         }
 
@@ -262,36 +240,13 @@ namespace TasksCoordinator
         /// </summary>
         /// <param name="reader"></param>
         /// <param name="isStartedWorking"></param>
-        void ITaskCoordinatorAdvanced<M>.RemoveReader(IMessageReader<M> reader, bool isStartedWorking)
+        void ITaskCoordinatorAdvanced<M>.RemoveReader(IMessageReader<M> reader)
         {
             lock (this._SyncRoot)
             {
-                int prevCount = this._readersCount;
-                int newCount = prevCount - 1;
-
-                if (newCount < 0)
-                    throw new PPSException(string.Format("ReadersCount must not be equal to {0}", newCount));
-
                 if (Object.ReferenceEquals(this._primaryReader, reader))
                 {
                     this._primaryReader = null;
-                }
-
-                if (newCount == 0 && this._primaryReader != null)
-                    throw new InvalidOperationException("The PrimaryReader must be NULL when no free readers is left");
-
-                if (isStartedWorking)
-                    this._workingCount += 1;
-                this._readersCount = newCount;
-
-                if (newCount == 0 && !this._stopServiceSource.IsCancellationRequested)
-                {
-                    int freeCount = this.AvailableCount;
-                    int canCreateCount = this.AvailableToCreateCount;
-                    if (freeCount == 0 && canCreateCount > 0)
-                    {
-                        this.StartNewTask();
-                    }
                 }
             }
         }
@@ -302,24 +257,10 @@ namespace TasksCoordinator
         /// </summary>
         /// <param name="reader"></param>
         /// <param name="isEndedWorking"></param>
-        void ITaskCoordinatorAdvanced<M>.AddReader(IMessageReader<M> reader, bool isEndedWorking)
+        void ITaskCoordinatorAdvanced<M>.AddReader(IMessageReader<M> reader)
         {
             lock (this._SyncRoot)
             {
-                int prevCount = this._readersCount;
-                int newCount = prevCount + 1;
-
-                if (prevCount == 0 && this._primaryReader != null)
-                    throw new InvalidOperationException("PrimaryReader must be NULL when no free readers is left");
-
-                if (newCount > this._maxReadersCount)
-                    throw new InvalidOperationException(string.Format("ReadersCount must not be equal to {0}", newCount));
-
-                this._readersCount = newCount;
-
-                if (isEndedWorking)
-                    this._workingCount -= 1;
-
                 if (this._primaryReader == null)
                 {
                     this._primaryReader = reader;
@@ -344,18 +285,20 @@ namespace TasksCoordinator
         }
 
         #region IQueueActivator
-        bool IQueueActivator.ActivateQueue()
+        async Task<bool> IQueueActivator.ActivateQueue()
         {
             if (!this._isQueueActivationEnabled)
                 return false;
             lock (this._SyncRoot)
             {
-                if (this._stopServiceSource == null || this._stopServiceSource.IsCancellationRequested)
+                if (!this._isStarted)
                     return false;
-                if (this.TasksCount > 0 || this._maxReadersCount == 0)
-                    return false;
-                return this.StartNewTask();
             }
+            if (this.TasksCount > 0)
+            {
+                return false;
+            }
+            return await this.StartNewTask();
         }
 
         public bool IsQueueActivationEnabled
@@ -367,28 +310,7 @@ namespace TasksCoordinator
         }
         #endregion
 
-        /// <summary>
-        /// сколько сейчас потоков может выполнять работу, если понадобится
-        /// </summary>
-        private int AvailableCount
-        {
-            get
-            {
-                return this.TasksCount - this._workingCount;
-            }
-        }
-
-        /// <summary>
-        /// сколько еще потоков можно создать
-        /// </summary>
-        private int AvailableToCreateCount
-        {
-            get
-            {
-                return this._maxReadersCount - this.TasksCount;
-            }
-        }
-
+       
         /// <summary>
         /// если есть потоки читающие сообщения
         /// то один из них должен быть главным
@@ -402,7 +324,9 @@ namespace TasksCoordinator
 
         public int MaxReadersCount
         {
-            get { return this._maxReadersCount; }
+            get {
+                return this._maxReadersCount;
+            }
         }
 
         /// <summary>
@@ -420,7 +344,7 @@ namespace TasksCoordinator
         {
             get
             {
-                return this._stopServiceSource.Token;
+                return this._stopSource.Token;
             }
         }
 

@@ -1,8 +1,10 @@
-﻿namespace Shared.Services
+﻿using System.Threading.Tasks;
+
+namespace Shared.Services
 {
     public interface IQueueActivator
     {
-        bool ActivateQueue();
+        Task<bool> ActivateQueue();
         bool IsQueueActivationEnabled
         {
             get;

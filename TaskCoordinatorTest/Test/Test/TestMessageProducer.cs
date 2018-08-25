@@ -12,7 +12,7 @@ namespace TasksCoordinator.Test
     public class TestMessageProducer: IMessageProducer<Message>
     {
         // adds a realistic delay - like when the messages are read from the database transport (instead of a local in memory queue)
-        private const int READ_MESSAGE_DELAY = 50;
+        private const int READ_MESSAGE_DELAY = 0;
         private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
         private ITaskService _service;
         private CancellationToken _cancellation;
@@ -40,14 +40,14 @@ namespace TasksCoordinator.Test
             set { _cancellation = value; }
         }
 
-        async Task<int> IMessageProducer<Message>.GetMessages(IMessageWorker<Message> worker, bool isPrimaryReader)
+        async Task<int> IMessageProducer<Message>.DoWork(IMessageWorker<Message> worker, bool isPrimaryReader)
         {
             int cnt = 0;
             //Console.WriteLine(string.Format("begin {0}", worker.taskId));
             IEnumerable<Message> messages = await this.ReadMessages(isPrimaryReader, worker.taskId).ConfigureAwait(false);
             cnt = messages.Count();
             //Console.WriteLine(string.Format("end {0}", worker.taskId));
-          
+
             if (cnt > 0)
             {
                 bool isOk = worker.OnBeforeDoWork();

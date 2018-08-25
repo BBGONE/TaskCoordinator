@@ -18,9 +18,14 @@ namespace ConsoleApplication1
         private static async Task Start()
         {
 
-            svc = new TestSSSBService("test", 4,false,false, TaskWorkType.Mixed);
+            svc = new TestSSSBService("test", 4,false,false, TaskWorkType.UltraShortCPUBound);
+            for (int i = 0; i < 3; ++i)
+            {
+                svc.MessageQueue.Add(new Message() { SequenceNumber = i });
+            }
+            Console.WriteLine($"Initial TasksCount: {svc.TasksCoordinator.TasksCount}");
             await svc.Start();
-            var producerTask = QueueData();
+            var producerTask = QueueAdditionalData();
             Console.WriteLine(string.Format("messages processed: {0}", svc.ProcessedMessages.Count));
             Console.WriteLine(string.Format("messages in queue: {0}", svc.MessageQueue.Count));
             svc.StartActivator(50);
@@ -41,18 +46,13 @@ namespace ConsoleApplication1
         
     
 
-        public static async Task QueueData()
+        public static async Task QueueAdditionalData()
         {
             //await Task.Delay(7000);
             Random rnd = new Random();
             int cnt = 0;
-            Console.WriteLine($"Initial TasksCount: {svc.TasksCoordinator.TasksCount}");
-
-            for (int i = 0; i < 15; ++i)
-            {
-                svc.MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
-            }
-            await Task.Delay(10000);
+            await Task.Delay(7500);
+            Console.WriteLine($"Delayed TasksCount: {svc.TasksCoordinator.TasksCount}");
 
             for (int i = 0; i < 10; ++i)
             {
@@ -61,9 +61,9 @@ namespace ConsoleApplication1
 
             svc.Activate();
 
-            while (true)
+            while (true && !svc.IsStopped)
             {
-                await Task.Delay(3000);
+                await Task.Delay(1000);
                 int num = 50;
                 for (int i = 0; i < num; ++i)
                 {

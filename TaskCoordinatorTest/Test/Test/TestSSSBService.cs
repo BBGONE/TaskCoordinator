@@ -100,10 +100,12 @@ namespace SSSB
         #region OnEvent Methods
         protected virtual void OnStarting()
         {
+          
         }
 
         protected virtual void OnStart()
         {
+            
         }
 
         protected virtual void OnStop()
@@ -119,6 +121,9 @@ namespace SSSB
         /// </summary>
         public async Task Start()
         {
+            if (!this._isStopped)
+                return;
+            _isStopped = false;
             this.OnStarting();
             this.InternalStart();
         }
@@ -241,7 +246,7 @@ namespace SSSB
                 // Console.WriteLine("isActivated: " + isActivated.ToString());
                 if (isActivated == 1)
                 {
-                    bool res = this.QueueActivator.ActivateQueue();
+                    bool res = await this.QueueActivator.ActivateQueue();
                     Console.WriteLine("activation occured: " + res.ToString());
                 }
             }

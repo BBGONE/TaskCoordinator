@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
 using Shared;
+using System.Linq;
 
 namespace TasksCoordinator
 {
@@ -42,7 +43,8 @@ namespace TasksCoordinator
             //пока обрабатывается сообщение
             //очередь не прослушивается этим потоком
             //пробуем передать эту роль другому свободному потоку
-            this._coordinator.RemoveReader(this, true);
+            this._coordinator.RemoveReader(this);
+            this._coordinator.StartNewTask();
             return true;
         }
 
@@ -55,20 +57,19 @@ namespace TasksCoordinator
 
         void IMessageWorker<M>.OnAfterDoWork()
         {
-            this._coordinator.AddReader(this, true);
+            this._coordinator.AddReader(this);
         }
 
         /// <summary>
         /// If this method returns False then the thread exits from the  loop
         /// </summary>
         /// <returns></returns>
-        async Task<bool> IMessageReader<M>.ProcessMessage()
+        async Task<MessageReaderResult> IMessageReader<M>.ProcessMessage()
         {
-            bool result = false;
             if (this._coordinator.IsPaused)
             {
                 await Task.Delay(1000).ConfigureAwait(false);
-                return true;
+                return new MessageReaderResult() { IsWorkDone = true, IsRemoved = false };
             }
 
             this._currentMessage = default(M);
@@ -79,7 +80,7 @@ namespace TasksCoordinator
                 bool canRead = (isPrimaryReader || this._coordinator.IsEnableParallelReading);
                 if (canRead)
                 {
-                    isDidWork = await this._producer.GetMessages(this, isPrimaryReader).ConfigureAwait(false) > 0;
+                    isDidWork = await this._producer.DoWork(this, isPrimaryReader).ConfigureAwait(false) > 0;
                 }
             }
             catch (OperationCanceledException)
@@ -91,18 +92,12 @@ namespace TasksCoordinator
                 this.OnProcessMessageException(ex);
                 throw;
             }
-            finally
-            {
-                bool isRemoved = false;
-                this.AfterProcessedMessage(isDidWork, out isRemoved);
-                result = !isRemoved;
-            }
-            return result;
+            return this.AfterProcessedMessage(isDidWork);
         }
 
-        protected void AfterProcessedMessage(bool workDone, out bool isRemoved)
+        protected MessageReaderResult AfterProcessedMessage(bool workDone)
         {
-            isRemoved = false;
+            bool isRemoved = false;
             if (this.Cancellation.IsCancellationRequested)
             {
                 isRemoved = true;
@@ -111,6 +106,8 @@ namespace TasksCoordinator
             {
                 isRemoved = this._coordinator.IsSafeToRemoveReader(this);
             }
+
+            return new MessageReaderResult() { IsRemoved = isRemoved, IsWorkDone = workDone };
         }
 
         public int taskId
