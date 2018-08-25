@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 namespace TasksCoordinator.Interface
 {
-    public interface IMessageReader<M>
+    public interface IMessageReader
     {
         int taskId { get; }
         Task<MessageReaderResult> ProcessMessage();

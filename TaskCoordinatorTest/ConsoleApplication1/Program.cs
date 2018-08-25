@@ -1,5 +1,5 @@
-﻿using SSSB;
-using System;
+﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator;
 using TasksCoordinator.Test;
@@ -8,7 +8,9 @@ namespace ConsoleApplication1
 {
     class Program
     {
-        private static TestSSSBService svc;
+        private static TestService svc;
+        private static string messageType = Enum.GetName(typeof(TaskWorkType), TaskWorkType.ShortCPUBound);
+        private static volatile int SEQUENCE_NUM = 0;
 
         static void Main(string[] args)
         {
@@ -17,19 +19,18 @@ namespace ConsoleApplication1
 
         private static async Task Start()
         {
+            SEQUENCE_NUM = 0;
+            svc = new TestService("TestService", 4, false, true);
 
-            svc = new TestSSSBService("test", 4,false,false, TaskWorkType.UltraShortCPUBound);
-            for (int i = 0; i < 3; ++i)
+            for (int i = 0; i < 50000; ++i)
             {
-                svc.MessageQueue.Add(new Message() { SequenceNumber = i });
+                svc.MessageQueue.Add(new Message() { SequenceNumber = Interlocked.Increment(ref SEQUENCE_NUM), MessageType= messageType });
             }
-            Console.WriteLine($"Initial TasksCount: {svc.TasksCoordinator.TasksCount}");
+            Console.WriteLine(string.Format("Messages in queue: {0}", svc.MessageQueue.Count));
             await svc.Start();
             var producerTask = QueueAdditionalData();
-            Console.WriteLine(string.Format("messages processed: {0}", svc.ProcessedMessages.Count));
-            Console.WriteLine(string.Format("messages in queue: {0}", svc.MessageQueue.Count));
             svc.StartActivator(50);
-            var stopTask = Stop(30);
+            var stopTask = Stop(10);
             Console.ReadLine();
             svc.Stop();
         }
@@ -40,23 +41,20 @@ namespace ConsoleApplication1
             svc.Stop();
             Console.WriteLine("**************************************");
             Console.WriteLine("Service is stopped.");
-            Console.WriteLine(string.Format("messages processed: {0}", svc.ProcessedMessages.Count));
-            Console.WriteLine(string.Format("messages in queue: {0}", svc.MessageQueue.Count));
+            Console.WriteLine(string.Format("Messages in queue: {0}", svc.MessageQueue.Count));
+            Console.WriteLine(string.Format("ProcessedCount: {0}", svc.ProcessedCount));
         }
         
     
 
         public static async Task QueueAdditionalData()
         {
-            //await Task.Delay(7000);
-            Random rnd = new Random();
-            int cnt = 0;
             await Task.Delay(7500);
             Console.WriteLine($"Delayed TasksCount: {svc.TasksCoordinator.TasksCount}");
 
             for (int i = 0; i < 10; ++i)
             {
-                svc.MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
+                svc.MessageQueue.Add(new Message() { SequenceNumber = Interlocked.Increment(ref SEQUENCE_NUM), MessageType = messageType });
             }
 
             svc.Activate();
@@ -67,7 +65,7 @@ namespace ConsoleApplication1
                 int num = 50;
                 for (int i = 0; i < num; ++i)
                 {
-                    svc.MessageQueue.Add(new Message() { SequenceNumber = ++cnt });
+                    svc.MessageQueue.Add(new Message() { SequenceNumber = Interlocked.Increment(ref SEQUENCE_NUM), MessageType = messageType });
                 }
 
                 svc.Activate();

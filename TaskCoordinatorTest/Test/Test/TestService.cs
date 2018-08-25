@@ -3,49 +3,39 @@ using Shared.Errors;
 using Shared.Services;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator;
 using TasksCoordinator.Interface;
-using TasksCoordinator.Test;
 
-namespace SSSB
+namespace TasksCoordinator.Test
 {
     /// <summary>
     /// Message Dispatcher to process messages read from queue.
     /// </summary>
-    public class TestSSSBService : ISSSBService
+    public class TestService : ITaskService
     {
-        private static ErrorMessages _errorMessages = new ErrorMessages();
-        internal static ILog _log = Log.GetInstance("TestSSSBService");
+        internal static ILog _log = Log.GetInstance("TestService");
 
         #region Private Fields
         private string _name;
-        private string _queueName;
-        private Dictionary<string, IMessageHandler<ServiceMessageEventArgs>> _messageHandlers;
-        private Dictionary<string, IMessageHandler<ErrorMessageEventArgs>> _errorMessageHandlers;
         private volatile bool _isStopped;
         private ITaskCoordinator _tasksCoordinator;
+        private TestMessageDispatcher _dispatcher;
 
         private BlockingCollection<Message> _MessageQueue;
-        private ConcurrentBag<Message> _ProcessedMessages;
         #endregion
 
 
-        public TestSSSBService(string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false, TaskWorkType workType = TaskWorkType.LongCPUBound)
+        public TestService(string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false)
         {
             _name = name;
-            _messageHandlers = new Dictionary<string, IMessageHandler<ServiceMessageEventArgs>>();
-            _errorMessageHandlers = new Dictionary<string, IMessageHandler<ErrorMessageEventArgs>>();
             _isStopped = true;
             this.isQueueActivationEnabled = isQueueActivationEnabled;
-            _MessageQueue = new BlockingCollection<Message>();
-            _ProcessedMessages = new ConcurrentBag<Message>();
-            var dispatcher = new TestMessageDispatcher(ProcessedMessages, workType);
+            this._MessageQueue = new BlockingCollection<Message>();
+            this._dispatcher = new TestMessageDispatcher();
             var producer = new TestMessageProducer(this, MessageQueue);
             var readerFactory = new TestMessageReaderFactory();
-            _tasksCoordinator = new TestTasksCoordinator(dispatcher, producer, readerFactory,
+            this._tasksCoordinator = new TestTasksCoordinator(this._dispatcher, producer, readerFactory,
                 maxReadersCount, isEnableParallelReading);
         }
 
@@ -72,28 +62,18 @@ namespace SSSB
         {
             get { return _name; }
         }
-
-        /// <summary>
-        /// Название очереди.
-        /// </summary>
-        public string QueueName
-        {
-            get { return _queueName; }
-        }
-    
         #endregion
 
         internal void InternalStart()
         {
             try
             {
-                _queueName = "test";
                 this._tasksCoordinator.Start();
                 this.OnStart();
             }
             catch (Exception ex)
             {
-                throw new PPSException($"The Service to handle messages from the queue: {this.QueueName} failed to start", ex, _log);
+                throw new PPSException($"The Service: {this.Name} failed to start", ex, _log);
             }
         }
 
@@ -205,17 +185,6 @@ namespace SSSB
         public bool isQueueActivationEnabled { get; private set; }
 
         public BlockingCollection<Message> MessageQueue { get => _MessageQueue; set => _MessageQueue = value; }
-        public ConcurrentBag<Message> ProcessedMessages { get => _ProcessedMessages; set => _ProcessedMessages = value; }
-
-        ErrorMessage ISSSBService.GetError(Guid messageID)
-        {
-            return _errorMessages.GetError(messageID);
-        }
-
-        int ISSSBService.AddError(Guid messageID, Exception err)
-        {
-            return _errorMessages.AddError(messageID, err);
-        }
         #endregion
 
         #region Immitate Queue Activation
@@ -253,5 +222,10 @@ namespace SSSB
         }
 
         #endregion
+
+        public int ProcessedCount
+        {
+            get { return this._dispatcher.MESSAGES_PROCESSED; }
+        }
     }
 }

@@ -24,7 +24,7 @@ namespace TasksCoordinator
         private readonly bool _isEnableParallelReading;
         private readonly int _maxReadersCount;
         private volatile int _taskIdSeq;
-        private volatile IMessageReader<M> _primaryReader;
+        private volatile IMessageReader _primaryReader;
         private volatile bool _isStarted;
         private volatile bool _isPaused;
         private SemaphoreSlim _semaphore;
@@ -164,7 +164,7 @@ namespace TasksCoordinator
             return result;
         }
 
-        protected IMessageReader<M> GetMessageReader(int taskId)
+        protected IMessageReader GetMessageReader(int taskId)
         {
             return this._readerFactory.CreateReader(taskId, this._producer, this);
         }
@@ -175,7 +175,7 @@ namespace TasksCoordinator
             try
             {
                 token.ThrowIfCancellationRequested();
-                IMessageReader<M> mr = this.GetMessageReader(taskId);
+                IMessageReader mr = this.GetMessageReader(taskId);
                 (this as ITaskCoordinatorAdvanced<M>).AddReader(mr);
                 isReaderAdded = true;
                 MessageReaderResult readerResult = new MessageReaderResult() { IsRemoved = false, IsWorkDone = false };
@@ -226,7 +226,7 @@ namespace TasksCoordinator
         }
 
 
-        bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader<M> reader)
+        bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader reader)
         {
             lock (this._SyncRoot)
             {
@@ -240,7 +240,7 @@ namespace TasksCoordinator
         /// </summary>
         /// <param name="reader"></param>
         /// <param name="isStartedWorking"></param>
-        void ITaskCoordinatorAdvanced<M>.RemoveReader(IMessageReader<M> reader)
+        void ITaskCoordinatorAdvanced<M>.RemoveReader(IMessageReader reader)
         {
             lock (this._SyncRoot)
             {
@@ -257,7 +257,7 @@ namespace TasksCoordinator
         /// </summary>
         /// <param name="reader"></param>
         /// <param name="isEndedWorking"></param>
-        void ITaskCoordinatorAdvanced<M>.AddReader(IMessageReader<M> reader)
+        void ITaskCoordinatorAdvanced<M>.AddReader(IMessageReader reader)
         {
             lock (this._SyncRoot)
             {
@@ -268,7 +268,7 @@ namespace TasksCoordinator
             }
         }
 
-        bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader<M> reader)
+        bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader reader)
         {
             lock (this._SyncRoot)
             {
@@ -316,7 +316,7 @@ namespace TasksCoordinator
         /// то один из них должен быть главным
         /// т.е. использовать WaitFor(RECEIVE( , а не просто RECEIVE(.
         /// </summary>
-        public IMessageReader<M> PrimaryReader
+        public IMessageReader PrimaryReader
         {
             get { return _primaryReader; }
             private set { _primaryReader = value; }

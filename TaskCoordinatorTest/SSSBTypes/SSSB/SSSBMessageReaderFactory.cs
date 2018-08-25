@@ -12,7 +12,7 @@ namespace SSSB
             this._service = service;
         }
 
-        public IMessageReader<SSSBMessage> CreateReader(int taskId, IMessageProducer<SSSBMessage> messageProducer, BaseTasksCoordinator<SSSBMessage> coordinator)
+        public IMessageReader CreateReader(int taskId, IMessageProducer<SSSBMessage> messageProducer, BaseTasksCoordinator<SSSBMessage> coordinator)
         {
             return new SSSBMessageReader(this._service, taskId, messageProducer, coordinator);
         }

@@ -20,9 +20,9 @@ namespace SSSB
 	/// Сообщение
 	/// </summary>
 	[Serializable]
-	public class SSSBMessage: Message
+	public class SSSBMessage : Message
     {
-		private Guid? _conversationHandle;
+        private Guid? _conversationHandle;
 		private Guid? _conversationGroupID;
         private MessageValidationType _validationType;
         private string _contractName;
@@ -102,11 +102,11 @@ namespace SSSB
 
         public const string PPS_EmptyMessageType = "PPS_EmptyMessageType";
         public const string PPS_StepCompleteMessageType = "PPS_StepCompleteMessageType";
-	
-		/// <summary>
-		/// Идентификатор диалога обмена сообщениями.
-		/// </summary>
-		public Guid? ConversationHandle
+
+        /// <summary>
+        /// Идентификатор диалога обмена сообщениями.
+        /// </summary>
+        public Guid? ConversationHandle
 		{
 			get { return _conversationHandle; }
 			set { _conversationHandle = value; }

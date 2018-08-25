@@ -42,7 +42,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Test\TestSSSBService.cs" />
+    <Compile Include="Test\TestService.cs" />
     <Compile Include="Test\TaskWorkType.cs" />
     <Compile Include="Test\TestMessageDispatcher.cs" />
     <Compile Include="Test\TestMessageProducer.cs" />

@@ -1,46 +1,34 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
-using System.Linq;
 
 namespace TasksCoordinator.Test
 {
     public class TestMessageDispatcher: IMessageDispatcher<Message>
     {
-        private static volatile int longCount = 0;
-        #region TEST RESULTS
-        // Work type (category)  for testing message processing
-        private TaskWorkType _workType;
-        private ConcurrentBag<Message> _processedMessages;
-        public ConcurrentBag<Message> ProcessedMessages
-        {
-            get { return _processedMessages; }
-        }
-        #endregion
+       internal volatile int MESSAGES_PROCESSED;
 
-        public TestMessageDispatcher(ConcurrentBag<Message> processedMessages, TaskWorkType workType)
+        public TestMessageDispatcher()
         {
-            this._processedMessages = processedMessages;
-            this._workType = workType;
+            this.MESSAGES_PROCESSED = 0;
         }
 
-        private async Task<bool> DispatchMessage(Message message, WorkContext context, TaskWorkType workType)
+        private async Task<bool> DispatchMessage(Message message, WorkContext context)
         {
             CancellationToken cancellation = context.Cancellation;
             //возвратить ли сообщение назад в очередь?
             bool rollBack = false;
+            TaskWorkType workType = (TaskWorkType)Enum.Parse(typeof(TaskWorkType), message.MessageType);
             switch (workType)
             {
                 case TaskWorkType.LongCPUBound:
                     Task task = new Task(async () => {
                         try
                         {
-                            ++longCount;
                             await CPU_TASK(message, cancellation, 10000000).ConfigureAwait(false);
-                            --longCount;
                         }
                         catch (OperationCanceledException)
                         {
@@ -60,30 +48,30 @@ namespace TasksCoordinator.Test
                     await IO_TASK(message, cancellation, 5000).ConfigureAwait(false);
                     break;
                 case TaskWorkType.ShortCPUBound:
-                    await  CPU_TASK(message, cancellation, 10000).ConfigureAwait(false); 
+                    await  CPU_TASK(message, cancellation, 5000).ConfigureAwait(false); 
                     break;
                 case TaskWorkType.ShortIOBound:
                     await IO_TASK(message, cancellation, 500).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortCPUBound:
-                    await CPU_TASK(message, cancellation, 100).ConfigureAwait(false);
+                    await CPU_TASK(message, cancellation, 5).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortIOBound:
-                    await IO_TASK(message, cancellation, 100).ConfigureAwait(false);
+                    await IO_TASK(message, cancellation, 10).ConfigureAwait(false);
                     break;
                 case TaskWorkType.Mixed:
                     var workTypes = Enum.GetValues(typeof(TaskWorkType)).Cast<int>().Where(v => v < 100).ToArray();
                     Random rnd = new Random();
                     int val = rnd.Next(workTypes.Length-1);
                     TaskWorkType wrkType = (TaskWorkType)workTypes[val];
-                    var unused =await this.DispatchMessage(message, context, wrkType).ConfigureAwait(false);
+                    message.MessageType = Enum.GetName(typeof(TaskWorkType), wrkType);
+                    var unused = await this.DispatchMessage(message, context).ConfigureAwait(false);
                     return false;
                 default:
                     throw new InvalidOperationException("Unknown WorkType");
             }
-
-           ProcessedMessages.Add(message);
-            Console.WriteLine($"SEQNUM:{message.SequenceNumber} - THREAD: {Thread.CurrentThread.ManagedThreadId} - TasksCount:{context.Coordinator.TasksCount} LongCount: {longCount} WorkType: {workType}");
+            Interlocked.Increment(ref MESSAGES_PROCESSED);
+            // Console.WriteLine($"SEQNUM:{message.SequenceNumber} - THREAD: {Thread.CurrentThread.ManagedThreadId} - TasksCount:{context.Coordinator.TasksCount} WorkType: {message.MessageType}");
             return rollBack;
         }
 
@@ -103,16 +91,13 @@ namespace TasksCoordinator.Test
 
         // Test Task IO Bound
         private static Task IO_TASK(Message message, CancellationToken cancellation, int durationMilliseconds)
-        {
-            Random rnd = new Random();
-            int msecs = rnd.Next(durationMilliseconds / 5, durationMilliseconds);
-
-            return Task.Delay(msecs, cancellation);
+        { 
+            return Task.Delay(durationMilliseconds, cancellation);
             // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
         }
 
-        async Task<MessageProcessingResult> IMessageDispatcher<Message>.DispatchMessages(IEnumerable<Message> messages, WorkContext context,
-        Action<Message> onProcessStart)
+        async Task<MessageProcessingResult> IMessageDispatcher<Message>.DispatchMessages(IEnumerable<Message> messages, 
+            WorkContext context, Action<Message> onProcessStart)
         {
             bool rollBack = false;
             Message currentMessage = null;
@@ -127,7 +112,7 @@ namespace TasksCoordinator.Test
                 {
                     currentMessage = message;
                     onProcessStart(currentMessage);
-                    rollBack = await this.DispatchMessage(message, context, this._workType).ConfigureAwait(false);
+                    rollBack = await this.DispatchMessage(message, context).ConfigureAwait(false);
 
                     if (rollBack)
                         break;

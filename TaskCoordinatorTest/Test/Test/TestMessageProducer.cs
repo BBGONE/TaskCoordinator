@@ -11,8 +11,6 @@ namespace TasksCoordinator.Test
 {
     public class TestMessageProducer: IMessageProducer<Message>
     {
-        // adds a realistic delay - like when the messages are read from the database transport (instead of a local in memory queue)
-        private const int READ_MESSAGE_DELAY = 0;
         private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
         private ITaskService _service;
         private CancellationToken _cancellation;
@@ -75,6 +73,7 @@ namespace TasksCoordinator.Test
 
         private async Task<IEnumerable<Message>> ReadMessages(bool isPrimaryReader, int taskId)
         {
+            await Task.FromResult(0);
             LinkedList<Message> messages = new LinkedList<Message>();
             Random rnd = new Random();
             Message msg;
@@ -86,7 +85,6 @@ namespace TasksCoordinator.Test
                     {
                         msg = null;
                     }
-                    await Task.Delay(READ_MESSAGE_DELAY).ConfigureAwait(false);
                    // Console.WriteLine(string.Format("Primary reading {0}", taskId));
                 }
                 catch (OperationCanceledException)
@@ -104,7 +102,6 @@ namespace TasksCoordinator.Test
                 if (_messageQueue.TryTake(out msg))
                 {
                     // msg.ServiceName = $"TaskID:{taskId.ToString()}";
-                    await Task.Delay(READ_MESSAGE_DELAY).ConfigureAwait(false);
                     //Console.WriteLine(string.Format("Secondary reading {0}", taskId));
                     messages.AddLast(msg);
                 }

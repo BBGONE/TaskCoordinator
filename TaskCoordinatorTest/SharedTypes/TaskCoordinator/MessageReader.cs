@@ -1,14 +1,13 @@
-﻿using System;
+﻿using Shared;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
-using Shared;
-using System.Linq;
 
 namespace TasksCoordinator
 {
-    public class MessageReader<M> : IMessageReader<M>, IMessageWorker<M>
+    public class MessageReader<M> : IMessageReader, IMessageWorker<M>
     {
         #region Private Fields
         private int _taskId;
@@ -64,7 +63,7 @@ namespace TasksCoordinator
         /// If this method returns False then the thread exits from the  loop
         /// </summary>
         /// <returns></returns>
-        async Task<MessageReaderResult> IMessageReader<M>.ProcessMessage()
+        async Task<MessageReaderResult> IMessageReader.ProcessMessage()
         {
             if (this._coordinator.IsPaused)
             {

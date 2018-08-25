@@ -77,19 +77,19 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="COORDINATOR\BaseTasksCoordinator.cs" />
-    <Compile Include="COORDINATOR\Interface\ITaskCoordinatorAdvanced.cs" />
-    <Compile Include="COORDINATOR\Interface\ITaskCoordinator.cs" />
-    <Compile Include="COORDINATOR\Interface\IMessageDispatcher.cs" />
-    <Compile Include="COORDINATOR\Interface\IMessageProducer.cs" />
-    <Compile Include="COORDINATOR\Interface\IMessageReader.cs" />
-    <Compile Include="COORDINATOR\Interface\IMessageReaderFactory.cs" />
-    <Compile Include="COORDINATOR\Interface\IMessageWorker.cs" />
-    <Compile Include="COORDINATOR\Message.cs" />
-    <Compile Include="COORDINATOR\MessageProcessingResult.cs" />
-    <Compile Include="COORDINATOR\MessageReader.cs" />
-    <Compile Include="COORDINATOR\MessageReaderResult.cs" />
-    <Compile Include="COORDINATOR\WorkContext.cs" />
+    <Compile Include="TaskCoordinator\BaseTasksCoordinator.cs" />
+    <Compile Include="TaskCoordinator\Interface\ITaskCoordinatorAdvanced.cs" />
+    <Compile Include="TaskCoordinator\Interface\ITaskCoordinator.cs" />
+    <Compile Include="TaskCoordinator\Interface\IMessageDispatcher.cs" />
+    <Compile Include="TaskCoordinator\Interface\IMessageProducer.cs" />
+    <Compile Include="TaskCoordinator\Interface\IMessageReader.cs" />
+    <Compile Include="TaskCoordinator\Interface\IMessageReaderFactory.cs" />
+    <Compile Include="TaskCoordinator\Interface\IMessageWorker.cs" />
+    <Compile Include="TaskCoordinator\Message.cs" />
+    <Compile Include="TaskCoordinator\MessageProcessingResult.cs" />
+    <Compile Include="TaskCoordinator\MessageReader.cs" />
+    <Compile Include="TaskCoordinator\MessageReaderResult.cs" />
+    <Compile Include="TaskCoordinator\WorkContext.cs" />
     <Compile Include="Database\ConnectionManager.cs" />
     <Compile Include="Database\DbConnectionFactory.cs" />
     <Compile Include="Database\DbConnectionScope.cs" />
