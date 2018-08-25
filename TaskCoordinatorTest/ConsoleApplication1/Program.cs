@@ -39,6 +39,9 @@ namespace ConsoleApplication1
         {
             await Task.Delay(1000 * delaySeconds);
             svc.Stop();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
             Console.WriteLine("**************************************");
             Console.WriteLine("Service is stopped.");
             Console.WriteLine(string.Format("Messages in queue: {0}", svc.MessageQueue.Count));
