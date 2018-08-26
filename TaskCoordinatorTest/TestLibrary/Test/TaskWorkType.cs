@@ -2,12 +2,12 @@
 {
     public enum TaskWorkType
     {
-        ShortCPUBound,
-        LongCPUBound,
-        ShortIOBound,
-        LongIOBound,
         UltraShortIOBound,
         UltraShortCPUBound,
-        Mixed =100
+        ShortCPUBound,
+        ShortIOBound,
+        LongCPUBound,
+        LongIOBound,
+        Random = 100
     }
 }

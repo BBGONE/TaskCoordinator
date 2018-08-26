@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,6 +27,7 @@ namespace TasksCoordinator.Test
             // возвратить ли сообщение назад в очередь?
             bool rollBack = false;
             Payload payload = this._serializer.Deserialize<Payload>(message.Body);
+            payload.TryCount += 1;
             TaskWorkType workType = payload.WorkType;
             switch (workType)
             {
@@ -33,7 +35,7 @@ namespace TasksCoordinator.Test
                     Task task = new Task(async () => {
                         try
                         {
-                            await CPU_TASK(message, payload, cancellation, 10000000).ConfigureAwait(false);
+                            await CPU_TASK(message, payload, cancellation, 100000).ConfigureAwait(false);
                         }
                         catch (OperationCanceledException)
                         {
@@ -64,16 +66,10 @@ namespace TasksCoordinator.Test
                 case TaskWorkType.UltraShortIOBound:
                     await IO_TASK(message, payload, cancellation, 10).ConfigureAwait(false);
                     break;
-                case TaskWorkType.Mixed:
-                    var workTypes = Enum.GetValues(typeof(TaskWorkType)).Cast<int>().Where(v => v < 100).ToArray();
-                    Random rnd = new Random();
-                    int val = rnd.Next(workTypes.Length-1);
-                    TaskWorkType wrkType = (TaskWorkType)workTypes[val];
-                    message.MessageType = Enum.GetName(typeof(TaskWorkType), wrkType);
-                    var unused = await this.DispatchMessage(message, context).ConfigureAwait(false);
-                    return false;
+                case TaskWorkType.Random:
+                    throw new InvalidOperationException("Random WorkType is not Supported");
                 default:
-                    throw new InvalidOperationException("Unknown WorkType");
+                    throw new InvalidOperationException($"Unknown WorkType {workType}");
             }
           
             // Console.WriteLine($"SEQNUM:{message.SequenceNumber} - THREAD: {Thread.CurrentThread.ManagedThreadId} - TasksCount:{context.Coordinator.TasksCount} WorkType: {payload.WorkType}");
@@ -83,8 +79,10 @@ namespace TasksCoordinator.Test
         // Test Task which consumes CPU
         private async Task CPU_TASK(Message message, Payload payload, CancellationToken cancellation, int iterations)
         {
+            Stopwatch stopwatch = new Stopwatch();
             try
             {
+                stopwatch.Start();
                 await Task.FromResult(0);
                 // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
                 int cnt = iterations;
@@ -95,51 +93,83 @@ namespace TasksCoordinator.Test
                     //Do some CPU work 
                     payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("qwertyuiop[;lkjhngbfd--cnt={0}", cnt));
                 }
-                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK Time={0:dd.MM.yyyy HH:mm:ss.fff}---cnt={1}", DateTime.Now, cnt));
+                if (message.SequenceNumber % 20 == 0 && payload.TryCount < 2)
+                {
+                    throw new Exception($"Test Exception TryCount: {payload.TryCount}");
+                }
                 cancellation.ThrowIfCancellationRequested();
+                stopwatch.Stop();
+                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK TimeElapsed={0} ticks---cnt={1}  TryCount: {2}", stopwatch.ElapsedTicks, cnt, payload.TryCount));
                 ICallback callback;
                 if (this._callbacks.TryGetValue(payload.ClientID, out callback))
                 {
+                    cancellation.ThrowIfCancellationRequested();
                     message.Body = this._serializer.Serialize(payload);
                     callback.TaskCompleted(message, null);
                 }
             }
             catch (OperationCanceledException)
             {
-                //NOOP
+                if (stopwatch.IsRunning)
+                {
+                    stopwatch.Stop();
+                }
             }
             catch (Exception ex)
             {
+                if (stopwatch.IsRunning)
+                {
+                    stopwatch.Stop();
+                }
                 ICallback callback;
                 if (this._callbacks.TryGetValue(payload.ClientID, out callback))
                 {
                     message.Body = this._serializer.Serialize(payload);
                     callback.TaskCompleted(message, ex.Message);
                 }
-                throw;
             }
         }
 
         // Test Task IO Bound
         private async Task IO_TASK(Message message, Payload payload, CancellationToken cancellation, int durationMilliseconds)
         {
+            Stopwatch stopwatch = new Stopwatch();
             try
             {
+                stopwatch.Start();
                 await Task.Delay(durationMilliseconds, cancellation);
                 cancellation.ThrowIfCancellationRequested();
-                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK Time={0:dd.MM.yyyy HH:mm:ss.fff}", DateTime.Now));
-                cancellation.ThrowIfCancellationRequested();
+                stopwatch.Stop();
+                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK TimeElapsed={0} ticks--- durationMilliseconds={1}", stopwatch.ElapsedTicks, durationMilliseconds));
                 // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
                 ICallback callback;
                 if (this._callbacks.TryGetValue(payload.ClientID, out callback))
                 {
+                    cancellation.ThrowIfCancellationRequested();
                     message.Body = this._serializer.Serialize(payload);
                     callback.TaskCompleted(message, null);
                 }
             }
             catch (OperationCanceledException)
             {
+                if (stopwatch.IsRunning)
+                {
+                    stopwatch.Stop();
+                }
                 //NOOP
+            }
+            catch (Exception ex)
+            {
+                if (stopwatch.IsRunning)
+                {
+                    stopwatch.Stop();
+                }
+                ICallback callback;
+                if (this._callbacks.TryGetValue(payload.ClientID, out callback))
+                {
+                    message.Body = this._serializer.Serialize(payload);
+                    callback.TaskCompleted(message, ex.Message);
+                }
             }
         }
 

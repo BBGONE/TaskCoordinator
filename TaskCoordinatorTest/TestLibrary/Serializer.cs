@@ -6,12 +6,12 @@ namespace TasksCoordinator.Test
 {
     public class Serializer : ISerializer
     {
-        private BinaryFormatter formatter = new BinaryFormatter();
-
+        
         T ISerializer.Deserialize<T>(byte[] bytes)
         {
             using (MemoryStream stream = new MemoryStream(bytes))
             {
+                BinaryFormatter formatter = new BinaryFormatter();
                 return (T)formatter.Deserialize(stream);
             }
         }
@@ -20,6 +20,7 @@ namespace TasksCoordinator.Test
         {
             using (MemoryStream stream = new MemoryStream())
             {
+                BinaryFormatter formatter = new BinaryFormatter();
                 formatter.Serialize(stream, obj);
                 return stream.ToArray();
             }
