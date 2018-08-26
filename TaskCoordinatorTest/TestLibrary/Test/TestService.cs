@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
+using TasksCoordinator.Test.Interface;
 
 namespace TasksCoordinator.Test
 {
@@ -21,26 +22,26 @@ namespace TasksCoordinator.Test
         private volatile bool _isStopped;
         private ITaskCoordinator _tasksCoordinator;
         private TestMessageDispatcher _dispatcher;
-
-        private BlockingCollection<Message> _MessageQueue;
+        private BlockingCollection<Message> _messageQueue;
+        private ISerializer _serializer;
         #endregion
 
-
-        public TestService(string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false)
+        public TestService(ISerializer serializer, string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false)
         {
-            _name = name;
-            _isStopped = true;
+            this._name = name;
+            this._isStopped = true;
             this.isQueueActivationEnabled = isQueueActivationEnabled;
-            this._MessageQueue = new BlockingCollection<Message>();
-            this._dispatcher = new TestMessageDispatcher();
-            var producer = new TestMessageProducer(this, MessageQueue);
+            this._serializer = serializer;
+            this._messageQueue = new BlockingCollection<Message>();
+            this._dispatcher = new TestMessageDispatcher(this._serializer);
+            var producer = new TestMessageProducer(this, this._messageQueue);
             var readerFactory = new TestMessageReaderFactory();
             this._tasksCoordinator = new TestTasksCoordinator(this._dispatcher, producer, readerFactory,
                 maxReadersCount, isEnableParallelReading);
         }
 
         #region Properties
-        public ITaskCoordinator  TasksCoordinator { get => _tasksCoordinator; }
+        public ITaskCoordinator TasksCoordinator { get => _tasksCoordinator; }
 
         public bool IsStopped
         {
@@ -49,9 +50,9 @@ namespace TasksCoordinator.Test
 
         public bool IsPaused
         {
-            get 
+            get
             {
-                return this._tasksCoordinator.IsPaused; 
+                return this._tasksCoordinator.IsPaused;
             }
         }
 
@@ -80,17 +81,17 @@ namespace TasksCoordinator.Test
         #region OnEvent Methods
         protected virtual void OnStarting()
         {
-          
+
         }
 
         protected virtual void OnStart()
         {
-            
+
         }
 
         protected virtual void OnStop()
         {
-           
+
         }
         #endregion
 
@@ -108,11 +109,11 @@ namespace TasksCoordinator.Test
             this.InternalStart();
         }
 
-    	/// <summary>
-		/// Остановка сервиса.
-		/// </summary>
-		public void Stop()
-		{
+        /// <summary>
+        /// Остановка сервиса.
+        /// </summary>
+        public void Stop()
+        {
             try
             {
                 lock (this)
@@ -133,18 +134,18 @@ namespace TasksCoordinator.Test
                         return true;
                     }
                 });
-           
+
             }
-            catch (OperationCanceledException )
+            catch (OperationCanceledException)
             {
-               
+
             }
             catch (Exception ex)
             {
                 _log.Error(ex);
             }
             this.OnStop();
-		}
+        }
 
         /// <summary>
         /// приостанавливает обработку сообщений
@@ -183,8 +184,6 @@ namespace TasksCoordinator.Test
         }
 
         public bool isQueueActivationEnabled { get; private set; }
-
-        public BlockingCollection<Message> MessageQueue { get => _MessageQueue; set => _MessageQueue = value; }
         #endregion
 
         #region Immitate Queue Activation
@@ -223,9 +222,24 @@ namespace TasksCoordinator.Test
 
         #endregion
 
-        public int ProcessedCount
+        public void RegisterCallback(Guid clientID, ICallback callback) {
+            this._dispatcher.RegisterCallback(clientID, callback);
+        }
+
+        public bool UnRegisterCallback(Guid clientID)
         {
-            get { return this._dispatcher.MESSAGES_PROCESSED; }
+            return this._dispatcher.UnRegisterCallback(clientID);
+        }
+
+        public void AddToQueue<T>(T msg, int num, string msgType) {
+            byte[] bytes = this._serializer.Serialize(msg);
+            var message = new Message() { SequenceNumber = num, MessageType = msgType, Body= bytes, ServiceName = this.Name };
+            this._messageQueue.Add(message);
+        }
+
+        public int QueueLength
+        {
+            get { return this._messageQueue.Count; }
         }
     }
 }

@@ -7,8 +7,8 @@
     <ProjectGuid>{8F7D46E4-ACD9-4F5A-84A1-7FB7CA454BE9}</ProjectGuid>
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ConsoleApplication1</RootNamespace>
-    <AssemblyName>ConsoleApplication1</AssemblyName>
+    <RootNamespace>TestApplication</RootNamespace>
+    <AssemblyName>TestApplication</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
@@ -57,9 +57,9 @@
       <Project>{7edeed80-c546-4f00-a265-1801bda72c07}</Project>
       <Name>SSSBTypes</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Test\Test.csproj">
+    <ProjectReference Include="..\TestLibrary\TestLibrary.csproj">
       <Project>{9c19a7c3-99cb-4e27-97b8-430ca2472dbe}</Project>
-      <Name>Test</Name>
+      <Name>TestLibrary</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

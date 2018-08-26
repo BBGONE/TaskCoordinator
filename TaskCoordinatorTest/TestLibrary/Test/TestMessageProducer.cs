@@ -15,6 +15,7 @@ namespace TasksCoordinator.Test
         private ITaskService _service;
         private CancellationToken _cancellation;
         private readonly BlockingCollection<Message> _messageQueue;
+   
 
         public TestMessageProducer(ITaskService service, BlockingCollection<Message> messageQueue)
         {
@@ -24,7 +25,7 @@ namespace TasksCoordinator.Test
             this.DefaultWaitForTimeout = this._service.isQueueActivationEnabled ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(30);
         }
 
-        public BlockingCollection<Message> MessageQueue
+        private BlockingCollection<Message> MessageQueue
         {
             get { return _messageQueue; }
         }
@@ -99,7 +100,7 @@ namespace TasksCoordinator.Test
             }
             else
             {
-                if (_messageQueue.TryTake(out msg))
+                if (_messageQueue.TryTake(out msg, 0))
                 {
                     // msg.ServiceName = $"TaskID:{taskId.ToString()}";
                     //Console.WriteLine(string.Format("Secondary reading {0}", taskId));
