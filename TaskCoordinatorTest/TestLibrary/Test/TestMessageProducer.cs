@@ -13,7 +13,6 @@ namespace TasksCoordinator.Test
     {
         private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
         private ITaskService _service;
-        private CancellationToken _cancellation;
         private readonly BlockingCollection<Message> _messageQueue;
    
 
@@ -21,8 +20,7 @@ namespace TasksCoordinator.Test
         {
             this._service = service;
             this._messageQueue = messageQueue;
-            this._cancellation = CancellationToken.None;
-            this.DefaultWaitForTimeout = this._service.isQueueActivationEnabled ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(30);
+            this.DefaultWaitForTimeout = this._service.isQueueActivationEnabled ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(5);
         }
 
         private BlockingCollection<Message> MessageQueue
@@ -34,16 +32,11 @@ namespace TasksCoordinator.Test
             get { return this._service.isQueueActivationEnabled; }
         }
 
-        public CancellationToken Cancellation {
-            get { return _cancellation; }
-            set { _cancellation = value; }
-        }
-
-        async Task<int> IMessageProducer<Message>.DoWork(IMessageWorker<Message> worker, bool isPrimaryReader)
+        async Task<int> IMessageProducer<Message>.DoWork(IMessageWorker<Message> worker, bool isPrimaryReader, CancellationToken cancellation)
         {
             int cnt = 0;
             //Console.WriteLine(string.Format("begin {0}", worker.taskId));
-            IEnumerable<Message> messages = await this.ReadMessages(isPrimaryReader, worker.taskId).ConfigureAwait(false);
+            IEnumerable<Message> messages = await this.ReadMessages(isPrimaryReader, worker.taskId, cancellation).ConfigureAwait(false);
             cnt = messages.Count();
             //Console.WriteLine(string.Format("end {0}", worker.taskId));
 
@@ -72,7 +65,7 @@ namespace TasksCoordinator.Test
             return cnt;
         }
 
-        private async Task<IEnumerable<Message>> ReadMessages(bool isPrimaryReader, int taskId)
+        private async Task<IEnumerable<Message>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken cancellation)
         {
             await Task.FromResult(0);
             LinkedList<Message> messages = new LinkedList<Message>();
@@ -81,18 +74,9 @@ namespace TasksCoordinator.Test
             // for the Primary reader (it waits for messages when the queue is empty)
             if (isPrimaryReader)
             {
-                try {
-                    if (!_messageQueue.TryTake(out msg, Convert.ToInt32(DefaultWaitForTimeout.TotalMilliseconds), this.Cancellation))
-                    {
-                        msg = null;
-                    }
-                   // Console.WriteLine(string.Format("Primary reading {0}", taskId));
-                }
-                catch (OperationCanceledException)
-                {
-                    return messages;
-                }
-                if (msg != null)
+
+                // Console.WriteLine(string.Format("Primary reading {0}", taskId));
+                if (_messageQueue.TryTake(out msg, Convert.ToInt32(DefaultWaitForTimeout.TotalMilliseconds), cancellation))
                 {
                     // msg.ServiceName = $"TaskID:{taskId.ToString()}";
                     messages.AddLast(msg);
@@ -107,6 +91,9 @@ namespace TasksCoordinator.Test
                     messages.AddLast(msg);
                 }
             }
+
+            cancellation.ThrowIfCancellationRequested();
+
 
             return messages;
         }

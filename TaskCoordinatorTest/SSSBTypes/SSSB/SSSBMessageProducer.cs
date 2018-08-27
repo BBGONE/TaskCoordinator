@@ -17,7 +17,6 @@ namespace SSSB
     public class SSSBMessageProducer: IMessageProducer<SSSBMessage>
     {
         internal static readonly ILog _log = Log.GetInstance("SSSBMessageProducer");
-        private CancellationToken _cancellation;
         private static ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
         private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
         /// <summary>
@@ -29,7 +28,6 @@ namespace SSSB
         public SSSBMessageProducer(ISSSBService sssbService)
         {
             this._sssbService = sssbService;
-            this._cancellation = CancellationToken.None;
             this.DefaultWaitForTimeout = sssbService.isQueueActivationEnabled ? TimeSpan.FromSeconds(7) : TimeSpan.FromSeconds(30);
         }
 
@@ -38,13 +36,7 @@ namespace SSSB
             get { return _sssbService.isQueueActivationEnabled; }
         }
 
-        public CancellationToken Cancellation
-        {
-            get { return _cancellation; }
-            set { _cancellation = value; }
-        }
-
-        async Task<int> IMessageProducer<SSSBMessage>.DoWork(IMessageWorker<SSSBMessage> worker, bool isPrimaryReader)
+        async Task<int> IMessageProducer<SSSBMessage>.DoWork(IMessageWorker<SSSBMessage> worker, bool isPrimaryReader, CancellationToken cancellation)
         {
             SSSBMessage[] messages = new SSSBMessage[0];
             bool beforeWorkCalled = false;
@@ -62,7 +54,7 @@ namespace SSSB
                     Exception error = null;
                     try
                     {
-                        dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(this.Cancellation).ConfigureAwait(false);
+                        dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(cancellation).ConfigureAwait(false);
                     }
                     catch(Exception ex)
                     {
@@ -71,13 +63,13 @@ namespace SSSB
 
                     if (error != null)
                     {
-                        await _errorHandler.Handle(_log, error, this.Cancellation).ConfigureAwait(false); 
+                        await _errorHandler.Handle(_log, error, cancellation).ConfigureAwait(false); 
                         return 0;
                     }
 
                     using (dbconnection)
                     {
-                        messages = await this.ReadMessages(dbconnection, isPrimaryReader, worker.taskId).ConfigureAwait(false);
+                        messages = await this.ReadMessages(dbconnection, isPrimaryReader, worker.taskId, cancellation).ConfigureAwait(false);
                         cnt = messages.Length;
 
                         beforeWorkCalled = worker.OnBeforeDoWork();
@@ -100,7 +92,7 @@ namespace SSSB
             return cnt;
         }
 
-        private async Task<SSSBMessage[]> ReadMessages(SqlConnection dbconnection, bool isPrimaryReader, int taskId)
+        private async Task<SSSBMessage[]> ReadMessages(SqlConnection dbconnection, bool isPrimaryReader, int taskId, CancellationToken cancellation)
         {
             //reading messages from the queue
             IDataReader reader = null;
@@ -112,12 +104,12 @@ namespace SSSB
                         DEFAULT_FETCH_SIZE, 
                         (int)DefaultWaitForTimeout.TotalMilliseconds, 
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess, 
-                        this.Cancellation).ConfigureAwait(false);
+                        cancellation).ConfigureAwait(false);
                 else
                     reader = await SSSBManager.ReceiveMessagesNoWaitAsync(dbconnection, this._sssbService.QueueName, 
                         DEFAULT_FETCH_SIZE, 
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess,
-                        this.Cancellation).ConfigureAwait(false);
+                        cancellation).ConfigureAwait(false);
 
                 //no result after cancellation
                 if (reader == null)

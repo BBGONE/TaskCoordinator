@@ -17,6 +17,7 @@ namespace TasksCoordinator
     public abstract class BaseTasksCoordinator<M> : ITaskCoordinatorAdvanced<M>, IQueueActivator
     {
         private const int MAX_TASK_NUM = int.MaxValue;
+        private const int STOP_TIMEOUT = 30000;
         internal static ILog _log = Log.GetInstance("BaseTasksCoordinator");
 
         private readonly object _lock = new object();
@@ -63,7 +64,6 @@ namespace TasksCoordinator
                 if (this._isStarted)
                     return;
                 this._stopSource = new CancellationTokenSource();
-                this._producer.Cancellation = this._stopSource.Token;
                 this._taskIdSeq = 0;
                 this._primaryReader = null;
                 this._isStarted = true;
@@ -94,7 +94,7 @@ namespace TasksCoordinator
                 var tasks = this._tasks.ToArray().Select(p => p.Value).ToArray();
                 if (tasks.Length > 0)
                 {
-                    await Task.WhenAny(Task.WhenAll(tasks), Task.Delay(30000)).ConfigureAwait(false);
+                    await Task.WhenAny(Task.WhenAll(tasks), Task.Delay(STOP_TIMEOUT)).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException)
@@ -121,7 +121,7 @@ namespace TasksCoordinator
             int taskId = -1;
             try
             {
-                CancellationToken token = CancellationToken.None;
+                var cancellation = this.Cancellation;
                 lock (this._semaphoreLock)
                 {
                     var newcount = this._semaphore - 1;
@@ -137,7 +137,6 @@ namespace TasksCoordinator
                     var dummy = Task.FromResult(0);
                     try
                     {
-                        token = this.Cancellation;
                         Interlocked.CompareExchange(ref this._taskIdSeq, 0, MAX_TASK_NUM);
                         taskId = Interlocked.Increment(ref this._taskIdSeq);
                         result = this._tasks.TryAdd(taskId, dummy);
@@ -155,7 +154,7 @@ namespace TasksCoordinator
                         }
                         throw;
                     }
-                    var startTask = Task<Task<int>>.Factory.StartNew(() => { return JobRunner(token, taskId);  }, token);
+                    var startTask = Task<Task<int>>.Factory.StartNew(() => { return JobRunner(cancellation, taskId);  }, cancellation);
                     this._tasks.TryUpdate(taskId, startTask, dummy);
                     var task = await startTask;
                     this._tasks.TryUpdate(taskId, task, startTask);
@@ -216,6 +215,7 @@ namespace TasksCoordinator
             }
             catch (OperationCanceledException)
             {
+                throw;
             }
             catch (PPSException)
             {

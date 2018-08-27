@@ -23,19 +23,20 @@ namespace TasksCoordinator.Test
 
         private async Task<bool> DispatchMessage(Message message, WorkContext context)
         {
-            CancellationToken cancellation = context.Cancellation;
             // возвратить ли сообщение назад в очередь?
             bool rollBack = false;
+            CancellationToken cancellation = context.Cancellation;
             Payload payload = this._serializer.Deserialize<Payload>(message.Body);
             payload.TryCount += 1;
             TaskWorkType workType = payload.WorkType;
             switch (workType)
             {
                 case TaskWorkType.LongCPUBound:
-                    Task task = new Task(async () => {
+                    Task task = new Task(async () =>
+                    {
                         try
                         {
-                            await CPU_TASK(message, payload, cancellation, 100000).ConfigureAwait(false);
+                            await CPU_TASK(message, payload, cancellation, 10000000, context.taskId).ConfigureAwait(false);
                         }
                         catch (OperationCanceledException)
                         {
@@ -55,13 +56,13 @@ namespace TasksCoordinator.Test
                     await IO_TASK(message, payload, cancellation, 5000).ConfigureAwait(false);
                     break;
                 case TaskWorkType.ShortCPUBound:
-                    await  CPU_TASK(message, payload, cancellation, 5000).ConfigureAwait(false); 
+                    await CPU_TASK(message, payload, cancellation, 5000, context.taskId).ConfigureAwait(false);
                     break;
                 case TaskWorkType.ShortIOBound:
                     await IO_TASK(message, payload, cancellation, 500).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortCPUBound:
-                    await CPU_TASK(message, payload, cancellation, 5).ConfigureAwait(false);
+                    await CPU_TASK(message, payload, cancellation, 5, context.taskId).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortIOBound:
                     await IO_TASK(message, payload, cancellation, 10).ConfigureAwait(false);
@@ -71,14 +72,19 @@ namespace TasksCoordinator.Test
                 default:
                     throw new InvalidOperationException($"Unknown WorkType {workType}");
             }
-          
+
             // Console.WriteLine($"SEQNUM:{message.SequenceNumber} - THREAD: {Thread.CurrentThread.ManagedThreadId} - TasksCount:{context.Coordinator.TasksCount} WorkType: {payload.WorkType}");
             return rollBack;
         }
 
         // Test Task which consumes CPU
-        private async Task CPU_TASK(Message message, Payload payload, CancellationToken cancellation, int iterations)
+        private async Task CPU_TASK(Message message, Payload payload, CancellationToken cancellation, int iterations, int taskId)
         {
+            ICallback callback;
+            if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
+            {
+                return;
+            }
             Stopwatch stopwatch = new Stopwatch();
             try
             {
@@ -100,33 +106,24 @@ namespace TasksCoordinator.Test
                 cancellation.ThrowIfCancellationRequested();
                 stopwatch.Stop();
                 payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK TimeElapsed={0} ticks---cnt={1}  TryCount: {2}", stopwatch.ElapsedTicks, cnt, payload.TryCount));
-                ICallback callback;
-                if (this._callbacks.TryGetValue(payload.ClientID, out callback))
-                {
-                    cancellation.ThrowIfCancellationRequested();
-                    message.Body = this._serializer.Serialize(payload);
-                    callback.TaskCompleted(message, null);
-                }
+                 cancellation.ThrowIfCancellationRequested();
+                message.Body = this._serializer.Serialize(payload);
+                callback.PostTaskCompleted(message, null);
             }
             catch (OperationCanceledException)
             {
-                if (stopwatch.IsRunning)
-                {
-                    stopwatch.Stop();
-                }
+                message.Body = this._serializer.Serialize(payload);
+                callback.PostTaskCompleted(message, "CANCELLED");
             }
             catch (Exception ex)
             {
+                message.Body = this._serializer.Serialize(payload);
+                callback.PostTaskCompleted(message, ex.Message);
+            }
+            finally
+            {
                 if (stopwatch.IsRunning)
-                {
                     stopwatch.Stop();
-                }
-                ICallback callback;
-                if (this._callbacks.TryGetValue(payload.ClientID, out callback))
-                {
-                    message.Body = this._serializer.Serialize(payload);
-                    callback.TaskCompleted(message, ex.Message);
-                }
             }
         }
 
@@ -147,7 +144,7 @@ namespace TasksCoordinator.Test
                 {
                     cancellation.ThrowIfCancellationRequested();
                     message.Body = this._serializer.Serialize(payload);
-                    callback.TaskCompleted(message, null);
+                    callback.PostTaskCompleted(message, null);
                 }
             }
             catch (OperationCanceledException)
@@ -168,7 +165,7 @@ namespace TasksCoordinator.Test
                 if (this._callbacks.TryGetValue(payload.ClientID, out callback))
                 {
                     message.Body = this._serializer.Serialize(payload);
-                    callback.TaskCompleted(message, ex.Message);
+                    callback.PostTaskCompleted(message, ex.Message);
                 }
             }
         }

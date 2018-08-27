@@ -13,8 +13,8 @@ namespace TasksCoordinator
         private int _taskId;
         private readonly ITaskCoordinatorAdvanced<M> _coordinator;
         private readonly IMessageProducer<M> _producer;
+        private readonly CancellationToken _cancellation;
         private M _currentMessage = default(M);
-        private CancellationToken _cancellation;
 
         protected static ILog _log
         {
@@ -43,13 +43,14 @@ namespace TasksCoordinator
             //очередь не прослушивается этим потоком
             //пробуем передать эту роль другому свободному потоку
             this._coordinator.RemoveReader(this);
+            this._cancellation.ThrowIfCancellationRequested();
             this._coordinator.StartNewTask();
             return true;
         }
 
         async Task<MessageProcessingResult> IMessageWorker<M>.OnDoWork(IEnumerable<M> messages, object state)
         {
-            WorkContext context = new WorkContext(this.taskId, state, this.Cancellation, this._coordinator);
+            WorkContext context = new WorkContext(this.taskId, state, this._cancellation, this._coordinator);
             var res = await this._coordinator.Dispatcher.DispatchMessages(messages, context, (msg) => { this._currentMessage = msg; }).ConfigureAwait(false);
             return res;
         }
@@ -79,7 +80,7 @@ namespace TasksCoordinator
                 bool canRead = (isPrimaryReader || this._coordinator.IsEnableParallelReading);
                 if (canRead)
                 {
-                    isDidWork = await this._producer.DoWork(this, isPrimaryReader).ConfigureAwait(false) > 0;
+                    isDidWork = await this._producer.DoWork(this, isPrimaryReader, this._cancellation).ConfigureAwait(false) > 0;
                 }
             }
             catch (OperationCanceledException)
@@ -97,7 +98,7 @@ namespace TasksCoordinator
         protected MessageReaderResult AfterProcessedMessage(bool workDone)
         {
             bool isRemoved = false;
-            if (this.Cancellation.IsCancellationRequested)
+            if (this._cancellation.IsCancellationRequested)
             {
                 isRemoved = true;
             }
@@ -122,14 +123,6 @@ namespace TasksCoordinator
             get
             {
                 return this._coordinator.IsPrimaryReader(this);
-            }
-        }
-
-        public CancellationToken Cancellation
-        {
-            get
-            {
-                return this._cancellation;
             }
         }
 

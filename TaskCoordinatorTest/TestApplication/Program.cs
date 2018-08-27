@@ -19,7 +19,7 @@ namespace TestApplication
         private static volatile int ErrorCount;
         private static readonly ISerializer _serializer = new Serializer();
         private static Stopwatch stopwatch;
-        private const int BATCH_SIZE = 200;
+        private const int BATCH_SIZE = 50;
         private const int MAX_TASK_COUNT = 4;
         private const bool ENABLE_PARRALEL_READING = true;
         private const bool IS_ACTIVATION_ENABLED = false;
@@ -32,30 +32,68 @@ namespace TestApplication
 
         private class CallBack : ICallback
         {
-            public void TaskCompleted(Message message, string error)
+            private readonly int _batchSize;
+            private readonly TaskCompletionSource<int> _taskCompletionSource;
+
+            public CallBack(int batchSize)
+            {
+                this._batchSize = batchSize;
+                this._taskCompletionSource = new TaskCompletionSource<int>();
+            }
+
+            private void OnTaskOK(Message message)
+            {
+                Interlocked.Increment(ref Program.ProcessedCount);
+                var payload = _serializer.Deserialize<Payload>(message.Body);
+                string result = System.Text.Encoding.UTF8.GetString(payload.Result);
+                Console.WriteLine($"SEQNUM: {message.SequenceNumber} Result: {result}");
+
+                if (ProcessedCount == this._batchSize)
+                {
+                    this._taskCompletionSource.TrySetResult(this._batchSize);
+                    Console.WriteLine($"BATCH WITH {this._batchSize} messages completed after: {stopwatch.ElapsedMilliseconds} ms");
+                }
+            }
+
+            private void OnTaskCompleted(Message message, string error)
             {
                 if (string.IsNullOrEmpty(error))
                 {
-                    Interlocked.Increment(ref Program.ProcessedCount);
-                    var payload = _serializer.Deserialize<Payload>(message.Body);
-                    string result = System.Text.Encoding.UTF8.GetString(payload.Result);
-                    Console.WriteLine($"SEQNUM: {message.SequenceNumber} Result: {result}");
+                    this.OnTaskOK(message);
                 }
                 else
                 {
-                    Interlocked.Increment(ref Program.ErrorCount);
-                    Console.WriteLine($"SEQNUM: {message.SequenceNumber} Error: {error}");
-                    var payload = _serializer.Deserialize<Payload>(message.Body);
-                    if (payload.TryCount <= 3)
+                    if (error == "CANCELLED")
                     {
-                        svc.AddToQueue(payload, (int)message.SequenceNumber, typeof(Payload).Name);
+                        this._taskCompletionSource.TrySetCanceled();
+                        Console.WriteLine($"SEQNUM: {message.SequenceNumber} is Cancelled");
+                    }
+                    else
+                    {
+                        Interlocked.Increment(ref Program.ErrorCount);
+                        Console.WriteLine($"SEQNUM: {message.SequenceNumber} Error: {error}");
+                        var payload = _serializer.Deserialize<Payload>(message.Body);
+                        if (payload.TryCount <= 3)
+                        {
+                            svc.AddToQueue(payload, (int)message.SequenceNumber, typeof(Payload).Name);
+                        }
+                        else
+                        {
+                            this._taskCompletionSource.TrySetException(new Exception(error));
+                        }
                     }
                 }
+            }
 
-                if (ProcessedCount == BATCH_SIZE)
-                {
-                     Console.WriteLine($"BATCH WITH {BATCH_SIZE} messages completed after: {stopwatch.ElapsedMilliseconds} ms");
-                }
+            // MUST BE ASYNCRONOUS TO PREVENT DEADLOCK !!!
+            public void PostTaskCompleted(Message message, string error)
+            {
+                Task.Factory.StartNew(() => { this.OnTaskCompleted(message, error); });
+            }
+
+            public Task<int> ResultAsync
+            {
+                get { return this._taskCompletionSource.Task; }
             }
         }
 
@@ -66,30 +104,40 @@ namespace TestApplication
             ProcessedCount = 0;
             ErrorCount = 0;
             svc = new TestService(_serializer, "TestService", MAX_TASK_COUNT, IS_ACTIVATION_ENABLED, ENABLE_PARRALEL_READING);
-            svc.RegisterCallback(ClientID, new CallBack());
-
-            for (int i = 0; i < BATCH_SIZE; ++i)
+            var callBack = new CallBack(BATCH_SIZE);
+            svc.RegisterCallback(ClientID, callBack);
+            try
             {
-                svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
+                for (int i = 0; i < BATCH_SIZE; ++i)
+                {
+                    svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
+                }
+
+                Console.WriteLine(string.Format("QueueLength: {0}", svc.QueueLength));
+                stopwatch.Start();
+
+                await svc.Start();
+                await callBack.ResultAsync;
+            } 
+            catch(Exception ex)
+            {
+                Console.WriteLine($"Processing Exception: {ex.Message}");
             }
+            finally
+            {
+                svc.UnRegisterCallback(ClientID);
 
-            Console.WriteLine(string.Format("QueueLength: {0}", svc.QueueLength));
-            stopwatch.Start();
-
-            await svc.Start();
-            // var producerTask = QueueAdditionalData();
-            // svc.StartActivator(50);
-            // stop after 10 seconds
-            var stopTask = Stop(10);
-            Console.ReadLine();
-            svc.Stop();
+                // var producerTask = QueueAdditionalData();
+                // svc.StartActivator(50);
+                await StopAfter(0);
+                Console.ReadLine();
+            }
         }
 
-        public static async Task Stop(int delaySeconds)
+        public static async Task StopAfter(int delaySeconds)
         {
             await Task.Delay(1000 * delaySeconds);
             svc.Stop();
-            svc.UnRegisterCallback(ClientID);
 
             Console.WriteLine("**************************************");
             Console.WriteLine("Service is stopped.");

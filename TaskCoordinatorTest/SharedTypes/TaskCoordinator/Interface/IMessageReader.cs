@@ -1,5 +1,4 @@
-﻿using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace TasksCoordinator.Interface
 {
@@ -8,6 +7,5 @@ namespace TasksCoordinator.Interface
         int taskId { get; }
         Task<MessageReaderResult> ProcessMessage();
         bool IsPrimaryReader { get; }
-        CancellationToken Cancellation { get; }
     }
 }

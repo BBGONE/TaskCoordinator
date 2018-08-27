@@ -1,9 +1,7 @@
-﻿using System;
-
-namespace TasksCoordinator.Test.Interface
+﻿namespace TasksCoordinator.Test.Interface
 {
     public interface ICallback
     {
-        void TaskCompleted(Message message, string error);
+        void PostTaskCompleted(Message message, string error);
     }
 }
