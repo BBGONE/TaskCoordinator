@@ -110,10 +110,10 @@ namespace TestApplication
                 Console.WriteLine(string.Format("QueueLength: {0}", svc.QueueLength));
                 stopwatch.Start();
 
-                await svc.Start();
-                // await Task.Delay(2000);
+                await svc.Start().ConfigureAwait(false);
+                // await Task.Delay(2000).ConfigureAwait(false);
                 // svc.Stop();
-                await callBack.ResultAsync;
+                await callBack.ResultAsync.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -129,7 +129,7 @@ namespace TestApplication
 
                 // var producerTask = QueueAdditionalData();
                 // svc.StartActivator(50);
-                await StopAfter(0);
+                await StopAfter(0).ConfigureAwait(false);
                 Console.ReadLine();
             }
         }

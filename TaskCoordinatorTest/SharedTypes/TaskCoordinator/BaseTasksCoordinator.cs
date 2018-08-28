@@ -218,7 +218,7 @@ namespace TasksCoordinator
             }
             catch (OperationCanceledException)
             {
-                throw;
+                // NOOP
             }
             catch (PPSException)
             {
