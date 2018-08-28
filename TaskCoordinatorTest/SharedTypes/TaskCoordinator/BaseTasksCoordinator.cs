@@ -367,7 +367,7 @@ namespace TasksCoordinator
         {
             get
             {
-                return this._stopSource.Token;
+                return this._cancellation;
             }
         }
 
