@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.27004.2009
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestApplication", "TestApplication\TestApplication.csproj", "{8F7D46E4-ACD9-4F5A-84A1-7FB7CA454BE9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SSSBTypes", "SSSBTypes\SSSBTypes.csproj", "{7EDEED80-C546-4F00-A265-1801BDA72C07}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SSSB", "SSSBTypes\SSSB.csproj", "{7EDEED80-C546-4F00-A265-1801BDA72C07}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedTypes", "SharedTypes\SharedTypes.csproj", "{EAF313D1-2C87-4989-B995-84ED8AC94AAA}"
 EndProject

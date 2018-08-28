@@ -108,17 +108,17 @@ namespace TasksCoordinator.Test
                 payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK TimeElapsed={0} ticks---cnt={1}  TryCount: {2}", stopwatch.ElapsedTicks, cnt, payload.TryCount));
                  cancellation.ThrowIfCancellationRequested();
                 message.Body = this._serializer.Serialize(payload);
-                callback.PostTaskCompleted(message, null);
+                callback.TaskCompleted(message, null);
             }
             catch (OperationCanceledException)
             {
                 message.Body = this._serializer.Serialize(payload);
-                callback.PostTaskCompleted(message, "CANCELLED");
+                callback.TaskCompleted(message, "CANCELLED");
             }
             catch (Exception ex)
             {
                 message.Body = this._serializer.Serialize(payload);
-                callback.PostTaskCompleted(message, ex.Message);
+                callback.TaskCompleted(message, ex.Message);
             }
             finally
             {
@@ -144,7 +144,7 @@ namespace TasksCoordinator.Test
                 {
                     cancellation.ThrowIfCancellationRequested();
                     message.Body = this._serializer.Serialize(payload);
-                    callback.PostTaskCompleted(message, null);
+                    callback.TaskCompleted(message, null);
                 }
             }
             catch (OperationCanceledException)
@@ -165,7 +165,7 @@ namespace TasksCoordinator.Test
                 if (this._callbacks.TryGetValue(payload.ClientID, out callback))
                 {
                     message.Body = this._serializer.Serialize(payload);
-                    callback.PostTaskCompleted(message, ex.Message);
+                    callback.TaskCompleted(message, ex.Message);
                 }
             }
         }

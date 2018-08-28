@@ -127,10 +127,6 @@ namespace SSSB
                 messages = list.ToArray();
                 return messages;
             }
-            catch (PPSException)
-            {
-                throw;
-            }
             catch (Exception ex)
             {
                 throw new PPSException(string.Format("ReadMessages error on queue: {0}, isPrimaryListener: {1}", this._sssbService.QueueName, isPrimaryReader), ex);

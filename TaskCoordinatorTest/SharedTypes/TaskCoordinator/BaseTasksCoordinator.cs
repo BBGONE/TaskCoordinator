@@ -31,6 +31,7 @@ namespace TasksCoordinator
         private volatile bool _isPaused;
         private int _semaphore;
         private CancellationTokenSource _stopSource;
+        private CancellationToken _cancellation;
         private readonly IMessageDispatcher<M> _dispatcher;
         private readonly ConcurrentDictionary<int, Task> _tasks;
         protected readonly IMessageReaderFactory<M> _readerFactory;
@@ -42,6 +43,7 @@ namespace TasksCoordinator
         {
             this._semaphore = 0;
             this._stopSource = null;
+            this._cancellation = CancellationToken.None;
             this._dispatcher = messageDispatcher;
             this._producer = messageProducer;
             this._readerFactory = messageReaderFactory;
@@ -64,6 +66,7 @@ namespace TasksCoordinator
                 if (this._isStarted)
                     return;
                 this._stopSource = new CancellationTokenSource();
+                this._cancellation = this._stopSource.Token;
                 this._taskIdSeq = 0;
                 this._primaryReader = null;
                 this._isStarted = true;
@@ -74,7 +77,7 @@ namespace TasksCoordinator
             }
 
             if (!await this.StartNewTask())
-                throw new Exception("Can not start initial task to process messages");
+                throw new Exception("Can not start the initial task to process messages");
         }
 
         public async Task Stop()

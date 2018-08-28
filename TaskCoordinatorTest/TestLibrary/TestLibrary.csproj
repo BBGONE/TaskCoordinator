@@ -43,6 +43,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serializer.cs" />
+    <Compile Include="Test\CallbackProxy.cs" />
     <Compile Include="Test\Interface\ICallback.cs" />
     <Compile Include="Test\Interface\ISerializer.cs" />
     <Compile Include="Test\Payload.cs" />
@@ -58,9 +59,9 @@
       <Project>{eaf313d1-2c87-4989-b995-84ed8ac94aaa}</Project>
       <Name>SharedTypes</Name>
     </ProjectReference>
-    <ProjectReference Include="..\SSSBTypes\SSSBTypes.csproj">
+    <ProjectReference Include="..\SSSBTypes\SSSB.csproj">
       <Project>{7edeed80-c546-4f00-a265-1801bda72c07}</Project>
-      <Name>SSSBTypes</Name>
+      <Name>SSSB</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

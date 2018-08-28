@@ -55,7 +55,7 @@ namespace TestApplication
                 }
             }
 
-            private void OnTaskCompleted(Message message, string error)
+            public void TaskCompleted(Message message, string error)
             {
                 if (string.IsNullOrEmpty(error))
                 {
@@ -85,12 +85,6 @@ namespace TestApplication
                 }
             }
 
-            // MUST BE ASYNCRONOUS TO PREVENT DEADLOCK !!!
-            public void PostTaskCompleted(Message message, string error)
-            {
-                Task.Factory.StartNew(() => { this.OnTaskCompleted(message, error); });
-            }
-
             public Task<int> ResultAsync
             {
                 get { return this._taskCompletionSource.Task; }
@@ -117,9 +111,15 @@ namespace TestApplication
                 stopwatch.Start();
 
                 await svc.Start();
+                // await Task.Delay(1000);
+                // svc.Stop();
                 await callBack.ResultAsync;
-            } 
-            catch(Exception ex)
+            }
+            catch (OperationCanceledException)
+            {
+                // NOOP
+            }
+            catch (Exception ex)
             {
                 Console.WriteLine($"Processing Exception: {ex.Message}");
             }

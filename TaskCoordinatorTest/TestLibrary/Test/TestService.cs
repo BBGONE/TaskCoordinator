@@ -223,7 +223,7 @@ namespace TasksCoordinator.Test
         #endregion
 
         public void RegisterCallback(Guid clientID, ICallback callback) {
-            this._dispatcher.RegisterCallback(clientID, callback);
+            this._dispatcher.RegisterCallback(clientID, new CallbackProxy(callback));
         }
 
         public bool UnRegisterCallback(Guid clientID)

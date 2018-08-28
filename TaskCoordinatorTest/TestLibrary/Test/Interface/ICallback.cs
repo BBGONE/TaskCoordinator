@@ -2,6 +2,6 @@
 {
     public interface ICallback
     {
-        void PostTaskCompleted(Message message, string error);
+        void TaskCompleted(Message message, string error);
     }
 }
