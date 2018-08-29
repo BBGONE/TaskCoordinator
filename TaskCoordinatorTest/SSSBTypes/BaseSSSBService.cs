@@ -14,7 +14,7 @@ namespace SSSB
     /// </summary>
     public class BaseSSSBService : ISSSBService
     {
-        internal static readonly ILog _log = Log.GetInstance("BaseSSSBService");
+        internal static readonly ILog Log = Shared.Log.GetInstance("BaseSSSBService");
         private static ErrorMessages _errorMessages = new ErrorMessages();
 
         #region Private Fields
@@ -47,13 +47,13 @@ namespace SSSB
             {
                 _queueName = await ServiceBrokerHelper.GetServiceQueueName(_name).ConfigureAwait(false);
                 if (_queueName == null)
-                    throw new PPSException(string.Format(ServiceBrokerResources.ServiceInitializationErrMsg, _name), _log);
-                await this._tasksCoordinator.Start();
+                    throw new PPSException(string.Format(ServiceBrokerResources.ServiceInitializationErrMsg, _name), Log);
+                this._tasksCoordinator.Start();
                 this.OnStarted();
             }
             catch (Exception ex)
             {
-                throw new PPSException(ServiceBrokerResources.StartErrMsg, ex, _log);
+                throw new PPSException(ServiceBrokerResources.StartErrMsg, ex, Log);
             }
         }
 
@@ -98,7 +98,7 @@ namespace SSSB
                 {
                     ++i;
                     if (i >= 3 && i <= 7)
-                        _log.Error(string.Format("Не удается установить соединение с БД в SSSB сервисе: {0}", this.Name));
+                        Log.Error(string.Format("Не удается установить соединение с БД в SSSB сервисе: {0}", this.Name));
                     if ((i % 20) == 0)
                         throw new Exception(string.Format("После 20 попыток не удается установить соединение с БД при запуске сервиса: {0}!", this.Name));
                     await Task.Delay(10000).ConfigureAwait(false);
@@ -115,7 +115,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                _log.Critical(ex);
+                Log.Critical(ex);
                 this._stopStartingSource.Cancel();
                 this._isStopped = true;
                 this._stopStartingSource = null;
@@ -151,7 +151,7 @@ namespace SSSB
                     }
                     else
                     {
-                        _log.Error(ex);
+                        Log.Error(ex);
                         return true;
                     }
                 });
@@ -163,7 +163,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                _log.Error(ex);
+                Log.Error(ex);
             }
         }
 

@@ -96,19 +96,21 @@ namespace TestApplication
             ProcessedCount = 0;
             ErrorCount = 0;
             svc = new TestService(_serializer, "TestService", MAX_TASK_COUNT, IS_ACTIVATION_ENABLED, ENABLE_PARRALEL_READING);
+
+            for (int i = 0; i < BATCH_SIZE; ++i)
+            {
+                svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
+            }
+            Console.WriteLine(string.Format("QueueLength: {0}", svc.QueueLength));
+
             var callBack = new CallBack(BATCH_SIZE);
             svc.RegisterCallback(ClientID, callBack);
             try
             {
-                for (int i = 0; i < BATCH_SIZE; ++i)
-                {
-                    svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
-                }
-
-                Console.WriteLine(string.Format("QueueLength: {0}", svc.QueueLength));
                 stopwatch.Start();
 
-                await svc.Start().ConfigureAwait(false);
+                svc.Start();
+
                 if (CANCEL_AFTER > 0)
                 {
                     await Task.Delay(CANCEL_AFTER).ConfigureAwait(false);

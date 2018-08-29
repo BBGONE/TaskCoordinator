@@ -20,7 +20,7 @@ namespace TasksCoordinator
         {
             get
             {
-                return BaseTasksCoordinator<M>._log;
+                return BaseTasksCoordinator<M>.Log;
             }
         }
         #endregion

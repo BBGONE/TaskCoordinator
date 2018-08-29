@@ -30,7 +30,16 @@ namespace TasksCoordinator.Test
             this._callback = callback;
             this._batchSize = callback.BatchSize;
             this._token = token;
-            this._register = this._token.Register(() => { this.JobCancelled(); });
+            this._register = this._token.Register(() => {
+                try
+                {
+                    this.JobCancelled();
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex);
+                }
+            }, false);
             this._status = 0;
         }
 

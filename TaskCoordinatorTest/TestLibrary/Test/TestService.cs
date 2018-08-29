@@ -26,6 +26,10 @@ namespace TasksCoordinator.Test
         private ISerializer _serializer;
         #endregion
 
+        public event EventHandler<EventArgs> ServiceStarting;
+        public event EventHandler<EventArgs> ServiceStarted;
+        public event EventHandler<EventArgs> ServiceStopped;
+
         public TestService(ISerializer serializer, string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false)
         {
             this._name = name;
@@ -39,6 +43,7 @@ namespace TasksCoordinator.Test
             this._tasksCoordinator = new TestTasksCoordinator(this._dispatcher, producer, readerFactory,
                 maxReadersCount, isEnableParallelReading);
         }
+
 
         #region Properties
         public ITaskCoordinator TasksCoordinator { get => _tasksCoordinator; }
@@ -70,7 +75,6 @@ namespace TasksCoordinator.Test
             try
             {
                 this._tasksCoordinator.Start();
-                this.OnStart();
             }
             catch (Exception ex)
             {
@@ -81,17 +85,17 @@ namespace TasksCoordinator.Test
         #region OnEvent Methods
         protected virtual void OnStarting()
         {
-
+            this.ServiceStarting?.Invoke(this, EventArgs.Empty);
         }
 
         protected virtual void OnStart()
         {
-
+            this.ServiceStarted?.Invoke(this, EventArgs.Empty);
         }
 
         protected virtual void OnStop()
         {
-
+            this.ServiceStopped?.Invoke(this, EventArgs.Empty);
         }
         #endregion
 
@@ -100,7 +104,7 @@ namespace TasksCoordinator.Test
         /// Запуск сервиса.
         /// Запускается QueueReadersCount читателей очереди сообщений с бесконечным циклом обработки.
         /// </summary>
-        public async Task Start()
+        public void Start()
         {
             if (!this._isStopped)
                 return;
