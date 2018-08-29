@@ -23,6 +23,7 @@ namespace TestApplication
         private const int MAX_TASK_COUNT = 4;
         private const bool ENABLE_PARRALEL_READING = true;
         private const bool IS_ACTIVATION_ENABLED = false;
+        private const int CANCEL_AFTER = 0;
 
 
         static void Main(string[] args)
@@ -33,61 +34,58 @@ namespace TestApplication
         private class CallBack : ICallback
         {
             private readonly int _batchSize;
-            private readonly TaskCompletionSource<int> _taskCompletionSource;
+            private readonly TaskCompletionSource<int> _completionSource;
 
             public CallBack(int batchSize)
             {
                 this._batchSize = batchSize;
-                this._taskCompletionSource = new TaskCompletionSource<int>();
+                this._completionSource = new TaskCompletionSource<int>();
             }
 
-            private void OnTaskOK(Message message)
+            public int BatchSize { get { return this._batchSize; } }
+            public void TaskSuccess(Message message)
             {
                 Interlocked.Increment(ref Program.ProcessedCount);
                 var payload = _serializer.Deserialize<Payload>(message.Body);
                 string result = System.Text.Encoding.UTF8.GetString(payload.Result);
                 Console.WriteLine($"SEQNUM: {message.SequenceNumber} Result: {result}");
-
-                if (ProcessedCount == this._batchSize)
-                {
-                    this._taskCompletionSource.TrySetResult(this._batchSize);
-                    Console.WriteLine($"BATCH WITH {this._batchSize} messages completed after: {stopwatch.ElapsedMilliseconds} ms");
-                }
             }
-
-            public void TaskCompleted(Message message, string error)
+            public bool TaskError(Message message, string error)
             {
-                if (string.IsNullOrEmpty(error))
+                Interlocked.Increment(ref Program.ErrorCount);
+                Console.WriteLine($"SEQNUM: {message.SequenceNumber} Error: {error}");
+                var payload = _serializer.Deserialize<Payload>(message.Body);
+                if (payload.TryCount <= 3)
                 {
-                    this.OnTaskOK(message);
+                    svc.AddToQueue(payload, (int)message.SequenceNumber, typeof(Payload).Name);
+                    return true;
                 }
                 else
                 {
-                    if (error == "CANCELLED")
-                    {
-                        this._taskCompletionSource.TrySetCanceled();
-                        Console.WriteLine($"SEQNUM: {message.SequenceNumber} is Cancelled");
-                    }
-                    else
-                    {
-                        Interlocked.Increment(ref Program.ErrorCount);
-                        Console.WriteLine($"SEQNUM: {message.SequenceNumber} Error: {error}");
-                        var payload = _serializer.Deserialize<Payload>(message.Body);
-                        if (payload.TryCount <= 3)
-                        {
-                            svc.AddToQueue(payload, (int)message.SequenceNumber, typeof(Payload).Name);
-                        }
-                        else
-                        {
-                            this._taskCompletionSource.TrySetException(new Exception(error));
-                        }
-                    }
+                    return false;
                 }
             }
-
+            public void JobCancelled()
+            {
+                Console.WriteLine($"BATCH WITH {this._batchSize} messages Cancelled after: {stopwatch.ElapsedMilliseconds} ms");
+                _completionSource.TrySetCanceled();
+            }
+            public void JobCompleted(string error)
+            {
+                Console.WriteLine($"BATCH WITH {this._batchSize} messages Completed after: {stopwatch.ElapsedMilliseconds} ms");
+                if (string.IsNullOrEmpty(error))
+                {
+                    _completionSource.TrySetResult(this._batchSize);
+                }
+                else
+                {
+                    _completionSource.TrySetException(new Exception(error));
+                }
+            }
+            
             public Task<int> ResultAsync
             {
-                get { return this._taskCompletionSource.Task; }
+                get { return this._completionSource.Task; }
             }
         }
 
@@ -111,8 +109,11 @@ namespace TestApplication
                 stopwatch.Start();
 
                 await svc.Start().ConfigureAwait(false);
-                // await Task.Delay(2000).ConfigureAwait(false);
-                // svc.Stop();
+                if (CANCEL_AFTER > 0)
+                {
+                    await Task.Delay(CANCEL_AFTER).ConfigureAwait(false);
+                    svc.Stop();
+                }
                 await callBack.ResultAsync.ConfigureAwait(false);
             }
             catch (OperationCanceledException)

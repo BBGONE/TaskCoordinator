@@ -13,12 +13,12 @@ namespace TasksCoordinator.Test
     public class TestMessageDispatcher: IMessageDispatcher<Message>
     {
         private readonly ISerializer _serializer;
-        private readonly ConcurrentDictionary<Guid, ICallback> _callbacks;
+        private readonly ConcurrentDictionary<Guid, ICallbackProxy> _callbacks;
 
         public TestMessageDispatcher(ISerializer serializer)
         {
             this._serializer = serializer;
-            this._callbacks = new ConcurrentDictionary<Guid, ICallback>();
+            this._callbacks = new ConcurrentDictionary<Guid, ICallbackProxy>();
         }
 
         private async Task<bool> DispatchMessage(Message message, WorkContext context)
@@ -32,11 +32,11 @@ namespace TasksCoordinator.Test
             switch (workType)
             {
                 case TaskWorkType.LongCPUBound:
-                    Task task = new Task(async () =>
+                    Task<Task> task = new Task<Task>(async () =>
                     {
                         try
                         {
-                            await CPU_TASK(message, payload, cancellation, 10000000, context.taskId).ConfigureAwait(false);
+                            await CPU_TASK(message, payload, cancellation, 5000000, context.taskId).ConfigureAwait(false);
                         }
                         catch (OperationCanceledException)
                         {
@@ -49,7 +49,9 @@ namespace TasksCoordinator.Test
                     if (!task.IsCanceled)
                     {
                         task.Start();
-                        await task.ConfigureAwait(false);
+                        var innerTask = await task.ConfigureAwait(false);
+                        await innerTask.ConfigureAwait(false);
+                        // Console.WriteLine($"CPU_TASK {message.SequenceNumber} ENDED");
                     }
                     break;
                 case TaskWorkType.LongIOBound:
@@ -80,7 +82,7 @@ namespace TasksCoordinator.Test
         // Test Task which consumes CPU
         private async Task CPU_TASK(Message message, Payload payload, CancellationToken cancellation, int iterations, int taskId)
         {
-            ICallback callback;
+            ICallbackProxy callback;
             if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
             {
                 return;
@@ -105,8 +107,8 @@ namespace TasksCoordinator.Test
                 }
                 cancellation.ThrowIfCancellationRequested();
                 stopwatch.Stop();
-                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK TimeElapsed={0} ticks---cnt={1}  TryCount: {2}", stopwatch.ElapsedTicks, cnt, payload.TryCount));
-                 cancellation.ThrowIfCancellationRequested();
+                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK Ticks={0} - cnt={1} Try: {2}", stopwatch.ElapsedTicks, cnt, payload.TryCount));
+                cancellation.ThrowIfCancellationRequested();
                 message.Body = this._serializer.Serialize(payload);
                 callback.TaskCompleted(message, null);
             }
@@ -130,6 +132,11 @@ namespace TasksCoordinator.Test
         // Test Task IO Bound
         private async Task IO_TASK(Message message, Payload payload, CancellationToken cancellation, int durationMilliseconds)
         {
+            ICallbackProxy callback;
+            if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
+            {
+                return;
+            }
             Stopwatch stopwatch = new Stopwatch();
             try
             {
@@ -137,35 +144,27 @@ namespace TasksCoordinator.Test
                 await Task.Delay(durationMilliseconds, cancellation);
                 cancellation.ThrowIfCancellationRequested();
                 stopwatch.Stop();
-                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK TimeElapsed={0} ticks--- durationMilliseconds={1}", stopwatch.ElapsedTicks, durationMilliseconds));
+                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK Ticks={0} - time={1} ms Try: {2}", stopwatch.ElapsedTicks, durationMilliseconds, payload.TryCount));
                 // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
-                ICallback callback;
-                if (this._callbacks.TryGetValue(payload.ClientID, out callback))
-                {
-                    cancellation.ThrowIfCancellationRequested();
-                    message.Body = this._serializer.Serialize(payload);
-                    callback.TaskCompleted(message, null);
-                }
+                cancellation.ThrowIfCancellationRequested();
+                message.Body = this._serializer.Serialize(payload);
+                callback.TaskCompleted(message, null);
             }
             catch (OperationCanceledException)
             {
-                if (stopwatch.IsRunning)
-                {
-                    stopwatch.Stop();
-                }
-                //NOOP
+                message.Body = this._serializer.Serialize(payload);
+                callback.TaskCompleted(message, "CANCELLED");
             }
             catch (Exception ex)
+            {
+                message.Body = this._serializer.Serialize(payload);
+                callback.TaskCompleted(message, ex.Message);
+            }
+            finally
             {
                 if (stopwatch.IsRunning)
                 {
                     stopwatch.Stop();
-                }
-                ICallback callback;
-                if (this._callbacks.TryGetValue(payload.ClientID, out callback))
-                {
-                    message.Body = this._serializer.Serialize(payload);
-                    callback.TaskCompleted(message, ex.Message);
                 }
             }
         }
@@ -199,15 +198,20 @@ namespace TasksCoordinator.Test
             return new MessageProcessingResult() { isRollBack = rollBack };
         }
 
-        public void RegisterCallback(Guid clientID, ICallback callback)
+        public void RegisterCallback(Guid clientID, ICallbackProxy callback)
         {
             this._callbacks.AddOrUpdate(clientID, callback, (id, value) => callback);
         }
 
         public bool UnRegisterCallback(Guid clientID)
         {
-            ICallback res;
-            return this._callbacks.TryRemove(clientID, out res);
+            ICallbackProxy res;
+            if (this._callbacks.TryRemove(clientID, out res))
+            {
+                (res as IDisposable).Dispose();
+                return true;
+            }
+            return false;
         }
     }
 }
