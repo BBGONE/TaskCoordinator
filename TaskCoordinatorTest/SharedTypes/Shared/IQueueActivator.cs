@@ -4,7 +4,7 @@ namespace Shared.Services
 {
     public interface IQueueActivator
     {
-        Task<bool> ActivateQueue();
+        bool ActivateQueue();
         bool IsQueueActivationEnabled
         {
             get;

@@ -15,7 +15,7 @@ namespace TasksCoordinator.Test
     /// </summary>
     public class TestService : ITaskService
     {
-        internal static ILog _log = Log.GetInstance("TestService");
+        internal static ILog Log = Shared.Log.GetInstance("TestService");
 
         #region Private Fields
         private string _name;
@@ -75,10 +75,11 @@ namespace TasksCoordinator.Test
             try
             {
                 this._tasksCoordinator.Start();
+                this.OnStart();
             }
             catch (Exception ex)
             {
-                throw new PPSException($"The Service: {this.Name} failed to start", ex, _log);
+                throw new PPSException($"The Service: {this.Name} failed to start", ex, Log);
             }
         }
 
@@ -129,14 +130,12 @@ namespace TasksCoordinator.Test
             catch (AggregateException ex)
             {
                 ex.Flatten().Handle((err) => {
-                    if (err is OperationCanceledException)
+                    if (!(err is OperationCanceledException))
                     {
-                        return true;
-                    } else
-                    {
-                        _log.Error(ex);
-                        return true;
+                        Log.Error(ex);
+
                     }
+                    return true;
                 });
 
             }
@@ -146,7 +145,7 @@ namespace TasksCoordinator.Test
             }
             catch (Exception ex)
             {
-                _log.Error(ex);
+                Log.Error(ex);
             }
             this.OnStop();
         }
@@ -218,7 +217,7 @@ namespace TasksCoordinator.Test
                 // Console.WriteLine("isActivated: " + isActivated.ToString());
                 if (isActivated == 1)
                 {
-                    bool res = await this.QueueActivator.ActivateQueue();
+                    bool res = this.QueueActivator.ActivateQueue();
                     Console.WriteLine("activation occured: " + res.ToString());
                 }
             }

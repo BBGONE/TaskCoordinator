@@ -145,21 +145,17 @@ namespace SSSB
             catch (AggregateException ex)
             {
                 ex.Flatten().Handle((err) => {
-                    if (err is OperationCanceledException)
-                    {
-                        return true;
-                    }
-                    else
+                    if (!(err is OperationCanceledException))
                     {
                         Log.Error(ex);
-                        return true;
-                    }
-                });
 
+                    }
+                    return true;
+                });
             }
             catch (OperationCanceledException)
             {
-
+                //NOOP
             }
             catch (Exception ex)
             {

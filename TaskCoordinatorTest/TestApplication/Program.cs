@@ -20,14 +20,14 @@ namespace TestApplication
         private static Stopwatch stopwatch;
 
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.Random;
-        private const int BATCH_SIZE = 50;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
+        private const int BATCH_SIZE = 5000;
         private const int MAX_TASK_COUNT = 4;
         private const bool ENABLE_PARRALEL_READING = true;
         private const bool IS_ACTIVATION_ENABLED = false;
         private const int CANCEL_AFTER = 0;
-        private const bool SHOW_TASK_SUCESS = true;
-        private const bool SHOW_TASK_ERROR = true;
+        private const bool SHOW_TASK_SUCESS = false;
+        private const bool SHOW_TASK_ERROR = false;
 
 
         static void Main(string[] args)

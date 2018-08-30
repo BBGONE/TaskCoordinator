@@ -323,7 +323,7 @@ namespace TasksCoordinator
         }
 
         #region IQueueActivator
-        async Task<bool> IQueueActivator.ActivateQueue()
+        bool IQueueActivator.ActivateQueue()
         {
             if (!this._isQueueActivationEnabled)
                 return false;

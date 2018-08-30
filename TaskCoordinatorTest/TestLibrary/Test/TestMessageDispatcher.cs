@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
@@ -87,10 +85,8 @@ namespace TasksCoordinator.Test
             {
                 return;
             }
-            Stopwatch stopwatch = new Stopwatch();
             try
             {
-                stopwatch.Start();
                 await Task.FromResult(0);
                 // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
                 int cnt = iterations;
@@ -101,13 +97,12 @@ namespace TasksCoordinator.Test
                     //Do some CPU work 
                     payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("qwertyuiop[;lkjhngbfd--cnt={0}", cnt));
                 }
-                if (message.SequenceNumber % 20 == 0 && payload.TryCount < 2)
+                if (message.SequenceNumber % 3000 == 0 && payload.TryCount < 2)
                 {
                     throw new Exception($"Test Exception TryCount: {payload.TryCount}");
                 }
                 cancellation.ThrowIfCancellationRequested();
-                stopwatch.Stop();
-                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK Ticks={0} - cnt={1} Try: {2}", stopwatch.ElapsedTicks, cnt, payload.TryCount));
+                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK cnt={0} Try: {1}", cnt, payload.TryCount));
                 cancellation.ThrowIfCancellationRequested();
                 message.Body = this._serializer.Serialize(payload);
                 callback.TaskCompleted(message, null);
@@ -121,11 +116,6 @@ namespace TasksCoordinator.Test
             {
                 message.Body = this._serializer.Serialize(payload);
                 callback.TaskCompleted(message, ex.Message);
-            }
-            finally
-            {
-                if (stopwatch.IsRunning)
-                    stopwatch.Stop();
             }
         }
 
@@ -137,14 +127,11 @@ namespace TasksCoordinator.Test
             {
                 return;
             }
-            Stopwatch stopwatch = new Stopwatch();
             try
             {
-                stopwatch.Start();
                 await Task.Delay(durationMilliseconds, cancellation);
                 cancellation.ThrowIfCancellationRequested();
-                stopwatch.Stop();
-                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK Ticks={0} - time={1} ms Try: {2}", stopwatch.ElapsedTicks, durationMilliseconds, payload.TryCount));
+                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK time={0} ms Try: {1}", durationMilliseconds, payload.TryCount));
                 // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
                 cancellation.ThrowIfCancellationRequested();
                 message.Body = this._serializer.Serialize(payload);
@@ -159,13 +146,6 @@ namespace TasksCoordinator.Test
             {
                 message.Body = this._serializer.Serialize(payload);
                 callback.TaskCompleted(message, ex.Message);
-            }
-            finally
-            {
-                if (stopwatch.IsRunning)
-                {
-                    stopwatch.Stop();
-                }
             }
         }
 
