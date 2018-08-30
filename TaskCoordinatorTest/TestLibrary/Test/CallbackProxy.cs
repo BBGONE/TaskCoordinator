@@ -47,17 +47,11 @@ namespace TasksCoordinator.Test
         {
             if (string.IsNullOrEmpty(error))
             {
+                this.TaskSuccess(message);
                 int count = Interlocked.Increment(ref this._processedCount);
-                try
+                if (count == this._batchSize)
                 {
-                    this.TaskSuccess(message);
-                }
-                finally
-                {
-                    if (count == this._batchSize)
-                    {
-                        this.JobCompleted(null);
-                    }
+                    this.JobCompleted(null);
                 }
             }
             else if (error == "CANCELLED")

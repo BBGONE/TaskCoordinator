@@ -12,18 +12,22 @@ namespace TestApplication
     class Program
     {
         private static TestService svc;
-        private static TaskWorkType _workType = TaskWorkType.Random;
         private static volatile int SEQUENCE_NUM = 0;
         private static readonly Guid ClientID = Guid.NewGuid();
         private static volatile int ProcessedCount;
         private static volatile int ErrorCount;
         private static readonly ISerializer _serializer = new Serializer();
         private static Stopwatch stopwatch;
+
+        // OPTIONS
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.Random;
         private const int BATCH_SIZE = 50;
         private const int MAX_TASK_COUNT = 4;
         private const bool ENABLE_PARRALEL_READING = true;
         private const bool IS_ACTIVATION_ENABLED = false;
         private const int CANCEL_AFTER = 0;
+        private const bool SHOW_TASK_SUCESS = true;
+        private const bool SHOW_TASK_ERROR = true;
 
 
         static void Main(string[] args)
@@ -48,12 +52,18 @@ namespace TestApplication
                 Interlocked.Increment(ref Program.ProcessedCount);
                 var payload = _serializer.Deserialize<Payload>(message.Body);
                 string result = System.Text.Encoding.UTF8.GetString(payload.Result);
-                Console.WriteLine($"SEQNUM: {message.SequenceNumber} Result: {result}");
+                if (SHOW_TASK_SUCESS)
+                {
+                    Console.WriteLine($"SEQNUM: {message.SequenceNumber} Result: {result}");
+                }
             }
             public bool TaskError(Message message, string error)
             {
                 Interlocked.Increment(ref Program.ErrorCount);
-                Console.WriteLine($"SEQNUM: {message.SequenceNumber} Error: {error}");
+                if (SHOW_TASK_ERROR)
+                {
+                    Console.WriteLine($"SEQNUM: {message.SequenceNumber} Error: {error}");
+                }
                 var payload = _serializer.Deserialize<Payload>(message.Body);
                 if (payload.TryCount <= 3)
                 {
@@ -161,7 +171,7 @@ namespace TestApplication
 
         private static Payload CreateNewPayload()
         {
-            TaskWorkType workType = _workType;
+            TaskWorkType workType = TASK_WORK_TYPE;
 
             if (workType== TaskWorkType.Random)
             {
