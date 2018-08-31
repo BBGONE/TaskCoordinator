@@ -97,7 +97,7 @@ namespace TasksCoordinator.Test
                     //Do some CPU work 
                     payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("qwertyuiop[;lkjhngbfd--cnt={0}", cnt));
                 }
-                if (message.SequenceNumber % 3000 == 0 && payload.TryCount < 2)
+                if (payload.RaiseError && payload.TryCount < 2)
                 {
                     throw new Exception($"Test Exception TryCount: {payload.TryCount}");
                 }
@@ -129,6 +129,10 @@ namespace TasksCoordinator.Test
             }
             try
             {
+                if (payload.RaiseError && payload.TryCount < 2)
+                {
+                    throw new Exception($"Test Exception TryCount: {payload.TryCount}");
+                }
                 await Task.Delay(durationMilliseconds, cancellation);
                 cancellation.ThrowIfCancellationRequested();
                 payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK time={0} ms Try: {1}", durationMilliseconds, payload.TryCount));

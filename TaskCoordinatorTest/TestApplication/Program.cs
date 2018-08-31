@@ -28,7 +28,7 @@ namespace TestApplication
         private const int CANCEL_AFTER = 0;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
-
+        private static readonly double ERROR_MESSAGES_PERCENT = 0;
 
         static void Main(string[] args)
         {
@@ -179,7 +179,21 @@ namespace TestApplication
                 int val = SEQUENCE_NUM % maxVal;
                 workType = (TaskWorkType)val;
             }
-            return new Payload() { CreateDate = DateTime.Now, WorkType = workType, ClientID = ClientID, TryCount = 0 };
+            bool raiseError = false;
+
+            if (ERROR_MESSAGES_PERCENT > 0)
+            {
+                if (SEQUENCE_NUM % ((int)Math.Floor(100 / ERROR_MESSAGES_PERCENT)) == 0)
+                    raiseError = true;
+            }
+
+            return new Payload() {
+                CreateDate = DateTime.Now,
+                WorkType = workType,
+                ClientID = ClientID,
+                TryCount = 0,
+                RaiseError= raiseError
+            };
         }
 
         public static async Task QueueAdditionalData()

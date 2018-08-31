@@ -16,5 +16,7 @@ namespace TasksCoordinator.Test
         public int TryCount;
         [ProtoMember(5)]
         public byte[] Result;
+        [ProtoMember(6)]
+        public bool RaiseError;
     }
 }
