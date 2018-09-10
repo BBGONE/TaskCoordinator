@@ -117,6 +117,19 @@ namespace TasksCoordinator
             bool result = false;
             bool semaphoreOK = false;
             int taskId = -1;
+            Action<int> exitTaskAction = (id) =>
+            {
+                Task res;
+                if (this._tasks.TryRemove(id, out res))
+                {
+                    lock (this._semaphoreLock)
+                    {
+                        this._semaphore += 1;
+                    }
+                }
+            };
+
+
             try
             {
                 var cancellation = this.Cancellation;
@@ -153,44 +166,24 @@ namespace TasksCoordinator
                         throw;
                     }
 
-                    var startTask = Task<Task<int>>.Factory.StartNew(() => JobRunner(cancellation, taskId), cancellation);
-                    this._tasks.TryUpdate(taskId, startTask, dummy);
-                    startTask.ContinueWith((antecedent) => {
-                        var err = antecedent.Exception;
-                        if (err != null)
+                    var task = Task<Task<int>>.Factory.StartNew(() => JobRunner(cancellation, taskId), cancellation).Unwrap();
+                    this._tasks.TryUpdate(taskId, task, dummy);
+                    task.ContinueWith((antecedent, state) => {
+                        exitTaskAction((int)state);
+                        if (antecedent.IsFaulted)
                         {
+                            var err = antecedent.Exception;
                             err.Flatten().Handle((ex) => {
-                                Task res;
-                                if (this._tasks.TryRemove(taskId, out res))
-                                {
-                                    lock (this._semaphoreLock)
-                                    {
-                                        this._semaphore += 1;
-                                    }
-                                }
-
-                                if (!(ex is OperationCanceledException))
-                                    Log.Error(ex);
+                                Log.Error(ex);
                                 return true;
                             });
                         }
-                        else
-                        {
-                            this._tasks.TryUpdate(taskId, antecedent.Result, antecedent);
-                        }
-                    }, cancellation);
+                    }, taskId, TaskContinuationOptions.NotOnRanToCompletion);
                 }
             }
             catch (Exception ex)
             {
-                Task res;
-                if (this._tasks.TryRemove(taskId, out res))
-                {
-                    lock (this._semaphoreLock)
-                    {
-                        this._semaphore += 1;
-                    }
-                }
+                exitTaskAction(taskId);
                 if (!(ex is OperationCanceledException))
                 {
                     Log.Error(ex);
