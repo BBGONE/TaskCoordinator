@@ -112,24 +112,24 @@ namespace TasksCoordinator
             }
         }
 
+        private void _ExitTask(int id)
+        {
+            Task res;
+            if (this._tasks.TryRemove(id, out res))
+            {
+                lock (this._semaphoreLock)
+                {
+                    this._semaphore += 1;
+                }
+            }
+        }
+
         private void _StartNewTask()
         {
             bool result = false;
             bool semaphoreOK = false;
             int taskId = -1;
-            Action<int> exitTaskAction = (id) =>
-            {
-                Task res;
-                if (this._tasks.TryRemove(id, out res))
-                {
-                    lock (this._semaphoreLock)
-                    {
-                        this._semaphore += 1;
-                    }
-                }
-            };
-
-
+            
             try
             {
                 var cancellation = this.Cancellation;
@@ -169,7 +169,7 @@ namespace TasksCoordinator
                     var task = Task<Task<int>>.Factory.StartNew(() => JobRunner(cancellation, taskId), cancellation).Unwrap();
                     this._tasks.TryUpdate(taskId, task, dummy);
                     task.ContinueWith((antecedent, state) => {
-                        exitTaskAction((int)state);
+                        this._ExitTask((int)state);
                         if (antecedent.IsFaulted)
                         {
                             var err = antecedent.Exception;
@@ -183,7 +183,7 @@ namespace TasksCoordinator
             }
             catch (Exception ex)
             {
-                exitTaskAction(taskId);
+                this._ExitTask(taskId);
                 if (!(ex is OperationCanceledException))
                 {
                     Log.Error(ex);
@@ -238,14 +238,7 @@ namespace TasksCoordinator
             }
             finally
             {
-                Task res;
-                if (this._tasks.TryRemove(taskId, out res))
-                {
-                    lock (this._semaphoreLock)
-                    {
-                        this._semaphore += 1;
-                    }
-                }
+                this._ExitTask(taskId);
             }
   
             return taskId;
