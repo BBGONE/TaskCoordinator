@@ -38,7 +38,7 @@ namespace TasksCoordinator.Test
             this._serializer = serializer;
             this._messageQueue = new BlockingCollection<Message>();
             this._dispatcher = new TestMessageDispatcher(this._serializer);
-            var producer = new TestMessageProducer(this, this._messageQueue);
+            var producer = new TestMessageProducer<Message>(this, this._messageQueue);
             var readerFactory = new TestMessageReaderFactory();
             this._tasksCoordinator = new TestTasksCoordinator(this._dispatcher, producer, readerFactory,
                 maxReadersCount, isEnableParallelReading);

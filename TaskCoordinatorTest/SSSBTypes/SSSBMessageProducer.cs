@@ -1,24 +1,20 @@
-﻿using Database.Shared;
-using Shared;
+﻿using Shared;
 using Shared.Errors;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
-using System.Threading.Tasks;
-using System.Transactions;
-using TasksCoordinator;
-using TasksCoordinator.Interface;
 using System.Threading;
+using System.Threading.Tasks;
+using TasksCoordinator.Interface;
 
 namespace SSSB
 {
     public class SSSBMessageProducer: IMessageProducer<SSSBMessage>
     {
         internal static readonly ILog _log = Log.GetInstance("SSSBMessageProducer");
-        private static ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
-        private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
+        private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(10);
         /// <summary>
         /// Число сообщений в пакете по умолчанию
         /// </summary>
@@ -28,7 +24,7 @@ namespace SSSB
         public SSSBMessageProducer(ISSSBService sssbService)
         {
             this._sssbService = sssbService;
-            this.DefaultWaitForTimeout = sssbService.isQueueActivationEnabled ? TimeSpan.FromSeconds(7) : TimeSpan.FromSeconds(30);
+            this.DefaultWaitForTimeout = sssbService.isQueueActivationEnabled ? TimeSpan.FromSeconds(10) : TimeSpan.FromSeconds(10);
         }
 
         public bool IsQueueActivationEnabled
@@ -36,64 +32,9 @@ namespace SSSB
             get { return _sssbService.isQueueActivationEnabled; }
         }
 
-        async Task<int> IMessageProducer<SSSBMessage>.DoWork(IMessageWorker<SSSBMessage> worker, bool isPrimaryReader, CancellationToken cancellation)
+        async Task<IEnumerable<SSSBMessage>> IMessageProducer<SSSBMessage>.ReadMessages(bool isPrimaryReader, int taskId, CancellationToken cancellation, object state)
         {
-            SSSBMessage[] messages = new SSSBMessage[0];
-            bool beforeWorkCalled = false;
-            int cnt = 0;
-         
-            MessageProcessingResult res = new MessageProcessingResult() { isRollBack = false };
-            TransactionOptions tranOptions = new TransactionOptions();
-            tranOptions.IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted;
-            tranOptions.Timeout = TimeSpan.FromMinutes(60);
-            try
-            {
-                SqlConnection dbconnection = null;
-                using (TransactionScope transactionScope = new TransactionScope(TransactionScopeOption.RequiresNew, tranOptions, TransactionScopeAsyncFlowOption.Enabled))
-                {
-                    Exception error = null;
-                    try
-                    {
-                        dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(cancellation).ConfigureAwait(false);
-                    }
-                    catch(Exception ex)
-                    {
-                        error = ex;
-                    }
-
-                    if (error != null)
-                    {
-                        await _errorHandler.Handle(_log, error, cancellation).ConfigureAwait(false); 
-                        return 0;
-                    }
-
-                    using (dbconnection)
-                    {
-                        messages = await this.ReadMessages(dbconnection, isPrimaryReader, worker.taskId, cancellation).ConfigureAwait(false);
-                        cnt = messages.Length;
-
-                        beforeWorkCalled = worker.OnBeforeDoWork();
-                        if (cnt > 0)
-                        {
-                            res = await worker.OnDoWork(messages, dbconnection).ConfigureAwait(false);
-                        }
-                        if (!res.isRollBack && cnt > 0)
-                        {
-                            transactionScope.Complete();
-                        }
-                    }
-                }
-            }
-            finally
-            {
-                if (beforeWorkCalled)
-                    worker.OnAfterDoWork();
-            }
-            return cnt;
-        }
-
-        private async Task<SSSBMessage[]> ReadMessages(SqlConnection dbconnection, bool isPrimaryReader, int taskId, CancellationToken cancellation)
-        {
+            SqlConnection dbconnection = (SqlConnection)state;
             //reading messages from the queue
             IDataReader reader = null;
             SSSBMessage[] messages = new SSSBMessage[0];
@@ -138,7 +79,7 @@ namespace SSSB
             }
         }
 
-
+ 
         /// <summary>
         /// Load message data from the data reader
         /// </summary>

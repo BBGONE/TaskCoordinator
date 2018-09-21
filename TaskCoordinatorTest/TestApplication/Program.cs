@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator;
@@ -20,10 +19,10 @@ namespace TestApplication
         private static Stopwatch stopwatch;
 
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
-        private const int BATCH_SIZE = 5000;
-        private const int MAX_TASK_COUNT = 4;
-        private const bool ENABLE_PARRALEL_READING = true;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.LongCPUBound;
+        private const int BATCH_SIZE = 20;
+        private const int MAX_TASK_COUNT = 8;
+        private const bool ENABLE_PARRALEL_READING = false;
         private const bool IS_ACTIVATION_ENABLED = false;
         private const int CANCEL_AFTER = 0;
         private const bool SHOW_TASK_SUCESS = false;
@@ -175,9 +174,9 @@ namespace TestApplication
 
             if (workType== TaskWorkType.Random)
             {
-                int maxVal = 5;
+                int maxVal = 2;
                 int val = SEQUENCE_NUM % maxVal;
-                workType = (TaskWorkType)val;
+                workType = val == 0 ? TaskWorkType.LongCPUBound: TaskWorkType.LongIOBound;
             }
             bool raiseError = false;
 

@@ -165,8 +165,7 @@ namespace TasksCoordinator
                         }
                         throw;
                     }
-
-                    var task = Task<Task<int>>.Factory.StartNew(() => JobRunner(cancellation, taskId), cancellation).Unwrap();
+                    Task<int> task = Task.Run(async () => await JobRunner(cancellation, taskId), cancellation);
                     this._tasks.TryUpdate(taskId, task, dummy);
                     task.ContinueWith((antecedent, state) => {
                         this._ExitTask((int)state);
@@ -178,7 +177,7 @@ namespace TasksCoordinator
                                 return true;
                             });
                         }
-                    }, taskId, TaskContinuationOptions.NotOnRanToCompletion);
+                    }, taskId, TaskContinuationOptions.NotOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
                 }
             }
             catch (Exception ex)
@@ -187,6 +186,38 @@ namespace TasksCoordinator
                 if (!(ex is OperationCanceledException))
                 {
                     Log.Error(ex);
+                }
+            }
+        }
+
+        /// <summary>
+        /// снимает с учета слушателя
+        /// он может впасть в спячку (ждет события), либо начать обработку сообщения
+        /// </summary>
+        /// <param name="reader"></param>
+        private void RemoveReader(IMessageReader reader)
+        {
+            lock (this._lock)
+            {
+                if (Object.ReferenceEquals(this._primaryReader, reader))
+                {
+                    this._primaryReader = null;
+                }
+            }
+        }
+
+        /// <summary>
+        /// добавляет для учета освободившегося слушателя
+        /// он мог освободиться от спячки, либо после обработки сообщения
+        /// </summary>
+        /// <param name="reader"></param>
+        private void AddReader(IMessageReader reader)
+        {
+            lock (this._lock)
+            {
+                if (this._primaryReader == null)
+                {
+                    this._primaryReader = reader;
                 }
             }
         }
@@ -203,7 +234,7 @@ namespace TasksCoordinator
             {
                 token.ThrowIfCancellationRequested();
                 IMessageReader mr = this.GetMessageReader(taskId);
-                (this as ITaskCoordinatorAdvanced<M>).AddReader(mr);
+                this.AddReader(mr);
                 isReaderAdded = true;
                 MessageReaderResult readerResult = new MessageReaderResult() { IsRemoved = false, IsWorkDone = false };
                 try
@@ -212,15 +243,14 @@ namespace TasksCoordinator
                     while (!readerResult.IsRemoved && !token.IsCancellationRequested)
                     {
                         readerResult = await mr.ProcessMessage().ConfigureAwait(false);
-                    } // while
-
+                    }
                     token.ThrowIfCancellationRequested();
                 }
                 finally
                 {
                     if (isReaderAdded)
                     {
-                        (this as ITaskCoordinatorAdvanced<M>).RemoveReader(mr);
+                        this.RemoveReader(mr);
                     }
                 }
             }
@@ -258,40 +288,6 @@ namespace TasksCoordinator
             }
         }
 
-        /// <summary>
-        /// снимает с учета слушателя
-        /// он может впасть в спячку (ждет события), либо начать обработку сообщения
-        /// </summary>
-        /// <param name="reader"></param>
-        /// <param name="isStartedWorking"></param>
-        void ITaskCoordinatorAdvanced<M>.RemoveReader(IMessageReader reader)
-        {
-            lock (this._lock)
-            {
-                if (Object.ReferenceEquals(this._primaryReader, reader))
-                {
-                    this._primaryReader = null;
-                }
-            }
-        }
-
-        /// <summary>
-        /// добавляет для учета освободившегося слушателя
-        /// он мог освободиться от спячки, либо после обработки сообщения
-        /// </summary>
-        /// <param name="reader"></param>
-        /// <param name="isEndedWorking"></param>
-        void ITaskCoordinatorAdvanced<M>.AddReader(IMessageReader reader)
-        {
-            lock (this._lock)
-            {
-                if (this._primaryReader == null)
-                {
-                    this._primaryReader = reader;
-                }
-            }
-        }
-
         bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader reader)
         {
             lock (this._lock)
@@ -300,12 +296,29 @@ namespace TasksCoordinator
             }
         }
 
-        IMessageDispatcher<M> ITaskCoordinatorAdvanced<M>.Dispatcher
+        bool ITaskCoordinatorAdvanced<M>.OnBeforeDoWork(IMessageReader reader)
         {
-            get
-            {
-                return this._dispatcher;
-            }
+            //пока обрабатывается сообщение
+            //очередь не прослушивается этим потоком
+            //пробуем передать эту роль другому свободному потоку
+            this.RemoveReader(reader);
+            this._cancellation.ThrowIfCancellationRequested();
+            this._StartNewTask();
+            return true;
+        }
+
+        async Task<MessageProcessingResult> ITaskCoordinatorAdvanced<M>.OnDoWork(M message, object state, int taskId)
+        {
+            // Console.WriteLine(string.Format("DO WORK {0}", taskId));
+            // Console.WriteLine(string.Format("Task: {0} Thread: {1}", taskId, Thread.CurrentThread.ManagedThreadId));
+            WorkContext context = new WorkContext(taskId, state, this._cancellation, this);
+            var res = await this._dispatcher.DispatchMessage(message, context).ConfigureAwait(false);
+            return res;
+        }
+
+        void ITaskCoordinatorAdvanced<M>.OnAfterDoWork(IMessageReader reader)
+        {
+            this.AddReader(reader);
         }
 
         #region IQueueActivator
@@ -334,18 +347,6 @@ namespace TasksCoordinator
             }
         }
         #endregion
-
-       
-        /// <summary>
-        /// если есть потоки читающие сообщения
-        /// то один из них должен быть главным
-        /// т.е. использовать WaitFor(RECEIVE( , а не просто RECEIVE(.
-        /// </summary>
-        public IMessageReader PrimaryReader
-        {
-            get { return _primaryReader; }
-            private set { _primaryReader = value; }
-        }
 
         public int MaxReadersCount
         {

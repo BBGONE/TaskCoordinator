@@ -1,20 +1,20 @@
 ﻿using Shared;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
 
 namespace TasksCoordinator
 {
-    public class MessageReader<M> : IMessageReader, IMessageWorker<M>
+    public class MessageReader<M> : IMessageReader
     {
         #region Private Fields
         private int _taskId;
         private readonly ITaskCoordinatorAdvanced<M> _coordinator;
-        private readonly IMessageProducer<M> _producer;
         private readonly CancellationToken _cancellation;
-        private M _currentMessage = default(M);
+        private readonly IMessageProducer<M> _producer;
 
         protected static ILog _log
         {
@@ -25,41 +25,55 @@ namespace TasksCoordinator
         }
         #endregion
 
-        public MessageReader(int taskId, IMessageProducer<M> messageProducer, ITaskCoordinatorAdvanced<M> tasksCoordinator)
+        public MessageReader(int taskId, ITaskCoordinatorAdvanced<M> tasksCoordinator, IMessageProducer<M> producer)
         {
             this._taskId = taskId;
             this._coordinator = tasksCoordinator;
-            this._producer = messageProducer;
             this._cancellation = this._coordinator.Cancellation;
+            this._producer = producer;
         }
 
-        protected virtual void OnProcessMessageException(Exception ex)
+        protected virtual async Task<int> DoWork(bool isPrimaryReader, CancellationToken cancellation)
+        {
+            int cnt = 0;
+            // Console.WriteLine(string.Format("begin {0} Thread: {1}", this.taskId, Thread.CurrentThread.ManagedThreadId));
+            IEnumerable<M> messages = await this._producer.ReadMessages(isPrimaryReader, this.taskId, cancellation, null).ConfigureAwait(false);
+            cnt = messages.Count();
+            // Console.WriteLine(string.Format("end {0} {1} {2}", this.taskId, isPrimaryReader, Thread.CurrentThread.ManagedThreadId));
+            if (cnt > 0)
+            {
+                bool isOk = this._coordinator.OnBeforeDoWork(this);
+                try
+                {
+                    foreach (M msg in messages)
+                    {
+                        // обработка сообщений
+                        try
+                        {
+                            MessageProcessingResult res = await this._coordinator.OnDoWork(msg, null, this.taskId).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            this.OnProcessMessageException(ex, msg);
+                            throw;
+                        }
+                    }
+                }
+                finally
+                {
+                    this._coordinator.OnAfterDoWork(this);
+                }
+            }
+
+            return cnt;
+        }
+
+    
+        protected virtual void OnProcessMessageException(Exception ex, M message)
         {
         }
 
-        bool IMessageWorker<M>.OnBeforeDoWork()
-        {
-            //пока обрабатывается сообщение
-            //очередь не прослушивается этим потоком
-            //пробуем передать эту роль другому свободному потоку
-            this._coordinator.RemoveReader(this);
-            this._cancellation.ThrowIfCancellationRequested();
-            this._coordinator.StartNewTask();
-            return true;
-        }
-
-        async Task<MessageProcessingResult> IMessageWorker<M>.OnDoWork(IEnumerable<M> messages, object state)
-        {
-            WorkContext context = new WorkContext(this.taskId, state, this._cancellation, this._coordinator);
-            var res = await this._coordinator.Dispatcher.DispatchMessages(messages, context, (msg) => { this._currentMessage = msg; }).ConfigureAwait(false);
-            return res;
-        }
-
-        void IMessageWorker<M>.OnAfterDoWork()
-        {
-            this._coordinator.AddReader(this);
-        }
-
+       
         /// <summary>
         /// If this method returns False then the thread exits from the  loop
         /// </summary>
@@ -72,26 +86,14 @@ namespace TasksCoordinator
                 return new MessageReaderResult() { IsWorkDone = true, IsRemoved = false };
             }
 
-            this._currentMessage = default(M);
             bool isDidWork = false;
-            try
+            bool isPrimaryReader = this.IsPrimaryReader;
+            bool canRead = (isPrimaryReader || this._coordinator.IsEnableParallelReading);
+            if (canRead)
             {
-                bool isPrimaryReader = this.IsPrimaryReader;
-                bool canRead = (isPrimaryReader || this._coordinator.IsEnableParallelReading);
-                if (canRead)
-                {
-                    isDidWork = await this._producer.DoWork(this, isPrimaryReader, this._cancellation).ConfigureAwait(false) > 0;
-                }
+                isDidWork = await this.DoWork(isPrimaryReader, this._cancellation).ConfigureAwait(false) > 0;
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                this.OnProcessMessageException(ex);
-                throw;
-            }
+
             return this.AfterProcessedMessage(isDidWork);
         }
 
@@ -126,11 +128,17 @@ namespace TasksCoordinator
             }
         }
 
-        public M CurrentMessage
-        {
+        public IMessageProducer<M> Producer {
             get
             {
-                return _currentMessage;
+                return _producer;
+            }
+        }
+
+        public ITaskCoordinatorAdvanced<M> Coordinator {
+            get
+            {
+               return _coordinator;
             }
         }
     }

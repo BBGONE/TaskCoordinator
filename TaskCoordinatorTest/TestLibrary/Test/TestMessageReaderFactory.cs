@@ -6,7 +6,7 @@ namespace TasksCoordinator.Test
     {
         public IMessageReader CreateReader(int taskId, IMessageProducer<Message> messageProducer, BaseTasksCoordinator<Message> coordinator)
         {
-            return new MessageReader<Message>(taskId, messageProducer, coordinator);
+            return new MessageReader<Message>(taskId, coordinator, messageProducer);
         }
     }
 }

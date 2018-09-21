@@ -5,9 +5,8 @@ namespace TasksCoordinator.Interface
 {
     public interface IMessageWorker<in M>
     {
-        bool OnBeforeDoWork();
-        Task<MessageProcessingResult> OnDoWork(IEnumerable<M> messages, object state);
-        void OnAfterDoWork();
-        int taskId { get; }
+        bool OnBeforeDoWork(IMessageReader reader);
+        Task<MessageProcessingResult> OnDoWork(M message, object state, int taskId);
+        void OnAfterDoWork(IMessageReader reader);
     }
 }

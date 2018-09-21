@@ -1,11 +1,12 @@
-﻿using System.Threading;
+﻿using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace TasksCoordinator.Interface
 {
-    public interface IMessageProducer<out M>
+    public interface IMessageProducer<M>
     {
-        Task<int> DoWork(IMessageWorker<M> worker, bool isPrimaryReader, CancellationToken cancellation);
+        Task<IEnumerable<M>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken cancellation, object state);
 
         bool IsQueueActivationEnabled
         {

@@ -1,15 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Bell.PPS.SSSB;
+using Shared;
+using Shared.Errors;
+using System;
+using System.Collections.Concurrent;
+using System.Data.SqlClient;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Transactions;
 using TasksCoordinator;
 using TasksCoordinator.Interface;
-using System.Data.SqlClient;
-using System.Transactions;
-using Shared;
-using System.Collections.Concurrent;
-using Shared.Errors;
-using System.Threading;
-using Bell.PPS.SSSB;
 
 namespace SSSB
 {
@@ -71,7 +70,7 @@ namespace SSSB
             }
         }
 
-        private async Task<bool> DispatchMessage(SqlConnection dbconnection, SSSBMessage message, CancellationToken cancellation)
+        private async Task<bool> _DispatchMessage(SqlConnection dbconnection, SSSBMessage message, CancellationToken cancellation)
         {
             //возвратить ли сообщение назад в очередь?
             bool rollBack = false;
@@ -153,43 +152,26 @@ namespace SSSB
         }
 
 
-        async Task<MessageProcessingResult> IMessageDispatcher<SSSBMessage>.DispatchMessages(IEnumerable<SSSBMessage> messages, WorkContext context, Action<SSSBMessage> onProcessStart)
+        async Task<MessageProcessingResult> IMessageDispatcher<SSSBMessage>.DispatchMessage(SSSBMessage message, WorkContext context)
         {
             bool rollBack = false;
-            SSSBMessage currentMessage = null;
             var dbconnection = (SqlConnection)context.state;
 
-            try
+            ErrorMessage msgerr = null;
+            bool end_dialog_with_error = false;
+            //определяем сообщение по ConversationHandle
+            if (message.ConversationHandle.HasValue)
             {
-                onProcessStart(currentMessage);
-
-                // Обработка сообщений
-                foreach (SSSBMessage message in messages)
-                {
-                    currentMessage = message;
-                    ErrorMessage msgerr = null;
-                    bool end_dialog_with_error = false;
-                    //определяем сообщение по ConversationHandle
-                    if (currentMessage.ConversationHandle.HasValue)
-                    {
-                        // оканчивалась ли ранее обработка этого сообщения с ошибкой?
-                        msgerr = _sssbService.GetError(currentMessage.ConversationHandle.Value);
-                        if (msgerr != null)
-                            end_dialog_with_error = msgerr.ErrorCount >= MAX_MESSAGE_ERROR_COUNT;
-                    }
-                    if (end_dialog_with_error)
-                        await this.DispatchErrorMessage(dbconnection, message, msgerr, context.Cancellation).ConfigureAwait(continueOnCapturedContext: false);
-                    else
-                        rollBack = await this.DispatchMessage(dbconnection, message, context.Cancellation).ConfigureAwait(continueOnCapturedContext: false);
-
-                    if (rollBack)
-                        break;
-                }
+                // оканчивалась ли ранее обработка этого сообщения с ошибкой?
+                msgerr = _sssbService.GetError(message.ConversationHandle.Value);
+                if (msgerr != null)
+                    end_dialog_with_error = msgerr.ErrorCount >= MAX_MESSAGE_ERROR_COUNT;
             }
-            finally
-            {
-                onProcessStart(null);
-            }
+            if (end_dialog_with_error)
+                await this.DispatchErrorMessage(dbconnection, message, msgerr, context.Cancellation).ConfigureAwait(continueOnCapturedContext: false);
+            else
+                rollBack = await this._DispatchMessage(dbconnection, message, context.Cancellation).ConfigureAwait(continueOnCapturedContext: false);
+
             return new MessageProcessingResult() { isRollBack = rollBack };
         }
 

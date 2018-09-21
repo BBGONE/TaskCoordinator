@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
@@ -19,7 +18,7 @@ namespace TasksCoordinator.Test
             this._callbacks = new ConcurrentDictionary<Guid, ICallbackProxy>();
         }
 
-        private async Task<bool> DispatchMessage(Message message, WorkContext context)
+        private async Task<bool> _DispatchMessage(Message message, WorkContext context)
         {
             // возвратить ли сообщение назад в очередь?
             bool rollBack = false;
@@ -30,33 +29,13 @@ namespace TasksCoordinator.Test
             switch (workType)
             {
                 case TaskWorkType.LongCPUBound:
-                    Task<Task> task = new Task<Task>(async () =>
-                    {
-                        try
-                        {
-                            await CPU_TASK(message, payload, cancellation, 5000000, context.taskId).ConfigureAwait(false);
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            //OK
-                        }
-                    }, cancellation, TaskCreationOptions.LongRunning);
-
-                    cancellation.ThrowIfCancellationRequested();
-
-                    if (!task.IsCanceled)
-                    {
-                        task.Start();
-                        var innerTask = await task.ConfigureAwait(false);
-                        await innerTask.ConfigureAwait(false);
-                        // Console.WriteLine($"CPU_TASK {message.SequenceNumber} ENDED");
-                    }
+                    await CPU_TASK(message, payload, cancellation, 5000000, context.taskId).ConfigureAwait(false);
                     break;
                 case TaskWorkType.LongIOBound:
                     await IO_TASK(message, payload, cancellation, 5000).ConfigureAwait(false);
                     break;
                 case TaskWorkType.ShortCPUBound:
-                    await CPU_TASK(message, payload, cancellation, 5000, context.taskId).ConfigureAwait(false);
+                    await CPU_TASK(message, payload, cancellation, 100000, context.taskId).ConfigureAwait(false);
                     break;
                 case TaskWorkType.ShortIOBound:
                     await IO_TASK(message, payload, cancellation, 500).ConfigureAwait(false);
@@ -89,6 +68,7 @@ namespace TasksCoordinator.Test
             {
                 await Task.FromResult(0);
                 // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
+
                 int cnt = iterations;
                 for (int i = 0; i < cnt; ++i)
                 {
@@ -129,12 +109,14 @@ namespace TasksCoordinator.Test
             }
             try
             {
+                
                 if (payload.RaiseError && payload.TryCount < 2)
                 {
                     throw new Exception($"Test Exception TryCount: {payload.TryCount}");
                 }
                 await Task.Delay(durationMilliseconds, cancellation);
                 cancellation.ThrowIfCancellationRequested();
+                
                 payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK time={0} ms Try: {1}", durationMilliseconds, payload.TryCount));
                 // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
                 cancellation.ThrowIfCancellationRequested();
@@ -153,32 +135,11 @@ namespace TasksCoordinator.Test
             }
         }
 
-        async Task<MessageProcessingResult> IMessageDispatcher<Message>.DispatchMessages(IEnumerable<Message> messages, 
-            WorkContext context, Action<Message> onProcessStart)
+        async Task<MessageProcessingResult> IMessageDispatcher<Message>.DispatchMessage(Message message, 
+            WorkContext context)
         {
             bool rollBack = false;
-            Message currentMessage = null;
-            onProcessStart(currentMessage);
-
-            //SSSBMessageProducer передает Connection в объекте state
-            //var dbconnection = context.state as SqlConnection;
-            try
-            {
-                //Как бы обработка сообщений
-                foreach (Message message in messages)
-                {
-                    currentMessage = message;
-                    onProcessStart(currentMessage);
-                    rollBack = await this.DispatchMessage(message, context).ConfigureAwait(false);
-
-                    if (rollBack)
-                        break;
-                }
-            }
-            finally
-            {
-                onProcessStart(null);
-            }
+            rollBack = await this._DispatchMessage(message, context).ConfigureAwait(false);
             return new MessageProcessingResult() { isRollBack = rollBack };
         }
 

@@ -6,6 +6,6 @@ namespace TasksCoordinator.Interface
 {
     public interface IMessageDispatcher<M>
     {
-        Task<MessageProcessingResult> DispatchMessages(IEnumerable<M> messages, WorkContext context, Action<M> onProcessStart);
+        Task<MessageProcessingResult> DispatchMessage(M message, WorkContext context);
     }
 }
