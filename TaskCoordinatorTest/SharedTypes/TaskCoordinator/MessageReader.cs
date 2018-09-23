@@ -8,36 +8,36 @@ using TasksCoordinator.Interface;
 
 namespace TasksCoordinator
 {
-    public class MessageReader<M> : IMessageReader
+    public abstract class MessageReader<TMessage, TState> : IMessageReader
     {
         #region Private Fields
         private int _taskId;
-        private readonly ITaskCoordinatorAdvanced<M> _coordinator;
+        private readonly ITaskCoordinatorAdvanced<TMessage> _coordinator;
         private readonly CancellationToken _cancellation;
-        private readonly IMessageProducer<M> _producer;
 
         protected static ILog _log
         {
             get
             {
-                return BaseTasksCoordinator<M>.Log;
+                return BaseTasksCoordinator<TMessage>.Log;
             }
         }
         #endregion
 
-        public MessageReader(int taskId, ITaskCoordinatorAdvanced<M> tasksCoordinator, IMessageProducer<M> producer)
+        public MessageReader(int taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator)
         {
             this._taskId = taskId;
             this._coordinator = tasksCoordinator;
             this._cancellation = this._coordinator.Cancellation;
-            this._producer = producer;
         }
+
+        protected abstract Task<IEnumerable<TMessage>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken cancellation, TState state);
 
         protected virtual async Task<int> DoWork(bool isPrimaryReader, CancellationToken cancellation)
         {
             int cnt = 0;
             // Console.WriteLine(string.Format("begin {0} Thread: {1}", this.taskId, Thread.CurrentThread.ManagedThreadId));
-            IEnumerable<M> messages = await this._producer.ReadMessages(isPrimaryReader, this.taskId, cancellation, null).ConfigureAwait(false);
+            IEnumerable<TMessage> messages = await this.ReadMessages(isPrimaryReader, this.taskId, cancellation, default(TState)).ConfigureAwait(false);
             cnt = messages.Count();
             // Console.WriteLine(string.Format("end {0} {1} {2}", this.taskId, isPrimaryReader, Thread.CurrentThread.ManagedThreadId));
             if (cnt > 0)
@@ -45,7 +45,7 @@ namespace TasksCoordinator
                 bool isOk = this._coordinator.OnBeforeDoWork(this);
                 try
                 {
-                    foreach (M msg in messages)
+                    foreach (TMessage msg in messages)
                     {
                         // обработка сообщений
                         try
@@ -69,7 +69,7 @@ namespace TasksCoordinator
         }
 
     
-        protected virtual void OnProcessMessageException(Exception ex, M message)
+        protected virtual void OnProcessMessageException(Exception ex, TMessage message)
         {
         }
 
@@ -128,14 +128,7 @@ namespace TasksCoordinator
             }
         }
 
-        public IMessageProducer<M> Producer {
-            get
-            {
-                return _producer;
-            }
-        }
-
-        public ITaskCoordinatorAdvanced<M> Coordinator {
+        public ITaskCoordinatorAdvanced<TMessage> Coordinator {
             get
             {
                return _coordinator;

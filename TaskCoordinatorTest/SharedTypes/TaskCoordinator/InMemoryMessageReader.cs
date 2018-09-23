@@ -1,41 +1,31 @@
-﻿using Shared.Services;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
 
-namespace TasksCoordinator.Test
+namespace TasksCoordinator
 {
-    public class TestMessageProducer<M>: IMessageProducer<M>
+    public class InMemoryMessageReader<TMessage> : MessageReader<TMessage, Object>
     {
-        private TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(30);
-        private ITaskService _service;
-        private readonly BlockingCollection<M> _messageQueue;
-   
+        public static readonly TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(10);
 
-        public TestMessageProducer(ITaskService service, BlockingCollection<M> messageQueue)
+        #region Private Fields
+        private readonly BlockingCollection<TMessage> _messageQueue;
+        #endregion
+
+        public InMemoryMessageReader(int taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, BlockingCollection<TMessage> messageQueue) :
+            base(taskId, tasksCoordinator)
         {
-            this._service = service;
             this._messageQueue = messageQueue;
-            this.DefaultWaitForTimeout = this._service.isQueueActivationEnabled ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(5);
         }
 
-        private BlockingCollection<M> MessageQueue
-        {
-            get { return _messageQueue; }
-        }
-
-        public bool IsQueueActivationEnabled {
-            get { return this._service.isQueueActivationEnabled; }
-        }
-
-        public async Task<IEnumerable<M>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken cancellation, object state)
+        protected override async Task<IEnumerable<TMessage>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken cancellation, object state)
         {
             await Task.FromResult(0);
-            LinkedList<M> messages = new LinkedList<M>();
-            M msg;
+            LinkedList<TMessage> messages = new LinkedList<TMessage>();
+            TMessage msg;
             // for the Primary reader (it waits for messages when the queue is empty)
             if (isPrimaryReader)
             {

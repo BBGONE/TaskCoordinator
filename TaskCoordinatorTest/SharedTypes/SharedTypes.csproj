@@ -81,12 +81,12 @@
     <Compile Include="TaskCoordinator\Interface\ITaskCoordinatorAdvanced.cs" />
     <Compile Include="TaskCoordinator\Interface\ITaskCoordinator.cs" />
     <Compile Include="TaskCoordinator\Interface\IMessageDispatcher.cs" />
-    <Compile Include="TaskCoordinator\Interface\IMessageProducer.cs" />
     <Compile Include="TaskCoordinator\Interface\IMessageReader.cs" />
     <Compile Include="TaskCoordinator\Interface\IMessageReaderFactory.cs" />
     <Compile Include="TaskCoordinator\Interface\IMessageWorker.cs" />
     <Compile Include="TaskCoordinator\Message.cs" />
     <Compile Include="TaskCoordinator\MessageProcessingResult.cs" />
+    <Compile Include="TaskCoordinator\InMemoryMessageReader.cs" />
     <Compile Include="TaskCoordinator\MessageReader.cs" />
     <Compile Include="TaskCoordinator\MessageReaderResult.cs" />
     <Compile Include="TaskCoordinator\WorkContext.cs" />

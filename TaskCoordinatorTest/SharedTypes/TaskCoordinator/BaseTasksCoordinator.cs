@@ -22,6 +22,8 @@ namespace TasksCoordinator
 
         private readonly object _lock = new object();
         private readonly object _semaphoreLock = new object();
+        private CancellationTokenSource _stopSource;
+        private CancellationToken _cancellation;
         private readonly bool _isQueueActivationEnabled;
         private readonly bool _isEnableParallelReading;
         private readonly int _maxReadersCount;
@@ -30,25 +32,20 @@ namespace TasksCoordinator
         private volatile int  _isStarted;
         private volatile bool _isPaused;
         private int _semaphore;
-        private CancellationTokenSource _stopSource;
-        private CancellationToken _cancellation;
         private readonly IMessageDispatcher<M> _dispatcher;
         private readonly ConcurrentDictionary<int, Task> _tasks;
         protected readonly IMessageReaderFactory<M> _readerFactory;
-        protected readonly IMessageProducer<M> _producer;
 
-        public BaseTasksCoordinator(IMessageDispatcher<M> messageDispatcher, IMessageProducer<M> messageProducer,
-            IMessageReaderFactory<M> messageReaderFactory,
-            int maxReadersCount, bool isEnableParallelReading = false)
+        public BaseTasksCoordinator(IMessageDispatcher<M> messageDispatcher, IMessageReaderFactory<M> messageReaderFactory,
+            int maxReadersCount, bool isEnableParallelReading = false, bool isQueueActivationEnabled = false)
         {
             this._semaphore = 0;
             this._stopSource = new CancellationTokenSource();
             this._cancellation = this._stopSource.Token;
             this._dispatcher = messageDispatcher;
-            this._producer = messageProducer;
             this._readerFactory = messageReaderFactory;
             this._maxReadersCount = maxReadersCount;
-            this._isQueueActivationEnabled = this._producer.IsQueueActivationEnabled;
+            this._isQueueActivationEnabled = isQueueActivationEnabled;
             this._isEnableParallelReading = isEnableParallelReading;
             this._taskIdSeq = 0;
             this._primaryReader = null;
@@ -224,7 +221,7 @@ namespace TasksCoordinator
 
         protected IMessageReader GetMessageReader(int taskId)
         {
-            return this._readerFactory.CreateReader(taskId, this._producer, this);
+            return this._readerFactory.CreateReader(taskId, this);
         }
 
         private async Task<int> JobRunner(CancellationToken token, int taskId)

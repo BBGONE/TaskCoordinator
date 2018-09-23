@@ -56,7 +56,6 @@
     <Compile Include="Test\TestService.cs" />
     <Compile Include="Test\TaskWorkType.cs" />
     <Compile Include="Test\TestMessageDispatcher.cs" />
-    <Compile Include="Test\TestMessageProducer.cs" />
     <Compile Include="Test\TestMessageReaderFactory.cs" />
     <Compile Include="Test\TestTasksCoordinator.cs" />
   </ItemGroup>

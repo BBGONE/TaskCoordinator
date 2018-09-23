@@ -92,7 +92,6 @@
     </Compile>
     <Compile Include="ServiceMessageEventArgs.cs" />
     <Compile Include="SSSBMessage.cs" />
-    <Compile Include="SSSBMessageProducer.cs" />
     <Compile Include="SSSBMessageReader.cs" />
     <Compile Include="SSSBTasksCoordinator.cs" />
     <Compile Include="StandardMessageHandlers.cs" />

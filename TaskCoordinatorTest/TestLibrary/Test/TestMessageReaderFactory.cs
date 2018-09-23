@@ -1,12 +1,20 @@
-﻿using TasksCoordinator.Interface;
+﻿using System.Collections.Concurrent;
+using TasksCoordinator.Interface;
 
 namespace TasksCoordinator.Test
 {
-    public class TestMessageReaderFactory : IMessageReaderFactory<Message>
+    public class TestMessageReaderFactory: IMessageReaderFactory<Message>
     {
-        public IMessageReader CreateReader(int taskId, IMessageProducer<Message> messageProducer, BaseTasksCoordinator<Message> coordinator)
+        private BlockingCollection<Message> messageQueue;
+
+        public TestMessageReaderFactory(BlockingCollection<Message> messageQueue)
         {
-            return new MessageReader<Message>(taskId, coordinator, messageProducer);
+            this.messageQueue = messageQueue;
+        }
+
+        public IMessageReader CreateReader(int taskId, BaseTasksCoordinator<Message> coordinator)
+        {
+            return new InMemoryMessageReader<Message>(taskId, coordinator, messageQueue);
         }
     }
 }

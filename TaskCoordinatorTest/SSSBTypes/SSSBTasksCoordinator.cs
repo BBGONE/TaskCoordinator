@@ -5,10 +5,9 @@ namespace SSSB
     public class SSSBTasksCoordinator: BaseTasksCoordinator<SSSBMessage>
     {
         public SSSBTasksCoordinator(ISSSBDispatcher messageDispatcher, 
-             SSSBMessageProducer messageProducer,
              SSSBMessageReaderFactory messageReaderFactory,
-             int maxReadersCount, bool isEnableParallelReading = false) :
-             base(messageDispatcher, messageProducer, messageReaderFactory, maxReadersCount, isEnableParallelReading)
+             int maxReadersCount, bool isEnableParallelReading = false, bool isQueueActivationEnabled = false) :
+             base(messageDispatcher, messageReaderFactory, maxReadersCount, isEnableParallelReading, isQueueActivationEnabled)
         {
         }
     }

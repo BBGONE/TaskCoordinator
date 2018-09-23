@@ -32,9 +32,8 @@ namespace SSSB
             _isStopped = true;
             this.isQueueActivationEnabled = isQueueActivationEnabled;
             this._dispatcher = new SSSBMessageDispatcher(this);
-            var producer = new SSSBMessageProducer(this);
             var readerFactory = new SSSBMessageReaderFactory(this);
-            _tasksCoordinator = new SSSBTasksCoordinator(this._dispatcher, producer, readerFactory, maxReadersCount, isEnableParallelReading);
+            _tasksCoordinator = new SSSBTasksCoordinator(this._dispatcher, readerFactory, maxReadersCount, isEnableParallelReading, this.isQueueActivationEnabled);
         }
 
         public EventHandler OnStartedEvent;

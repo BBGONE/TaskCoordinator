@@ -2,6 +2,6 @@
 {
     public interface IMessageReaderFactory<M>
     {
-        IMessageReader CreateReader(int taskId, IMessageProducer<M> messageProducer, BaseTasksCoordinator<M> coordinator);
+        IMessageReader CreateReader(int taskId, BaseTasksCoordinator<M> coordinator);
     }
 }

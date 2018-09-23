@@ -100,6 +100,10 @@ namespace TestApplication
 
         private static async Task Start()
         {
+            int minWork, minIO;
+            ThreadPool.GetMinThreads(out minWork, out minIO);
+            ThreadPool.SetMinThreads((MAX_TASK_COUNT + 2) > minWork? (MAX_TASK_COUNT + 2): minWork, minIO);
+
             stopwatch = new Stopwatch();
             SEQUENCE_NUM = 0;
             ProcessedCount = 0;
@@ -119,6 +123,8 @@ namespace TestApplication
                 stopwatch.Start();
 
                 svc.Start();
+                //await Task.Delay(100);
+                //Console.WriteLine($"TasksCount: {svc.TasksCoordinator.TasksCount}");
 
                 if (CANCEL_AFTER > 0)
                 {
@@ -126,6 +132,8 @@ namespace TestApplication
                     svc.Stop();
                 }
                 await callBack.ResultAsync.ConfigureAwait(false);
+
+                Console.WriteLine($"TasksCount: {svc.TasksCoordinator.TasksCount}");
             }
             catch (OperationCanceledException)
             {
