@@ -8,7 +8,7 @@ namespace TasksCoordinator.Test
     {
         T ISerializer.Deserialize<T>(byte[] bytes)
         {
-            using (MemoryStream stream = new MemoryStream(bytes))
+            using (var stream = new MemoryStream(bytes))
             {
                 return ProtoSerializer.Deserialize<T>(stream);
             }
@@ -16,7 +16,7 @@ namespace TasksCoordinator.Test
 
         byte[] ISerializer.Serialize<T>(T obj)
         {
-            using (MemoryStream stream = new MemoryStream())
+            using (var stream = new MemoryStream())
             {
                 ProtoSerializer.Serialize(stream, obj);
                 return stream.ToArray();
