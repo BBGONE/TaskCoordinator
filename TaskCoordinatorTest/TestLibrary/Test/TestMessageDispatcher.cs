@@ -10,12 +10,12 @@ namespace TasksCoordinator.Test
     public class TestMessageDispatcher: IMessageDispatcher<Message>
     {
         private readonly ISerializer _serializer;
-        private readonly ConcurrentDictionary<Guid, ICallbackProxy> _callbacks;
+        private readonly ConcurrentDictionary<Guid, ICallbackProxy<Message>> _callbacks;
 
         public TestMessageDispatcher(ISerializer serializer)
         {
             this._serializer = serializer;
-            this._callbacks = new ConcurrentDictionary<Guid, ICallbackProxy>();
+            this._callbacks = new ConcurrentDictionary<Guid, ICallbackProxy<Message>>();
         }
 
         private async Task<bool> _DispatchMessage(Message message, WorkContext context)
@@ -59,7 +59,7 @@ namespace TasksCoordinator.Test
         // Test Task which consumes CPU
         private async Task CPU_TASK(Message message, Payload payload, CancellationToken cancellation, int iterations, int taskId)
         {
-            ICallbackProxy callback;
+            ICallbackProxy<Message> callback;
             if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
             {
                 return;
@@ -85,24 +85,24 @@ namespace TasksCoordinator.Test
                 payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK cnt={0} Try: {1}", cnt, payload.TryCount));
                 cancellation.ThrowIfCancellationRequested();
                 message.Body = this._serializer.Serialize(payload);
-                callback.TaskCompleted(message, null);
+                await callback.TaskCompleted(message, null);
             }
             catch (OperationCanceledException)
             {
                 message.Body = this._serializer.Serialize(payload);
-                callback.TaskCompleted(message, "CANCELLED");
+                await callback.TaskCompleted(message, "CANCELLED");
             }
             catch (Exception ex)
             {
                 message.Body = this._serializer.Serialize(payload);
-                callback.TaskCompleted(message, ex.Message);
+                await callback.TaskCompleted(message, ex.Message);
             }
         }
 
         // Test Task IO Bound
         private async Task IO_TASK(Message message, Payload payload, CancellationToken cancellation, int durationMilliseconds)
         {
-            ICallbackProxy callback;
+            ICallbackProxy<Message> callback;
             if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
             {
                 return;
@@ -121,17 +121,17 @@ namespace TasksCoordinator.Test
                 // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
                 cancellation.ThrowIfCancellationRequested();
                 message.Body = this._serializer.Serialize(payload);
-                callback.TaskCompleted(message, null);
+                await callback.TaskCompleted(message, null);
             }
             catch (OperationCanceledException)
             {
                 message.Body = this._serializer.Serialize(payload);
-                callback.TaskCompleted(message, "CANCELLED");
+                await callback.TaskCompleted(message, "CANCELLED");
             }
             catch (Exception ex)
             {
                 message.Body = this._serializer.Serialize(payload);
-                callback.TaskCompleted(message, ex.Message);
+                await callback.TaskCompleted(message, ex.Message);
             }
         }
 
@@ -143,14 +143,14 @@ namespace TasksCoordinator.Test
             return new MessageProcessingResult() { isRollBack = rollBack };
         }
 
-        public void RegisterCallback(Guid clientID, ICallbackProxy callback)
+        public void RegisterCallback(Guid clientID, ICallbackProxy<Message> callback)
         {
             this._callbacks.AddOrUpdate(clientID, callback, (id, value) => callback);
         }
 
         public bool UnRegisterCallback(Guid clientID)
         {
-            ICallbackProxy res;
+            ICallbackProxy<Message> res;
             if (this._callbacks.TryRemove(clientID, out res))
             {
                 (res as IDisposable).Dispose();

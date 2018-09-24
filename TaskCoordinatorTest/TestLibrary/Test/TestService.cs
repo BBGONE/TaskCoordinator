@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using TasksCoordinator.Callbacks;
 using TasksCoordinator.Interface;
 using TasksCoordinator.Test.Interface;
 
@@ -224,8 +225,8 @@ namespace TasksCoordinator.Test
 
         #endregion
 
-        public void RegisterCallback(Guid clientID, ICallback callback) {
-            this._dispatcher.RegisterCallback(clientID, new CallbackProxy(callback, this._tasksCoordinator.Cancellation));
+        public void RegisterCallback(Guid clientID, ICallback<Message> callback) {
+            this._dispatcher.RegisterCallback(clientID, new CallbackProxy<Message>(callback, this._tasksCoordinator.Cancellation));
         }
 
         public bool UnRegisterCallback(Guid clientID)

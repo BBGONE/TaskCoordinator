@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using TasksCoordinator;
 using TasksCoordinator.Test;
 using TasksCoordinator.Test.Interface;
+using TasksCoordinator.Callbacks;
 
 namespace TestApplication
 {
@@ -19,8 +20,8 @@ namespace TestApplication
         private static Stopwatch stopwatch;
 
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.LongCPUBound;
-        private const int BATCH_SIZE = 20;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.ShortCPUBound;
+        private const int BATCH_SIZE = 50;
         private const int MAX_TASK_COUNT = 8;
         private const bool ENABLE_PARRALEL_READING = false;
         private const bool IS_ACTIVATION_ENABLED = false;
@@ -34,19 +35,13 @@ namespace TestApplication
             Program.Start().Wait();
         }
 
-        private class CallBack : ICallback
+        private class CallBack : BaseCallback<Message>
         {
-            private readonly int _batchSize;
-            private readonly TaskCompletionSource<int> _completionSource;
-
-            public CallBack(int batchSize)
+            public CallBack()
             {
-                this._batchSize = batchSize;
-                this._completionSource = new TaskCompletionSource<int>();
             }
 
-            public int BatchSize { get { return this._batchSize; } }
-            public void TaskSuccess(Message message)
+            public override void TaskSuccess(Message message)
             {
                 Interlocked.Increment(ref Program.ProcessedCount);
                 var payload = _serializer.Deserialize<Payload>(message.Body);
@@ -56,8 +51,9 @@ namespace TestApplication
                     Console.WriteLine($"SEQNUM: {message.SequenceNumber} Result: {result}");
                 }
             }
-            public bool TaskError(Message message, string error)
+            public override async Task<bool> TaskError(Message message, string error)
             {
+                await Task.FromResult(0);
                 Interlocked.Increment(ref Program.ErrorCount);
                 if (SHOW_TASK_ERROR)
                 {
@@ -74,28 +70,42 @@ namespace TestApplication
                     return false;
                 }
             }
-            public void JobCancelled()
+            public override void JobCancelled()
             {
-                Console.WriteLine($"BATCH WITH {this._batchSize} messages Cancelled after: {stopwatch.ElapsedMilliseconds} ms");
-                _completionSource.TrySetCanceled();
+                Console.WriteLine($"BATCH WITH {this.BatchInfo.BatchSize} messages Cancelled after: {stopwatch.ElapsedMilliseconds} ms");
+                base.JobCancelled();
             }
-            public void JobCompleted(string error)
+            public override void JobCompleted(string error)
             {
-                Console.WriteLine($"BATCH WITH {this._batchSize} messages Completed after: {stopwatch.ElapsedMilliseconds} ms");
-                if (string.IsNullOrEmpty(error))
+                Console.WriteLine($"BATCH WITH {this.BatchInfo.BatchSize} messages Completed after: {stopwatch.ElapsedMilliseconds} ms");
+                base.JobCompleted(error);
+            }
+        }
+
+        private static void QueueAdditional(CallBack callBack) {
+            // Asynchronously adds more items to the batch (NO AWAIT HERE)
+            Task.Delay(2000).ContinueWith((t) =>
+            {
+                Console.WriteLine(string.Format("Before QueueLength1: {0}", svc.QueueLength));
+                for (int i = 0; i < BATCH_SIZE; ++i)
                 {
-                    _completionSource.TrySetResult(this._batchSize);
+                    svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
                 }
-                else
-                {
-                    _completionSource.TrySetException(new Exception(error));
-                }
-            }
-            
-            public Task<int> ResultAsync
+                var batchInfo = callBack.UpdateBatchSize(BATCH_SIZE, false);
+                Console.WriteLine(string.Format("After QueueLength1: {0}", svc.QueueLength));
+            });
+
+            // Asynchronously adds more items to the batch (NO AWAIT HERE)
+            Task.Delay(4000).ContinueWith((t) =>
             {
-                get { return this._completionSource.Task; }
-            }
+                Console.WriteLine(string.Format("Before QueueLength2: {0}", svc.QueueLength));
+                for (int i = 0; i < BATCH_SIZE; ++i)
+                {
+                    svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
+                }
+                var batchInfo = callBack.UpdateBatchSize(BATCH_SIZE, true);
+                Console.WriteLine(string.Format("After QueueLength2: {0}", svc.QueueLength));
+            });
         }
 
         private static async Task Start()
@@ -109,22 +119,20 @@ namespace TestApplication
             ProcessedCount = 0;
             ErrorCount = 0;
             svc = new TestService(_serializer, "TestService", MAX_TASK_COUNT, IS_ACTIVATION_ENABLED, ENABLE_PARRALEL_READING);
-
-            for (int i = 0; i < BATCH_SIZE; ++i)
-            {
-                svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
-            }
-            Console.WriteLine(string.Format("QueueLength: {0}", svc.QueueLength));
-
-            var callBack = new CallBack(BATCH_SIZE);
-            svc.RegisterCallback(ClientID, callBack);
             try
             {
                 stopwatch.Start();
-
                 svc.Start();
-                //await Task.Delay(100);
-                //Console.WriteLine($"TasksCount: {svc.TasksCoordinator.TasksCount}");
+                var callBack = new CallBack();
+                svc.RegisterCallback(ClientID, callBack);
+               
+                for (int i = 0; i < BATCH_SIZE; ++i)
+                {
+                    svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
+                }
+                var batchInfo = callBack.UpdateBatchSize(BATCH_SIZE, false);
+                Console.WriteLine(string.Format("QueueLength: {0}", svc.QueueLength));
+                QueueAdditional(callBack);
 
                 if (CANCEL_AFTER > 0)
                 {

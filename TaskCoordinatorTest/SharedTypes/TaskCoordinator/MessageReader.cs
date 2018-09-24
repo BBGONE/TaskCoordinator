@@ -51,6 +51,10 @@ namespace TasksCoordinator
                         try
                         {
                             MessageProcessingResult res = await this._coordinator.OnDoWork(msg, null, this.taskId).ConfigureAwait(false);
+                            if (res.isRollBack)
+                            {
+                                this.OnRollback(msg, cancellation);
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -68,9 +72,14 @@ namespace TasksCoordinator
             return cnt;
         }
 
+        protected virtual void OnRollback(TMessage msg, CancellationToken cancellation)
+        {
+            // NOOP
+        }
     
         protected virtual void OnProcessMessageException(Exception ex, TMessage message)
         {
+            // NOOP
         }
 
        

@@ -51,5 +51,10 @@ namespace TasksCoordinator
 
             return messages;
         }
+
+        protected override void OnRollback(TMessage msg, CancellationToken cancellation)
+        {
+            _messageQueue.Add(msg, cancellation);
+        }
     }
 }

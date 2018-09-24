@@ -168,7 +168,10 @@ namespace SSSB
                                 {
                                     MessageProcessingResult res = await this.Coordinator.OnDoWork(msg, dbconnection, this.taskId).ConfigureAwait(false);
                                     if (res.isRollBack)
+                                    {
+                                        this.OnRollback(msg, cancellation);
                                         return cnt;
+                                    }
                                 }
                                 catch (Exception ex)
                                 {

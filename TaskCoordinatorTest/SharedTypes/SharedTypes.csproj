@@ -77,7 +77,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="TaskCoordinator\Callbacks\BaseCallback.cs" />
     <Compile Include="TaskCoordinator\BaseTasksCoordinator.cs" />
+    <Compile Include="TaskCoordinator\Callbacks\CallbackProxy.cs" />
+    <Compile Include="TaskCoordinator\Interface\ICallback.cs" />
+    <Compile Include="TaskCoordinator\Interface\ICallbackProxy.cs" />
     <Compile Include="TaskCoordinator\Interface\ITaskCoordinatorAdvanced.cs" />
     <Compile Include="TaskCoordinator\Interface\ITaskCoordinator.cs" />
     <Compile Include="TaskCoordinator\Interface\IMessageDispatcher.cs" />

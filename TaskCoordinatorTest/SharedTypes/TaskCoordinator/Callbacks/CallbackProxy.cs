@@ -2,11 +2,11 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Test.Interface;
+using TasksCoordinator.Interface;
 
-namespace TasksCoordinator.Test
+namespace TasksCoordinator.Callbacks
 {
-    public class CallbackProxy : ICallbackProxy, IDisposable
+    public class CallbackProxy<T> : ICallbackProxy<T>, IDisposable
     {
         public enum JobStatus : int
         {
@@ -18,17 +18,15 @@ namespace TasksCoordinator.Test
 
         internal static ILog Log = Shared.Log.GetInstance("CallbackProxy");
 
-        private ICallback _callback;
+        private ICallback<T> _callback;
         private CancellationToken _token;
         private CancellationTokenRegistration _register;
-        private readonly int _batchSize;
         private volatile int _processedCount;
         private volatile int _status;
 
-        public CallbackProxy(ICallback callback, CancellationToken token)
+        public CallbackProxy(ICallback<T> callback, CancellationToken token)
         {
             this._callback = callback;
-            this._batchSize = callback.BatchSize;
             this._token = token;
             this._register = this._token.Register(() => {
                 try
@@ -40,16 +38,29 @@ namespace TasksCoordinator.Test
                     Log.Error(ex);
                 }
             }, false);
+
+            this._callback.CompleteAsync.ContinueWith((t) => {
+                int oldstatus = Interlocked.CompareExchange(ref this._status, 0, 0);
+                if (oldstatus == 0)
+                {
+                    var batchInfo = this._callback.BatchInfo;
+                    if (batchInfo.IsComplete && this._processedCount == batchInfo.BatchSize && !this._token.IsCancellationRequested)
+                    {
+                        this.JobCompleted(null);
+                    }
+                }
+            });
             this._status = 0;
         }
 
-        void ICallbackProxy.TaskCompleted(Message message, string error)
+        async Task ICallbackProxy<T>.TaskCompleted(T message, string error)
         {
             if (string.IsNullOrEmpty(error))
             {
                 this.TaskSuccess(message);
                 int count = Interlocked.Increment(ref this._processedCount);
-                if (count == this._batchSize)
+                var batchInfo = this._callback.BatchInfo;
+                if (batchInfo.IsComplete && count == batchInfo.BatchSize)
                 {
                     this.JobCompleted(null);
                 }
@@ -60,11 +71,11 @@ namespace TasksCoordinator.Test
             }
             else
             {
-                this.TaskError(message, error);
+                await this.TaskError(message, error);
             }
         }
 
-        void TaskSuccess(Message message)
+        void TaskSuccess(T message)
         {
             var oldstatus = Interlocked.CompareExchange(ref this._status, 0, 0);
             if (oldstatus == 0)
@@ -73,12 +84,12 @@ namespace TasksCoordinator.Test
             }
         }
 
-        void TaskError(Message message, string error)
+        async Task TaskError(T message, string error)
         {
             var oldstatus = Interlocked.CompareExchange(ref this._status, 0, 0);
             if (oldstatus == 0)
             {
-                bool res = this._callback.TaskError(message, error);
+                bool res = await this._callback.TaskError(message, error);
                 if (!res)
                 {
                     this.JobCompleted(error);
@@ -88,7 +99,7 @@ namespace TasksCoordinator.Test
 
         void JobCancelled()
         {
-            var oldstatus = Interlocked.CompareExchange(ref this._status, 3, 0);
+            var oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Cancelled, 0);
             if (oldstatus == 0)
             {
                 try
@@ -120,11 +131,11 @@ namespace TasksCoordinator.Test
             var oldstatus = 0;
             if (string.IsNullOrEmpty(error))
             {
-                oldstatus = Interlocked.CompareExchange(ref this._status, 1, 0);
+                oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Success, 0);
             }
             else
             {
-                oldstatus = Interlocked.CompareExchange(ref this._status, 2, 0);
+                oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Error, 0);
             }
 
             if (oldstatus == 0)
@@ -153,8 +164,7 @@ namespace TasksCoordinator.Test
             }
         }
 
-        int ICallbackProxy.BatchSize { get { return this._batchSize; } }
-
+        BatchInfo ICallbackProxy<T>.BatchInfo { get { return this._callback.BatchInfo; } }
         public JobStatus Status { get { return (JobStatus)_status; } }
 
         #region IDisposable Support
