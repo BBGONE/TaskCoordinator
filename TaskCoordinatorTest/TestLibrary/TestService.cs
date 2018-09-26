@@ -16,13 +16,13 @@ namespace TasksCoordinator.Test
     /// </summary>
     public class TestService : ITaskService
     {
-        internal static ILog Log = Shared.Log.GetInstance("TestService");
+        private readonly ILog _log = LogFactory.GetInstance("TestService");
 
         #region Private Fields
         private string _name;
         private volatile bool _isStopped;
         private ITaskCoordinator _tasksCoordinator;
-        private TestMessageDispatcher _dispatcher;
+        private TestMessageDispatcher _messageDispatcher;
         private BlockingCollection<Message> _messageQueue;
         private ISerializer _serializer;
         #endregion
@@ -38,10 +38,9 @@ namespace TasksCoordinator.Test
             this.isQueueActivationEnabled = isQueueActivationEnabled;
             this._serializer = serializer;
             this._messageQueue = new BlockingCollection<Message>();
-            this._dispatcher = new TestMessageDispatcher(this._serializer);
-            var readerFactory = new TestMessageReaderFactory(this._messageQueue);
-            this._tasksCoordinator = new TestTasksCoordinator(this._dispatcher, readerFactory,
-                maxReadersCount, isEnableParallelReading, this.isQueueActivationEnabled);
+            this._messageDispatcher = new TestMessageDispatcher(this._serializer);
+            var readerFactory = new TestMessageReaderFactory(this._messageQueue, this._messageDispatcher);
+            this._tasksCoordinator = new TestTasksCoordinator(readerFactory, maxReadersCount, isEnableParallelReading, this.isQueueActivationEnabled);
         }
 
 
@@ -79,7 +78,7 @@ namespace TasksCoordinator.Test
             }
             catch (Exception ex)
             {
-                throw new PPSException($"The Service: {this.Name} failed to start", ex, Log);
+                throw new PPSException($"The Service: {this.Name} failed to start", ex, _log);
             }
         }
 
@@ -132,7 +131,7 @@ namespace TasksCoordinator.Test
                 ex.Flatten().Handle((err) => {
                     if (!(err is OperationCanceledException))
                     {
-                        Log.Error(ex);
+                        _log.Error(ex);
 
                     }
                     return true;
@@ -145,7 +144,7 @@ namespace TasksCoordinator.Test
             }
             catch (Exception ex)
             {
-                Log.Error(ex);
+                _log.Error(ex);
             }
             this.OnStop();
         }
@@ -226,12 +225,12 @@ namespace TasksCoordinator.Test
         #endregion
 
         public void RegisterCallback(Guid clientID, ICallback<Message> callback) {
-            this._dispatcher.RegisterCallback(clientID, new CallbackProxy<Message>(callback, this._tasksCoordinator.Cancellation));
+            this._messageDispatcher.RegisterCallback(clientID, new CallbackProxy<Message>(callback, this._tasksCoordinator.Cancellation));
         }
 
         public bool UnRegisterCallback(Guid clientID)
         {
-            return this._dispatcher.UnRegisterCallback(clientID);
+            return this._messageDispatcher.UnRegisterCallback(clientID);
         }
 
         public void AddToQueue<T>(T msg, int num, string msgType) {
@@ -243,6 +242,11 @@ namespace TasksCoordinator.Test
         public int QueueLength
         {
             get { return this._messageQueue.Count; }
+        }
+
+        protected ILog Log
+        {
+            get { return _log; }
         }
     }
 }

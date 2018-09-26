@@ -14,7 +14,7 @@ namespace SSSB
     /// </summary>
     public class BaseSSSBService : ISSSBService
     {
-        internal static readonly ILog Log = Shared.Log.GetInstance("BaseSSSBService");
+        private readonly ILog _log = LogFactory.GetInstance("BaseSSSBService");
         private static ErrorMessages _errorMessages = new ErrorMessages();
 
         #region Private Fields
@@ -22,8 +22,9 @@ namespace SSSB
         private string _queueName;
         private volatile bool _isStopped;
         private CancellationTokenSource _stopStartingSource;
-        private SSSBTasksCoordinator _tasksCoordinator;
-        private ISSSBDispatcher _dispatcher;
+        private readonly SSSBTasksCoordinator _tasksCoordinator;
+        private readonly SSSBMessageReaderFactory _readerFactory;
+        private readonly ISSSBDispatcher _messageDispatcher;
         #endregion
 
         public BaseSSSBService(string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false)
@@ -31,14 +32,13 @@ namespace SSSB
             _name = name;
             _isStopped = true;
             this.isQueueActivationEnabled = isQueueActivationEnabled;
-            this._dispatcher = new SSSBMessageDispatcher(this);
-            var readerFactory = new SSSBMessageReaderFactory(this);
-            _tasksCoordinator = new SSSBTasksCoordinator(this._dispatcher, readerFactory, maxReadersCount, isEnableParallelReading, this.isQueueActivationEnabled);
+            this._messageDispatcher = new SSSBMessageDispatcher(this);
+            this._readerFactory = new SSSBMessageReaderFactory(this, this._messageDispatcher);
+            this._tasksCoordinator = new SSSBTasksCoordinator(this._readerFactory, maxReadersCount, isEnableParallelReading, this.isQueueActivationEnabled);
         }
 
         public EventHandler OnStartedEvent;
         public EventHandler OnStoppedEvent;
-
 
         internal async Task InternalStart()
         {
@@ -46,13 +46,13 @@ namespace SSSB
             {
                 _queueName = await ServiceBrokerHelper.GetServiceQueueName(_name).ConfigureAwait(false);
                 if (_queueName == null)
-                    throw new PPSException(string.Format(ServiceBrokerResources.ServiceInitializationErrMsg, _name), Log);
+                    throw new PPSException(string.Format(ServiceBrokerResources.ServiceInitializationErrMsg, _name), _log);
                 this._tasksCoordinator.Start();
                 this.OnStarted();
             }
             catch (Exception ex)
             {
-                throw new PPSException(ServiceBrokerResources.StartErrMsg, ex, Log);
+                throw new PPSException(ServiceBrokerResources.StartErrMsg, ex, _log);
             }
         }
 
@@ -97,7 +97,7 @@ namespace SSSB
                 {
                     ++i;
                     if (i >= 3 && i <= 7)
-                        Log.Error(string.Format("Не удается установить соединение с БД в SSSB сервисе: {0}", this.Name));
+                        _log.Error(string.Format("Не удается установить соединение с БД в SSSB сервисе: {0}", this.Name));
                     if ((i % 20) == 0)
                         throw new Exception(string.Format("После 20 попыток не удается установить соединение с БД при запуске сервиса: {0}!", this.Name));
                     await Task.Delay(10000).ConfigureAwait(false);
@@ -114,7 +114,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                Log.Critical(ex);
+                _log.Critical(ex);
                 this._stopStartingSource.Cancel();
                 this._isStopped = true;
                 this._stopStartingSource = null;
@@ -146,7 +146,7 @@ namespace SSSB
                 ex.Flatten().Handle((err) => {
                     if (!(err is OperationCanceledException))
                     {
-                        Log.Error(ex);
+                        _log.Error(ex);
 
                     }
                     return true;
@@ -158,7 +158,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                Log.Error(ex);
+                _log.Error(ex);
             }
         }
 
@@ -187,7 +187,7 @@ namespace SSSB
 		/// <param name="handler"></param>
 		public void RegisterMessageHandler(string messageType, IMessageHandler<ServiceMessageEventArgs> handler)
         {
-            this._dispatcher.RegisterMessageHandler(messageType, handler);
+            this._messageDispatcher.RegisterMessageHandler(messageType, handler);
         }
 
         /// <summary>
@@ -197,7 +197,7 @@ namespace SSSB
         /// <param name="handler"></param>
         public void RegisterErrorMessageHandler(string messageType, IMessageHandler<ErrorMessageEventArgs> handler)
         {
-            this._dispatcher.RegisterErrorMessageHandler(messageType, handler);
+            this._messageDispatcher.RegisterErrorMessageHandler(messageType, handler);
         }
 
         /// <summary>
@@ -206,7 +206,7 @@ namespace SSSB
         /// <param name="messageType"></param>
         public void UnregisterMessageHandler(string messageType)
         {
-            this._dispatcher.UnregisterMessageHandler(messageType);
+            this._messageDispatcher.UnregisterMessageHandler(messageType);
         }
 
         /// <summary>
@@ -215,10 +215,9 @@ namespace SSSB
         /// <param name="messageType"></param>
         public void UnregisterErrorMessageHandler(string messageType)
         {
-            this._dispatcher.UnregisterErrorMessageHandler(messageType);
+            this._messageDispatcher.UnregisterErrorMessageHandler(messageType);
         }
         #endregion
-
 
         #region ITaskService Members
         string ITaskService.Name
@@ -278,6 +277,11 @@ namespace SSSB
         public string QueueName
         {
             get { return _queueName; }
+        }
+
+        protected ILog Log
+        {
+            get { return _log; }
         }
         #endregion
     }

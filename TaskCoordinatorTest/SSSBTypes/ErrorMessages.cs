@@ -53,7 +53,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                Log.Instance.Error(ex);
+                LogFactory.Instance.Error(ex);
             }
             finally
             {
@@ -96,7 +96,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                Log.Instance.Error(ex);
+                LogFactory.Instance.Error(ex);
             }
             finally
             {
@@ -128,7 +128,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                Log.Instance.Error(ex);
+                LogFactory.Instance.Error(ex);
             }
             finally
             {
@@ -146,7 +146,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                Log.Instance.Error(ex);
+                LogFactory.Instance.Error(ex);
                 return;
             }
             finally
@@ -165,7 +165,7 @@ namespace SSSB
             }
             catch (Exception ex)
             {
-                Log.Instance.Critical(ex);
+                LogFactory.Instance.Critical(ex);
                 return;
             }
             finally
@@ -197,7 +197,7 @@ namespace SSSB
                 }
                 catch (Exception ex)
                 {
-                    Log.Instance.Error(ex);
+                    LogFactory.Instance.Error(ex);
                 }
                 finally
                 {

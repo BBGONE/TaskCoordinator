@@ -7,7 +7,7 @@ using TasksCoordinator.Test.Interface;
 
 namespace TasksCoordinator.Test
 {
-    public class TestMessageDispatcher: IMessageDispatcher<Message>
+    public class TestMessageDispatcher: IMessageDispatcher<Message, object>
     {
         private readonly ISerializer _serializer;
         private readonly ConcurrentDictionary<Guid, ICallbackProxy<Message>> _callbacks;
@@ -18,33 +18,32 @@ namespace TasksCoordinator.Test
             this._callbacks = new ConcurrentDictionary<Guid, ICallbackProxy<Message>>();
         }
 
-        private async Task<bool> _DispatchMessage(Message message, WorkContext context)
+        private async Task<bool> _DispatchMessage(Message message, int taskId, CancellationToken token)
         {
             // возвратить ли сообщение назад в очередь?
             bool rollBack = false;
-            CancellationToken cancellation = context.Cancellation;
             Payload payload = this._serializer.Deserialize<Payload>(message.Body);
             payload.TryCount += 1;
             TaskWorkType workType = payload.WorkType;
             switch (workType)
             {
                 case TaskWorkType.LongCPUBound:
-                    await CPU_TASK(message, payload, cancellation, 5000000, context.taskId).ConfigureAwait(false);
+                    await CPU_TASK(message, payload, token, 5000000, taskId).ConfigureAwait(false);
                     break;
                 case TaskWorkType.LongIOBound:
-                    await IO_TASK(message, payload, cancellation, 5000).ConfigureAwait(false);
+                    await IO_TASK(message, payload, token, 5000).ConfigureAwait(false);
                     break;
                 case TaskWorkType.ShortCPUBound:
-                    await CPU_TASK(message, payload, cancellation, 100000, context.taskId).ConfigureAwait(false);
+                    await CPU_TASK(message, payload, token, 100000, taskId).ConfigureAwait(false);
                     break;
                 case TaskWorkType.ShortIOBound:
-                    await IO_TASK(message, payload, cancellation, 500).ConfigureAwait(false);
+                    await IO_TASK(message, payload, token, 500).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortCPUBound:
-                    await CPU_TASK(message, payload, cancellation, 5, context.taskId).ConfigureAwait(false);
+                    await CPU_TASK(message, payload, token, 5, taskId).ConfigureAwait(false);
                     break;
                 case TaskWorkType.UltraShortIOBound:
-                    await IO_TASK(message, payload, cancellation, 10).ConfigureAwait(false);
+                    await IO_TASK(message, payload, token, 10).ConfigureAwait(false);
                     break;
                 case TaskWorkType.Random:
                     throw new InvalidOperationException("Random WorkType is not Supported");
@@ -57,7 +56,7 @@ namespace TasksCoordinator.Test
         }
 
         // Test Task which consumes CPU
-        private async Task CPU_TASK(Message message, Payload payload, CancellationToken cancellation, int iterations, int taskId)
+        private async Task CPU_TASK(Message message, Payload payload, CancellationToken token, int iterations, int taskId)
         {
             ICallbackProxy<Message> callback;
             if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
@@ -72,7 +71,7 @@ namespace TasksCoordinator.Test
                 int cnt = iterations;
                 for (int i = 0; i < cnt; ++i)
                 {
-                    cancellation.ThrowIfCancellationRequested();
+                    token.ThrowIfCancellationRequested();
                     //rollBack = !rollBack;
                     //Do some CPU work 
                     payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("qwertyuiop[;lkjhngbfd--cnt={0}", cnt));
@@ -81,9 +80,9 @@ namespace TasksCoordinator.Test
                 {
                     throw new Exception($"Test Exception TryCount: {payload.TryCount}");
                 }
-                cancellation.ThrowIfCancellationRequested();
+                token.ThrowIfCancellationRequested();
                 payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK cnt={0} Try: {1}", cnt, payload.TryCount));
-                cancellation.ThrowIfCancellationRequested();
+                token.ThrowIfCancellationRequested();
                 message.Body = this._serializer.Serialize(payload);
                 await callback.TaskCompleted(message, null);
             }
@@ -100,7 +99,7 @@ namespace TasksCoordinator.Test
         }
 
         // Test Task IO Bound
-        private async Task IO_TASK(Message message, Payload payload, CancellationToken cancellation, int durationMilliseconds)
+        private async Task IO_TASK(Message message, Payload payload, CancellationToken token, int durationMilliseconds)
         {
             ICallbackProxy<Message> callback;
             if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
@@ -114,12 +113,12 @@ namespace TasksCoordinator.Test
                 {
                     throw new Exception($"Test Exception TryCount: {payload.TryCount}");
                 }
-                await Task.Delay(durationMilliseconds, cancellation);
-                cancellation.ThrowIfCancellationRequested();
+                await Task.Delay(durationMilliseconds, token);
+                token.ThrowIfCancellationRequested();
                 
                 payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK time={0} ms Try: {1}", durationMilliseconds, payload.TryCount));
                 // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
-                cancellation.ThrowIfCancellationRequested();
+                token.ThrowIfCancellationRequested();
                 message.Body = this._serializer.Serialize(payload);
                 await callback.TaskCompleted(message, null);
             }
@@ -135,11 +134,10 @@ namespace TasksCoordinator.Test
             }
         }
 
-        async Task<MessageProcessingResult> IMessageDispatcher<Message>.DispatchMessage(Message message, 
-            WorkContext context)
+        async Task<MessageProcessingResult> IMessageDispatcher<Message, object>.DispatchMessage(Message message, int taskId, CancellationToken token, object state)
         {
             bool rollBack = false;
-            rollBack = await this._DispatchMessage(message, context).ConfigureAwait(false);
+            rollBack = await this._DispatchMessage(message, taskId, token).ConfigureAwait(false);
             return new MessageProcessingResult() { isRollBack = rollBack };
         }
 

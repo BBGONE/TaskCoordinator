@@ -7,7 +7,7 @@ namespace SSSB
 {
 	public static class StandardMessageHandlers
 	{
-        private static ILog _log = Log.GetInstance("SSSB");
+        private static ILog _log = LogFactory.GetInstance("SSSB");
 
         #region Standard MessageHandlers
         /// <summary>

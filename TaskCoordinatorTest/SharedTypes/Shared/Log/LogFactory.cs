@@ -9,36 +9,36 @@ using System.Configuration;
 
 namespace Shared
 {
-    public class Log : ILog
+    public class LogFactory : ILog
     {
       
         private static ReaderWriterLock _eventSourcesLock = new ReaderWriterLock();
-        private static Dictionary<string, Log> _eventSources = new Dictionary<string, Log>();
+        private static Dictionary<string, LogFactory> _eventSources = new Dictionary<string, LogFactory>();
 
-        static Log()
+        static LogFactory()
         {
           
         }
         
 
-        private Log()
+        private LogFactory()
         {
             
         }
 
-        private Log(string eventSource)
+        private LogFactory(string eventSource)
         {
           
         }
 
-        public static Log GetInstance(string eventSource)
+        public static LogFactory GetInstance(string eventSource)
         {
             try
             {
                 _eventSourcesLock.AcquireWriterLock(1000);
                 try
                 {
-                    Log log = null;
+                    LogFactory log = null;
                     if (_eventSources.TryGetValue("default", out log))
                     {
                         return log;
@@ -46,8 +46,8 @@ namespace Shared
                     else
                     {
                         if (!_eventSources.ContainsKey("default"))
-                            _eventSources.Add("default", new Log());
-                        return new Log("default");
+                            _eventSources.Add("default", new LogFactory());
+                        return new LogFactory("default");
                     }
                 }
                 finally
@@ -61,7 +61,7 @@ namespace Shared
             }
         }
 
-        public static Log Instance
+        public static LogFactory Instance
         {
             get
             {

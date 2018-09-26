@@ -13,64 +13,24 @@ namespace TasksCoordinator
         #region Private Fields
         private int _taskId;
         private readonly ITaskCoordinatorAdvanced<TMessage> _coordinator;
-        private readonly CancellationToken _cancellation;
-
-        protected static ILog _log
-        {
-            get
-            {
-                return BaseTasksCoordinator<TMessage>.Log;
-            }
-        }
+        private readonly CancellationToken _token;
+        private readonly ILog _log;
+       
         #endregion
 
-        public MessageReader(int taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator)
+        public MessageReader(int taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log)
         {
             this._taskId = taskId;
             this._coordinator = tasksCoordinator;
-            this._cancellation = this._coordinator.Cancellation;
+            this._token = this._coordinator.Cancellation;
+            this._log = log;
         }
 
-        protected abstract Task<IEnumerable<TMessage>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken cancellation, TState state);
+        protected abstract Task<IEnumerable<TMessage>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken token, TState state);
 
-        protected virtual async Task<int> DoWork(bool isPrimaryReader, CancellationToken cancellation)
-        {
-            int cnt = 0;
-            // Console.WriteLine(string.Format("begin {0} Thread: {1}", this.taskId, Thread.CurrentThread.ManagedThreadId));
-            IEnumerable<TMessage> messages = await this.ReadMessages(isPrimaryReader, this.taskId, cancellation, default(TState)).ConfigureAwait(false);
-            cnt = messages.Count();
-            // Console.WriteLine(string.Format("end {0} {1} {2}", this.taskId, isPrimaryReader, Thread.CurrentThread.ManagedThreadId));
-            if (cnt > 0)
-            {
-                bool isOk = this._coordinator.OnBeforeDoWork(this);
-                try
-                {
-                    foreach (TMessage msg in messages)
-                    {
-                        // обработка сообщений
-                        try
-                        {
-                            MessageProcessingResult res = await this._coordinator.OnDoWork(msg, null, this.taskId).ConfigureAwait(false);
-                            if (res.isRollBack)
-                            {
-                                this.OnRollback(msg, cancellation);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            this.OnProcessMessageException(ex, msg);
-                            throw;
-                        }
-                    }
-                }
-                finally
-                {
-                    this._coordinator.OnAfterDoWork(this);
-                }
-            }
-
-            return cnt;
-        }
+        protected abstract Task<MessageProcessingResult> DispatchMessage(TMessage message, int taskId, CancellationToken token, TState state);
+      
+        protected abstract Task<int> DoWork(bool isPrimaryReader, CancellationToken cancellation);
 
         protected virtual void OnRollback(TMessage msg, CancellationToken cancellation)
         {
@@ -82,11 +42,6 @@ namespace TasksCoordinator
             // NOOP
         }
 
-       
-        /// <summary>
-        /// If this method returns False then the thread exits from the  loop
-        /// </summary>
-        /// <returns></returns>
         async Task<MessageReaderResult> IMessageReader.ProcessMessage()
         {
             if (this._coordinator.IsPaused)
@@ -100,7 +55,7 @@ namespace TasksCoordinator
             bool canRead = (isPrimaryReader || this._coordinator.IsEnableParallelReading);
             if (canRead)
             {
-                isDidWork = await this.DoWork(isPrimaryReader, this._cancellation).ConfigureAwait(false) > 0;
+                isDidWork = await this.DoWork(isPrimaryReader, this._token).ConfigureAwait(false) > 0;
             }
 
             return this.AfterProcessedMessage(isDidWork);
@@ -109,7 +64,7 @@ namespace TasksCoordinator
         protected MessageReaderResult AfterProcessedMessage(bool workDone)
         {
             bool isRemoved = false;
-            if (this._cancellation.IsCancellationRequested)
+            if (this._token.IsCancellationRequested)
             {
                 isRemoved = true;
             }
@@ -119,6 +74,11 @@ namespace TasksCoordinator
             }
 
             return new MessageReaderResult() { IsRemoved = isRemoved, IsWorkDone = workDone };
+        }
+
+        protected ILog Log
+        {
+            get { return _log; }
         }
 
         public int taskId

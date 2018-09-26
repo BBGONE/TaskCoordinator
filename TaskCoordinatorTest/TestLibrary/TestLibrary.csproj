@@ -49,13 +49,13 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Serializer.cs" />
-    <Compile Include="Test\Interface\ISerializer.cs" />
-    <Compile Include="Test\Payload.cs" />
-    <Compile Include="Test\TestService.cs" />
-    <Compile Include="Test\TaskWorkType.cs" />
-    <Compile Include="Test\TestMessageDispatcher.cs" />
-    <Compile Include="Test\TestMessageReaderFactory.cs" />
-    <Compile Include="Test\TestTasksCoordinator.cs" />
+    <Compile Include="Interface\ISerializer.cs" />
+    <Compile Include="Payload.cs" />
+    <Compile Include="TestService.cs" />
+    <Compile Include="TaskWorkType.cs" />
+    <Compile Include="TestMessageDispatcher.cs" />
+    <Compile Include="TestMessageReaderFactory.cs" />
+    <Compile Include="TestTasksCoordinator.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\SharedTypes\SharedTypes.csproj">

@@ -93,7 +93,6 @@
     <Compile Include="TaskCoordinator\InMemoryMessageReader.cs" />
     <Compile Include="TaskCoordinator\MessageReader.cs" />
     <Compile Include="TaskCoordinator\MessageReaderResult.cs" />
-    <Compile Include="TaskCoordinator\WorkContext.cs" />
     <Compile Include="Database\ConnectionManager.cs" />
     <Compile Include="Database\DbConnectionFactory.cs" />
     <Compile Include="Database\DbConnectionScope.cs" />
@@ -106,10 +105,10 @@
     <Compile Include="Errors\ErrorHelper.cs" />
     <Compile Include="Errors\PPSException.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Shared\IQueueActivator.cs" />
+    <Compile Include="TaskCoordinator\Interface\IQueueActivator.cs" />
     <Compile Include="Shared\Log\ILog.cs" />
-    <Compile Include="Shared\ITaskService.cs" />
-    <Compile Include="Shared\Log\Log.cs" />
+    <Compile Include="TaskCoordinator\Interface\ITaskService.cs" />
+    <Compile Include="Shared\Log\LogFactory.cs" />
     <Compile Include="Shared\NullableHelper.cs" />
   </ItemGroup>
   <ItemGroup>

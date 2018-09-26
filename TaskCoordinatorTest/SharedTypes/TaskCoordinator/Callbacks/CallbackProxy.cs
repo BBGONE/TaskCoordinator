@@ -16,7 +16,7 @@ namespace TasksCoordinator.Callbacks
             Cancelled = 3
         }
 
-        internal static ILog Log = Shared.Log.GetInstance("CallbackProxy");
+        internal static ILog Log = Shared.LogFactory.GetInstance("CallbackProxy");
 
         private ICallback<T> _callback;
         private CancellationToken _token;

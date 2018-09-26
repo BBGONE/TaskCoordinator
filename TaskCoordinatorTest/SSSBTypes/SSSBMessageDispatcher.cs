@@ -14,7 +14,7 @@ namespace SSSB
 {
     public class SSSBMessageDispatcher : ISSSBDispatcher
     {
-        internal static readonly ILog _log = Log.GetInstance("SSSBMessageDispatcher");
+        private readonly ILog _log = LogFactory.GetInstance("SSSBMessageDispatcher");
 
         private ISSSBService _sssbService;
         private ConcurrentDictionary<string, IMessageHandler<ServiceMessageEventArgs>> _messageHandlers;
@@ -41,7 +41,7 @@ namespace SSSB
             return args;
         }
 
-        private async Task DispatchErrorMessage(SqlConnection dbconnection, SSSBMessage message, ErrorMessage msgerr, CancellationToken cancellation)
+        private async Task DispatchErrorMessage(SqlConnection dbconnection, SSSBMessage message, ErrorMessage msgerr, CancellationToken token)
         {
             try
             {
@@ -54,7 +54,7 @@ namespace SSSB
                 {
                     using (TransactionScope dispatcherTransactionScope = new TransactionScope(TransactionScopeOption.Suppress, TransactionScopeAsyncFlowOption.Enabled))
                     {
-                        ErrorMessageEventArgs errArgs = new ErrorMessageEventArgs(message, this._sssbService, msgerr.FirstError, cancellation);
+                        ErrorMessageEventArgs errArgs = new ErrorMessageEventArgs(message, this._sssbService, msgerr.FirstError, token);
                         errArgs = await errorMessageHandler.HandleMessage(this._sssbService, errArgs).ConfigureAwait(continueOnCapturedContext: false);
                     }
                 }
@@ -70,13 +70,13 @@ namespace SSSB
             }
         }
 
-        private async Task<bool> _DispatchMessage(SqlConnection dbconnection, SSSBMessage message, CancellationToken cancellation)
+        private async Task<bool> _DispatchMessage(SqlConnection dbconnection, SSSBMessage message, CancellationToken token)
         {
             //возвратить ли сообщение назад в очередь?
             bool rollBack = false;
 
             IMessageHandler<ServiceMessageEventArgs> messageHandler;
-            ServiceMessageEventArgs serviceArgs = this.CreateServiceMessageEventArgs(message, cancellation);
+            ServiceMessageEventArgs serviceArgs = this.CreateServiceMessageEventArgs(message, token);
 
             //if we registered custom handlers for predefined message types
             if (_messageHandlers.TryGetValue(message.MessageType, out messageHandler))
@@ -151,11 +151,9 @@ namespace SSSB
             return rollBack;
         }
 
-
-        async Task<MessageProcessingResult> IMessageDispatcher<SSSBMessage>.DispatchMessage(SSSBMessage message, WorkContext context)
+        async Task<MessageProcessingResult> IMessageDispatcher<SSSBMessage, SqlConnection>.DispatchMessage(SSSBMessage message, int taskId, CancellationToken token, SqlConnection dbconnection)
         {
             bool rollBack = false;
-            var dbconnection = (SqlConnection)context.state;
 
             ErrorMessage msgerr = null;
             bool end_dialog_with_error = false;
@@ -168,9 +166,9 @@ namespace SSSB
                     end_dialog_with_error = msgerr.ErrorCount >= MAX_MESSAGE_ERROR_COUNT;
             }
             if (end_dialog_with_error)
-                await this.DispatchErrorMessage(dbconnection, message, msgerr, context.Cancellation).ConfigureAwait(continueOnCapturedContext: false);
+                await this.DispatchErrorMessage(dbconnection, message, msgerr, token).ConfigureAwait(continueOnCapturedContext: false);
             else
-                rollBack = await this._DispatchMessage(dbconnection, message, context.Cancellation).ConfigureAwait(continueOnCapturedContext: false);
+                rollBack = await this._DispatchMessage(dbconnection, message, token).ConfigureAwait(continueOnCapturedContext: false);
 
             return new MessageProcessingResult() { isRollBack = rollBack };
         }

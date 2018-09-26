@@ -12,7 +12,7 @@ namespace SSSB
 	/// </summary>
 	public static class ServiceBrokerHelper
 	{
-        private static ILog _log = Log.GetInstance("SSSB");
+        private static ILog _log = LogFactory.GetInstance("SSSB");
 		
 		/// <summary>
 		/// Запуск диалога обмена сообщениями.

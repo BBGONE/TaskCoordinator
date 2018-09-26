@@ -18,8 +18,7 @@ namespace TasksCoordinator
     {
         private const int MAX_TASK_NUM = int.MaxValue;
         private const int STOP_TIMEOUT = 30000;
-        internal static ILog Log = Shared.Log.GetInstance("BaseTasksCoordinator");
-
+        private readonly ILog _log;
         private readonly object _lock = new object();
         private readonly object _semaphoreLock = new object();
         private CancellationTokenSource _stopSource;
@@ -32,17 +31,16 @@ namespace TasksCoordinator
         private volatile int  _isStarted;
         private volatile bool _isPaused;
         private int _semaphore;
-        private readonly IMessageDispatcher<M> _dispatcher;
         private readonly ConcurrentDictionary<int, Task> _tasks;
         protected readonly IMessageReaderFactory<M> _readerFactory;
 
-        public BaseTasksCoordinator(IMessageDispatcher<M> messageDispatcher, IMessageReaderFactory<M> messageReaderFactory,
+        public BaseTasksCoordinator(IMessageReaderFactory<M> messageReaderFactory,
             int maxReadersCount, bool isEnableParallelReading = false, bool isQueueActivationEnabled = false)
         {
+            this._log = LogFactory.GetInstance("BaseTasksCoordinator");
             this._semaphore = 0;
             this._stopSource = new CancellationTokenSource();
             this._cancellation = this._stopSource.Token;
-            this._dispatcher = messageDispatcher;
             this._readerFactory = messageReaderFactory;
             this._maxReadersCount = maxReadersCount;
             this._isQueueActivationEnabled = isQueueActivationEnabled;
@@ -95,7 +93,7 @@ namespace TasksCoordinator
             }
             catch (Exception ex)
             {
-                Log.Error(ex);
+                _log.Error(ex);
             }
             finally
             {
@@ -170,7 +168,7 @@ namespace TasksCoordinator
                         {
                             var err = antecedent.Exception;
                             err.Flatten().Handle((ex) => {
-                                Log.Error(ex);
+                                _log.Error(ex);
                                 return true;
                             });
                         }
@@ -182,7 +180,7 @@ namespace TasksCoordinator
                 this._ExitTask(taskId);
                 if (!(ex is OperationCanceledException))
                 {
-                    Log.Error(ex);
+                    _log.Error(ex);
                 }
             }
         }
@@ -217,11 +215,6 @@ namespace TasksCoordinator
                     this._primaryReader = reader;
                 }
             }
-        }
-
-        protected IMessageReader GetMessageReader(int taskId)
-        {
-            return this._readerFactory.CreateReader(taskId, this);
         }
 
         private async Task<int> JobRunner(CancellationToken token, int taskId)
@@ -261,21 +254,30 @@ namespace TasksCoordinator
             }
             catch (Exception ex)
             {
-                Log.Error(ex);
+                _log.Error(ex);
             }
             finally
             {
                 this._ExitTask(taskId);
             }
-  
+
             return taskId;
+        }
+
+        protected ILog Log
+        {
+            get { return _log; }
+        }
+
+        protected IMessageReader GetMessageReader(int taskId)
+        {
+            return this._readerFactory.CreateReader(taskId, this);
         }
 
         void ITaskCoordinatorAdvanced<M>.StartNewTask()
         {
             this._StartNewTask();
         }
-
 
         bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader reader)
         {
@@ -302,15 +304,6 @@ namespace TasksCoordinator
             this._cancellation.ThrowIfCancellationRequested();
             this._StartNewTask();
             return true;
-        }
-
-        async Task<MessageProcessingResult> ITaskCoordinatorAdvanced<M>.OnDoWork(M message, object state, int taskId)
-        {
-            // Console.WriteLine(string.Format("DO WORK {0}", taskId));
-            // Console.WriteLine(string.Format("Task: {0} Thread: {1}", taskId, Thread.CurrentThread.ManagedThreadId));
-            WorkContext context = new WorkContext(taskId, state, this._cancellation, this);
-            var res = await this._dispatcher.DispatchMessage(message, context).ConfigureAwait(false);
-            return res;
         }
 
         void ITaskCoordinatorAdvanced<M>.OnAfterDoWork(IMessageReader reader)

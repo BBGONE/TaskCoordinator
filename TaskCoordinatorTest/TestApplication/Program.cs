@@ -15,7 +15,7 @@ namespace TestApplication
         // OPTIONS
         private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
         private const int BATCH_SIZE = 100000;
-        private const int MAX_TASK_COUNT = 8;
+        private const int MAX_TASK_COUNT = 6;
         private const bool ENABLE_PARRALEL_READING = false;
         private const bool IS_ACTIVATION_ENABLED = false;
         private const int CANCEL_AFTER = 0;
@@ -30,7 +30,7 @@ namespace TestApplication
         {
             int minWork, minIO;
             ThreadPool.GetMinThreads(out minWork, out minIO);
-            ThreadPool.SetMinThreads((MAX_TASK_COUNT + 2) > minWork? (MAX_TASK_COUNT + 2): minWork, minIO);
+            ThreadPool.SetMinThreads((MAX_TASK_COUNT+2) > minWork? (MAX_TASK_COUNT + 2) : minWork, minIO);
 
          
             SEQUENCE_NUM = 0;
@@ -50,7 +50,6 @@ namespace TestApplication
                     }
                     var batchInfo = callBack.UpdateBatchSize(BATCH_SIZE, false);
                 });
-
                 await Task.Run(() =>
                 {
                     for (int i = 0; i < BATCH_SIZE; ++i)

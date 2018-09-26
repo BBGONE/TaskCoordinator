@@ -7,7 +7,7 @@ namespace Shared.Errors
     [Serializable]
     public class PPSException : Exception
     {
-        private static ILog _log = Log.Instance;
+        private static ILog _log = LogFactory.Instance;
 
         private string _shortMessage;
         private string _vocalMessage;

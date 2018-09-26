@@ -1,4 +1,5 @@
 ﻿using Database.Shared;
+using Shared;
 using Shared.Errors;
 using System;
 using System.Collections.Generic;
@@ -9,6 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
 using TasksCoordinator;
+using TasksCoordinator.Interface;
 
 namespace SSSB
 {
@@ -16,14 +18,17 @@ namespace SSSB
     {
         public const int DEFAULT_FETCH_SIZE = 1;
         public static readonly TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(10);
+        private static readonly ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
 
-        private ISSSBService _service;
-        private static ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
+        private readonly ISSSBService _service;
+        private readonly IMessageDispatcher<SSSBMessage, SqlConnection> _dispatcher;
 
-        public SSSBMessageReader(ISSSBService service, int taskId, BaseTasksCoordinator<SSSBMessage> tasksCoordinator) :
-            base(taskId, tasksCoordinator)
+        public SSSBMessageReader(int taskId, BaseTasksCoordinator<SSSBMessage> tasksCoordinator, ILog log,
+            ISSSBService service, ISSSBDispatcher dispatcher) :
+            base(taskId, tasksCoordinator, log)
         {
             this._service = service;
+            this._dispatcher = dispatcher;
         }
 
         /// <summary>
@@ -70,7 +75,7 @@ namespace SSSB
             return message;
         }
 
-        protected override async Task<IEnumerable<SSSBMessage>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken cancellation, SqlConnection state)
+        protected override async Task<IEnumerable<SSSBMessage>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken token, SqlConnection state)
         {
             SqlConnection dbconnection = state;
             //reading messages from the queue
@@ -83,12 +88,12 @@ namespace SSSB
                         DEFAULT_FETCH_SIZE,
                         (int)DefaultWaitForTimeout.TotalMilliseconds,
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess,
-                        cancellation).ConfigureAwait(false);
+                        token).ConfigureAwait(false);
                 else
                     reader = await SSSBManager.ReceiveMessagesNoWaitAsync(dbconnection, this._service.QueueName,
                         DEFAULT_FETCH_SIZE,
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess,
-                        cancellation).ConfigureAwait(false);
+                        token).ConfigureAwait(false);
 
                 //no result after cancellation
                 if (reader == null)
@@ -117,15 +122,13 @@ namespace SSSB
             }
         }
 
-        protected override void OnProcessMessageException(Exception ex, SSSBMessage msg)
+        protected override async Task<MessageProcessingResult> DispatchMessage(SSSBMessage message, int taskId, CancellationToken token, SqlConnection state)
         {
-            if (msg != null && msg.ConversationHandle.HasValue)
-            {
-                this._service.AddError(msg.ConversationHandle.Value, ex);
-            }
+            var res = await this._dispatcher.DispatchMessage(message, taskId, token, state).ConfigureAwait(false);
+            return res;
         }
 
-        protected override async Task<int> DoWork(bool isPrimaryReader, CancellationToken cancellation)
+        protected override async Task<int> DoWork(bool isPrimaryReader, CancellationToken token)
         {
             bool beforeWorkCalled = false;
             int cnt = 0;
@@ -141,7 +144,7 @@ namespace SSSB
                     Exception error = null;
                     try
                     {
-                        dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(cancellation).ConfigureAwait(false);
+                        dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(token).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -150,14 +153,14 @@ namespace SSSB
 
                     if (error != null)
                     {
-                        await _errorHandler.Handle(_log, error, cancellation).ConfigureAwait(false);
+                        await _errorHandler.Handle(Log, error, token).ConfigureAwait(false);
                         return 0;
                     }
 
                     using (dbconnection)
                     {
                         //dbconnection
-                        IEnumerable<SSSBMessage> messages = messages = await this.ReadMessages(isPrimaryReader, this.taskId, cancellation, dbconnection).ConfigureAwait(false);
+                        IEnumerable<SSSBMessage> messages = messages = await this.ReadMessages(isPrimaryReader, this.taskId, token, dbconnection).ConfigureAwait(false);
                         cnt = messages.Count();
                         if (cnt > 0)
                         {
@@ -166,10 +169,10 @@ namespace SSSB
                             {
                                 try
                                 {
-                                    MessageProcessingResult res = await this.Coordinator.OnDoWork(msg, dbconnection, this.taskId).ConfigureAwait(false);
+                                    MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, dbconnection).ConfigureAwait(false);
                                     if (res.isRollBack)
                                     {
-                                        this.OnRollback(msg, cancellation);
+                                        this.OnRollback(msg, token);
                                         return cnt;
                                     }
                                 }
@@ -192,6 +195,14 @@ namespace SSSB
             }
 
             return cnt;
+        }
+
+        protected override void OnProcessMessageException(Exception ex, SSSBMessage msg)
+        {
+            if (msg != null && msg.ConversationHandle.HasValue)
+            {
+                this._service.AddError(msg.ConversationHandle.Value, ex);
+            }
         }
     }
 }

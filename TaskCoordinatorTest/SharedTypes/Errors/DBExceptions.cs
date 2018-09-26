@@ -246,7 +246,7 @@ namespace Shared.Errors
 
     public class DBWrapperExceptionsHelper
     {
-        private static ILog _log = Log.Instance;
+        private static ILog _log = LogFactory.Instance;
 
         public const int SqlServerUniqueConstraintErrorNumber = 2627;
         public const int SqlServerUniqueIndexErrorNumber = 2601;
