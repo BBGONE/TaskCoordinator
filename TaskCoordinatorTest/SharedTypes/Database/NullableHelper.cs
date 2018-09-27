@@ -1,6 +1,6 @@
 using System;
 
-namespace Database.Shared
+namespace Shared.Database
 {
     /// <summary>
     /// ¬спомогательный класс дл€ работы с Nullable-типами

@@ -80,8 +80,8 @@
     <Compile Include="TaskCoordinator\Callbacks\BaseCallback.cs" />
     <Compile Include="TaskCoordinator\BaseTasksCoordinator.cs" />
     <Compile Include="TaskCoordinator\Callbacks\CallbackProxy.cs" />
-    <Compile Include="TaskCoordinator\Interface\ICallback.cs" />
-    <Compile Include="TaskCoordinator\Interface\ICallbackProxy.cs" />
+    <Compile Include="TaskCoordinator\Callbacks\Interface\ICallback.cs" />
+    <Compile Include="TaskCoordinator\Callbacks\Interface\ICallbackProxy.cs" />
     <Compile Include="TaskCoordinator\Interface\ITaskCoordinatorAdvanced.cs" />
     <Compile Include="TaskCoordinator\Interface\ITaskCoordinator.cs" />
     <Compile Include="TaskCoordinator\Interface\IMessageDispatcher.cs" />
@@ -99,7 +99,6 @@
     <Compile Include="Database\DbNameConnectionFactory.cs" />
     <Compile Include="Database\DbScope.cs" />
     <Compile Include="Database\IDbConnectionFactory.cs" />
-    <Compile Include="Database\NullableHelper.cs" />
     <Compile Include="Errors\ConnectionErrorHandler.cs" />
     <Compile Include="Errors\DBExceptions.cs" />
     <Compile Include="Errors\ErrorHelper.cs" />
@@ -109,7 +108,7 @@
     <Compile Include="Shared\Log\ILog.cs" />
     <Compile Include="TaskCoordinator\Interface\ITaskService.cs" />
     <Compile Include="Shared\Log\LogFactory.cs" />
-    <Compile Include="Shared\NullableHelper.cs" />
+    <Compile Include="Database\NullableHelper.cs" />
   </ItemGroup>
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Client.3.5">

@@ -1,16 +1,13 @@
-﻿using Database.Shared;
+﻿using Shared.Database;
 using Shared;
 using Shared.Errors;
 using System;
-using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Transactions;
 using TasksCoordinator;
-using TasksCoordinator.Interface;
 
 namespace SSSB
 {
@@ -75,12 +72,11 @@ namespace SSSB
             return message;
         }
 
-        protected override async Task<IEnumerable<SSSBMessage>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken token, SqlConnection state)
+        protected override async Task<SSSBMessage> ReadMessage(bool isPrimaryReader, int taskId, CancellationToken token, SqlConnection state)
         {
             SqlConnection dbconnection = state;
-            //reading messages from the queue
+            // reading messages from the queue
             IDataReader reader = null;
-            SSSBMessage[] messages = new SSSBMessage[0];
             try
             {
                 if (isPrimaryReader)
@@ -95,21 +91,13 @@ namespace SSSB
                         CommandBehavior.SingleResult | CommandBehavior.SequentialAccess,
                         token).ConfigureAwait(false);
 
-                //no result after cancellation
+                // no result after cancellation
                 if (reader == null)
                 {
-                    //return empty array
-                    return messages;
+                    return null;
                 }
 
-                var list = new LinkedList<SSSBMessage>();
-                while (reader.Read())
-                {
-                    list.AddLast(this.FillMessageFromReader(reader));
-                }
-
-                messages = list.ToArray();
-                return messages;
+                return reader.Read() ? this.FillMessageFromReader(reader) : null;
             }
             catch (Exception ex)
             {
@@ -130,68 +118,60 @@ namespace SSSB
 
         protected override async Task<int> DoWork(bool isPrimaryReader, CancellationToken token)
         {
-            bool beforeWorkCalled = false;
             int cnt = 0;
-
-            try
+            TransactionOptions tranOptions = new TransactionOptions();
+            tranOptions.IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted;
+            tranOptions.Timeout = TimeSpan.FromMinutes(60);
+            using (TransactionScope transactionScope = new TransactionScope(TransactionScopeOption.RequiresNew, tranOptions, TransactionScopeAsyncFlowOption.Enabled))
             {
-                TransactionOptions tranOptions = new TransactionOptions();
-                tranOptions.IsolationLevel =  System.Transactions.IsolationLevel.ReadCommitted;
-                tranOptions.Timeout = TimeSpan.FromMinutes(60);
-                using (TransactionScope transactionScope = new TransactionScope(TransactionScopeOption.RequiresNew, tranOptions, TransactionScopeAsyncFlowOption.Enabled))
+                SqlConnection dbconnection = null;
+                Exception error = null;
+                try
                 {
-                    SqlConnection dbconnection = null;
-                    Exception error = null;
-                    try
-                    {
-                        dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(token).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        error = ex;
-                    }
+                    dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(token).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    error = ex;
+                }
 
-                    if (error != null)
-                    {
-                        await _errorHandler.Handle(Log, error, token).ConfigureAwait(false);
-                        return 0;
-                    }
+                if (error != null)
+                {
+                    await _errorHandler.Handle(Log, error, token).ConfigureAwait(false);
+                    return 0;
+                }
 
-                    using (dbconnection)
+                using (dbconnection)
+                {
+                    //dbconnection
+                    SSSBMessage msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, dbconnection).ConfigureAwait(false);
+                    cnt = msg == null ? 0 : 1;
+                    if (msg != null)
                     {
-                        //dbconnection
-                        IEnumerable<SSSBMessage> messages = messages = await this.ReadMessages(isPrimaryReader, this.taskId, token, dbconnection).ConfigureAwait(false);
-                        cnt = messages.Count();
-                        if (cnt > 0)
+                        bool isOk = this.Coordinator.OnBeforeDoWork(this);
+                        try
                         {
-                            beforeWorkCalled = this.Coordinator.OnBeforeDoWork(this);
-                            foreach (SSSBMessage msg in messages)
+                            MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, dbconnection).ConfigureAwait(false);
+                            if (res.isRollBack)
                             {
-                                try
-                                {
-                                    MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, dbconnection).ConfigureAwait(false);
-                                    if (res.isRollBack)
-                                    {
-                                        this.OnRollback(msg, token);
-                                        return cnt;
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    this.OnProcessMessageException(ex, msg);
-                                    throw;
-                                }
+                                this.OnRollback(msg, token);
+                                return cnt;
                             }
-
-                            transactionScope.Complete();
                         }
+                        catch (Exception ex)
+                        {
+                            this.OnProcessMessageException(ex, msg);
+                            throw;
+                        }
+                        finally
+                        {
+                            if (isOk)
+                                this.Coordinator.OnAfterDoWork(this);
+                        }
+
+                        transactionScope.Complete();
                     }
                 }
-            }
-            finally
-            {
-                if (beforeWorkCalled)
-                    this.Coordinator.OnAfterDoWork(this);
             }
 
             return cnt;

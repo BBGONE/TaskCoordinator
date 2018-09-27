@@ -55,9 +55,9 @@ namespace Shared
                     _eventSourcesLock.ReleaseWriterLock();
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw;
+                throw new Exception("LogFactory innitialization error", ex);
             }
         }
 

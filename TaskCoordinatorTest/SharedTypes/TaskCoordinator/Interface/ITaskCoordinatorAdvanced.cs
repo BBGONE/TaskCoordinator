@@ -1,5 +1,4 @@
 ﻿using Shared.Services;
-using System.Threading.Tasks;
 
 namespace TasksCoordinator.Interface
 {

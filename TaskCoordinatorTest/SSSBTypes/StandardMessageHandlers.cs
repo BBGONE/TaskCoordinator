@@ -1,11 +1,10 @@
-using System.Text;
 using Shared;
 using System.Data.SqlClient;
-using Bell.PPS.SSSB;
+using System.Text;
 
 namespace SSSB
 {
-	public static class StandardMessageHandlers
+    public static class StandardMessageHandlers
 	{
         private static ILog _log = LogFactory.GetInstance("SSSB");
 

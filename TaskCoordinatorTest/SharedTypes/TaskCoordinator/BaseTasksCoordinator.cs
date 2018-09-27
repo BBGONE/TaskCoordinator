@@ -14,7 +14,7 @@ namespace TasksCoordinator
     /// используется для регулирования количества слушающих очередь потоков
     /// в случае необходимости освобождает из спячки один поток
     /// </summary>
-    public abstract class BaseTasksCoordinator<M> : ITaskCoordinatorAdvanced<M>, IQueueActivator
+    public class BaseTasksCoordinator<M> : ITaskCoordinatorAdvanced<M>, IQueueActivator
     {
         private const int MAX_TASK_NUM = int.MaxValue;
         private const int STOP_TIMEOUT = 30000;
@@ -32,7 +32,7 @@ namespace TasksCoordinator
         private volatile bool _isPaused;
         private int _semaphore;
         private readonly ConcurrentDictionary<int, Task> _tasks;
-        protected readonly IMessageReaderFactory<M> _readerFactory;
+        private readonly IMessageReaderFactory<M> _readerFactory;
 
         public BaseTasksCoordinator(IMessageReaderFactory<M> messageReaderFactory,
             int maxReadersCount, bool isEnableParallelReading = false, bool isQueueActivationEnabled = false)

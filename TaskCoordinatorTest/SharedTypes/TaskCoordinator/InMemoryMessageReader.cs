@@ -1,8 +1,6 @@
 ﻿using Shared;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
@@ -10,8 +8,10 @@ using TasksCoordinator.Interface;
 namespace TasksCoordinator
 {
     public class InMemoryMessageReader<TMessage> : MessageReader<TMessage, object>
+        where TMessage: class
     {
         public static readonly TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(10);
+        private static readonly Task NOOP = Task.FromResult(0);
 
         #region Private Fields
         private readonly BlockingCollection<TMessage> _messageQueue;
@@ -26,35 +26,27 @@ namespace TasksCoordinator
             this._dispatcher = dispatcher;
         }
 
-        protected override async Task<IEnumerable<TMessage>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken token, object state)
+        protected override async Task<TMessage> ReadMessage(bool isPrimaryReader, int taskId, CancellationToken token, object state)
         {
-            await Task.FromResult(0);
-            LinkedList<TMessage> messages = new LinkedList<TMessage>();
+            await NOOP;
             TMessage msg;
+            bool isOK = false;
+
             // for the Primary reader (it waits for messages when the queue is empty)
             if (isPrimaryReader)
             {
                 // Console.WriteLine(string.Format("Primary reading {0}", taskId));
-                if (_messageQueue.TryTake(out msg, Convert.ToInt32(DefaultWaitForTimeout.TotalMilliseconds), token))
-                {
-                    // msg.ServiceName = $"TaskID:{taskId.ToString()}";
-                    messages.AddLast(msg);
-                }
+                isOK = _messageQueue.TryTake(out msg, Convert.ToInt32(DefaultWaitForTimeout.TotalMilliseconds), token);
             }
             else
             {
-                if (_messageQueue.TryTake(out msg, 0))
-                {
-                    // msg.ServiceName = $"TaskID:{taskId.ToString()}";
-                    //Console.WriteLine(string.Format("Secondary reading {0}", taskId));
-                    messages.AddLast(msg);
-                }
+                isOK = _messageQueue.TryTake(out msg, 0);
             }
 
             token.ThrowIfCancellationRequested();
 
 
-            return messages;
+            return isOK? msg: null;
         }
 
         protected override async Task<MessageProcessingResult> DispatchMessage(TMessage message, int taskId, CancellationToken token, object state)
@@ -69,35 +61,29 @@ namespace TasksCoordinator
         {
             int cnt = 0;
             // Console.WriteLine(string.Format("begin {0} Thread: {1}", this.taskId, Thread.CurrentThread.ManagedThreadId));
-            IEnumerable<TMessage> messages = await this.ReadMessages(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
-            cnt = messages.Count();
+            TMessage msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
+            cnt = msg == null ? 0 : 1;
             // Console.WriteLine(string.Format("end {0} {1} {2}", this.taskId, isPrimaryReader, Thread.CurrentThread.ManagedThreadId));
             if (cnt > 0)
             {
                 bool isOk = this.Coordinator.OnBeforeDoWork(this);
                 try
                 {
-                    foreach (TMessage msg in messages)
+                    MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, null).ConfigureAwait(false);
+                    if (res.isRollBack)
                     {
-                        // обработка сообщений
-                        try
-                        {
-                            MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, null).ConfigureAwait(false);
-                            if (res.isRollBack)
-                            {
-                                this.OnRollback(msg, token);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            this.OnProcessMessageException(ex, msg);
-                            throw;
-                        }
+                        this.OnRollback(msg, token);
                     }
+                }
+                catch (Exception ex)
+                {
+                    this.OnProcessMessageException(ex, msg);
+                    throw;
                 }
                 finally
                 {
-                    this.Coordinator.OnAfterDoWork(this);
+                    if (isOk)
+                        this.Coordinator.OnAfterDoWork(this);
                 }
             }
 

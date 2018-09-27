@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace Bell.PPS.SSSB {
+namespace SSSB {
     using System;
     
     

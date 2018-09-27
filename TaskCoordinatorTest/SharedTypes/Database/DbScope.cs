@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Transactions;
 
-namespace Database.Shared
+namespace Shared.Database
 {
     public class DbScope : IDisposable
     {

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Runtime.CompilerServices;
 
-namespace Database.Shared
+namespace Shared.Database
 {
     /// <summary>
     /// Options for modifying how DbConnectionScope.Current is affected while constructing a new scope.

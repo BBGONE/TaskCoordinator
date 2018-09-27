@@ -2,7 +2,7 @@ using System;
 using Shared.Errors;
 using System.Data.SqlClient;
 using System.Data;
-using Database.Shared;
+using Shared.Database;
 using System.Threading;
 using Shared;
 using System.Threading.Tasks;

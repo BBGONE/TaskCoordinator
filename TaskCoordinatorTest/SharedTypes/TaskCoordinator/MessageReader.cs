@@ -1,7 +1,5 @@
 ﻿using Shared;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Interface;
@@ -9,6 +7,7 @@ using TasksCoordinator.Interface;
 namespace TasksCoordinator
 {
     public abstract class MessageReader<TMessage, TState> : IMessageReader
+        where TMessage:class
     {
         #region Private Fields
         private int _taskId;
@@ -26,7 +25,7 @@ namespace TasksCoordinator
             this._log = log;
         }
 
-        protected abstract Task<IEnumerable<TMessage>> ReadMessages(bool isPrimaryReader, int taskId, CancellationToken token, TState state);
+        protected abstract Task<TMessage> ReadMessage(bool isPrimaryReader, int taskId, CancellationToken token, TState state);
 
         protected abstract Task<MessageProcessingResult> DispatchMessage(TMessage message, int taskId, CancellationToken token, TState state);
       

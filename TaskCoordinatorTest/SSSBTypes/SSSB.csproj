@@ -99,7 +99,7 @@
   <ItemGroup>
     <EmbeddedResource Include="ServiceBrokerResources.resx">
       <SubType>Designer</SubType>
-      <CustomToolNamespace>Bell.PPS.SSSB</CustomToolNamespace>
+      <CustomToolNamespace>SSSB</CustomToolNamespace>
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>ServiceBrokerResources.Designer.cs</LastGenOutput>
     </EmbeddedResource>

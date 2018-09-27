@@ -4,8 +4,7 @@ using System.Threading.Tasks;
 using Shared;
 using Shared.Errors;
 using Shared.Services;
-using Bell.PPS.SSSB;
-using Database.Shared;
+using Shared.Database;
 
 namespace SSSB
 {

@@ -3,7 +3,7 @@ using System.Data.Common;
 using System.Configuration;
 using System.Data.SqlClient;
 
-namespace Database.Shared
+namespace Shared.Database
 {
     public class DbConnectionFactory : IDbConnectionFactory
     {
