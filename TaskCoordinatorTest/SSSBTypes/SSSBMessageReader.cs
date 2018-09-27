@@ -21,7 +21,7 @@ namespace SSSB
         private static readonly ConnectionErrorHandler _errorHandler = new ConnectionErrorHandler();
 
         private readonly ISSSBService _service;
-        private readonly IMessageDispatcher<SSSBMessage, SqlConnection> _dispatcher;
+        private readonly ISSSBDispatcher _dispatcher;
 
         public SSSBMessageReader(int taskId, BaseTasksCoordinator<SSSBMessage> tasksCoordinator, ILog log,
             ISSSBService service, ISSSBDispatcher dispatcher) :
