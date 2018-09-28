@@ -28,111 +28,160 @@ namespace TasksCoordinator.Test
             switch (workType)
             {
                 case TaskWorkType.LongCPUBound:
-                    await CPU_TASK(message, payload, token, 5000000, taskId).ConfigureAwait(false);
+                    await RUN_SYNC_ACTION(() =>
+                    {
+                        LONG_RUN_CPU_TASK(message, payload, token, taskId);
+                    }, taskId, message, payload, token);
                     break;
                 case TaskWorkType.LongIOBound:
-                    await IO_TASK(message, payload, token, 5000).ConfigureAwait(false);
+                    await RUN_ASYNC_ACTION(async ()=>
+                    {
+                        await IO_TASK(message, payload, token, 5000).ConfigureAwait(false);
+                    }, taskId, message, payload, token);
                     break;
                 case TaskWorkType.ShortCPUBound:
-                    await CPU_TASK(message, payload, token, 100000, taskId).ConfigureAwait(false);
+                    await RUN_ASYNC_ACTION(async () =>
+                    {
+                        await CPU_TASK(message, payload, token, 1000000, taskId).ConfigureAwait(false);
+                    }, taskId, message, payload, token);
                     break;
                 case TaskWorkType.ShortIOBound:
-                    await IO_TASK(message, payload, token, 500).ConfigureAwait(false);
+                    await RUN_ASYNC_ACTION(async () =>
+                    {
+                        await IO_TASK(message, payload, token, 500).ConfigureAwait(false);
+                    }, taskId, message, payload, token);
                     break;
                 case TaskWorkType.UltraShortCPUBound:
-                    await CPU_TASK(message, payload, token, 5, taskId).ConfigureAwait(false);
+                    await RUN_ASYNC_ACTION(async () =>
+                    {
+                        await CPU_TASK(message, payload, token, 5, taskId).ConfigureAwait(false);
+                    }, taskId, message, payload, token);
                     break;
                 case TaskWorkType.UltraShortIOBound:
-                    await IO_TASK(message, payload, token, 10).ConfigureAwait(false);
+                    await RUN_ASYNC_ACTION(async () =>
+                    {
+                        await IO_TASK(message, payload, token, 10).ConfigureAwait(false);
+                    }, taskId, message, payload, token);
                     break;
                 case TaskWorkType.Random:
                     throw new InvalidOperationException("Random WorkType is not Supported");
                 default:
                     throw new InvalidOperationException($"Unknown WorkType {workType}");
             }
-
-            // Console.WriteLine($"SEQNUM:{message.SequenceNumber} - THREAD: {Thread.CurrentThread.ManagedThreadId} - TasksCount:{context.Coordinator.TasksCount} WorkType: {payload.WorkType}");
             return rollBack;
         }
 
-        // Test Task which consumes CPU
+        #region HELPER FUNCTIONS
+        private async Task RUN_SYNC_ACTION(Action action, int taskId, Message message, Payload payload , CancellationToken token) {
+            await Task.Factory.StartNew(async () => {
+                ICallbackProxy<Message> callback;
+                if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
+                {
+                    return;
+                }
+                try
+                {
+                    action();
+                    await callback.TaskCompleted(message, null);
+                }
+                catch (OperationCanceledException)
+                {
+                    message.Body = this._serializer.Serialize(payload);
+                    await callback.TaskCompleted(message, "CANCELLED");
+                }
+                catch (Exception ex)
+                {
+                    message.Body = this._serializer.Serialize(payload);
+                    await callback.TaskCompleted(message, ex.Message);
+                }
+            }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
+        }
+
+        private async Task RUN_ASYNC_ACTION(Func<Task> action, int taskId, Message message, Payload payload, CancellationToken token)
+        {
+            ICallbackProxy<Message> callback;
+            if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
+            {
+                return;
+            }
+            try
+            {
+                await action();
+                await callback.TaskCompleted(message, null);
+            }
+            catch (OperationCanceledException)
+            {
+                message.Body = this._serializer.Serialize(payload);
+                await callback.TaskCompleted(message, "CANCELLED");
+            }
+            catch (Exception ex)
+            {
+                message.Body = this._serializer.Serialize(payload);
+                await callback.TaskCompleted(message, ex.Message);
+            }
+        }
+        #endregion
+
+        #region TEST TASKS
+        // Sync TASK CPU Bound
+        private void LONG_RUN_CPU_TASK(Message message, Payload payload, CancellationToken token, int taskId)
+        {
+            int iterations = 10000000;
+            int cnt = iterations;
+            for (int i = 0; i < cnt; ++i)
+            {
+                token.ThrowIfCancellationRequested();
+                //rollBack = !rollBack;
+                //Do some CPU work 
+                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("qwertyuiop[;lkjhngbfd--cnt={0}", cnt));
+            }
+            if (payload.RaiseError && payload.TryCount < 2)
+            {
+                throw new Exception($"Test Exception TryCount: {payload.TryCount}");
+            }
+            token.ThrowIfCancellationRequested();
+            payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("LONG_RUN_CPU_TASK cnt={0} Try: {1}", cnt, payload.TryCount));
+            token.ThrowIfCancellationRequested();
+            message.Body = this._serializer.Serialize(payload);
+            token.ThrowIfCancellationRequested();
+        }
+
+        // Async Task CPU Bound
         private async Task CPU_TASK(Message message, Payload payload, CancellationToken token, int iterations, int taskId)
         {
-            ICallbackProxy<Message> callback;
-            if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
+            await Task.FromResult(0);
+            int cnt = iterations;
+            for (int i = 0; i < cnt; ++i)
             {
-                return;
-            }
-            try
-            {
-                await Task.FromResult(0);
-                // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
-
-                int cnt = iterations;
-                for (int i = 0; i < cnt; ++i)
-                {
-                    token.ThrowIfCancellationRequested();
-                    //rollBack = !rollBack;
-                    //Do some CPU work 
-                    payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("qwertyuiop[;lkjhngbfd--cnt={0}", cnt));
-                }
-                if (payload.RaiseError && payload.TryCount < 2)
-                {
-                    throw new Exception($"Test Exception TryCount: {payload.TryCount}");
-                }
                 token.ThrowIfCancellationRequested();
-                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK cnt={0} Try: {1}", cnt, payload.TryCount));
-                token.ThrowIfCancellationRequested();
-                message.Body = this._serializer.Serialize(payload);
-                await callback.TaskCompleted(message, null);
+                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("qwertyuiop[;lkjhngbfd--cnt={0}", cnt));
             }
-            catch (OperationCanceledException)
+            if (payload.RaiseError && payload.TryCount < 2)
             {
-                message.Body = this._serializer.Serialize(payload);
-                await callback.TaskCompleted(message, "CANCELLED");
+                throw new Exception($"Test Exception TryCount: {payload.TryCount}");
             }
-            catch (Exception ex)
-            {
-                message.Body = this._serializer.Serialize(payload);
-                await callback.TaskCompleted(message, ex.Message);
-            }
+            token.ThrowIfCancellationRequested();
+            payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("CPU_TASK cnt={0} Try: {1}", cnt, payload.TryCount));
+            token.ThrowIfCancellationRequested();
+            message.Body = this._serializer.Serialize(payload);
         }
 
-        // Test Task IO Bound
+        // Async Task IO Bound
         private async Task IO_TASK(Message message, Payload payload, CancellationToken token, int durationMilliseconds)
         {
-            ICallbackProxy<Message> callback;
-            if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
+            if (payload.RaiseError && payload.TryCount < 2)
             {
-                return;
+                throw new Exception($"Test Exception TryCount: {payload.TryCount}");
             }
-            try
-            {
-                
-                if (payload.RaiseError && payload.TryCount < 2)
-                {
-                    throw new Exception($"Test Exception TryCount: {payload.TryCount}");
-                }
-                await Task.Delay(durationMilliseconds, token);
-                token.ThrowIfCancellationRequested();
-                
-                payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK time={0} ms Try: {1}", durationMilliseconds, payload.TryCount));
-                // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
-                token.ThrowIfCancellationRequested();
-                message.Body = this._serializer.Serialize(payload);
-                await callback.TaskCompleted(message, null);
-            }
-            catch (OperationCanceledException)
-            {
-                message.Body = this._serializer.Serialize(payload);
-                await callback.TaskCompleted(message, "CANCELLED");
-            }
-            catch (Exception ex)
-            {
-                message.Body = this._serializer.Serialize(payload);
-                await callback.TaskCompleted(message, ex.Message);
-            }
+            await Task.Delay(durationMilliseconds, token);
+            token.ThrowIfCancellationRequested();
+
+            payload.Result = System.Text.Encoding.UTF8.GetBytes(string.Format("IO_TASK time={0} ms Try: {1}", durationMilliseconds, payload.TryCount));
+            // Console.WriteLine($"THREAD: {Thread.CurrentThread.ManagedThreadId}");
+            token.ThrowIfCancellationRequested();
+            message.Body = this._serializer.Serialize(payload);
         }
+        #endregion
 
         async Task<MessageProcessingResult> IMessageDispatcher<Message, object>.DispatchMessage(Message message, int taskId, CancellationToken token, object state)
         {

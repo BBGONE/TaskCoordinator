@@ -160,7 +160,7 @@ namespace TasksCoordinator
                         }
                         throw;
                     }
-                    Task<int> task = Task.Run(async () => await JobRunner(cancellation, taskId), cancellation);
+                    Task<int> task = Task.Run(() => JobRunner(cancellation, taskId), cancellation);
                     this._tasks.TryUpdate(taskId, task, dummy);
                     task.ContinueWith((antecedent, state) => {
                         this._ExitTask((int)state);

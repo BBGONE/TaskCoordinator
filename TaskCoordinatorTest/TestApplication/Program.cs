@@ -13,9 +13,11 @@ namespace TestApplication
         private static readonly Guid ClientID = Guid.NewGuid();
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
-        private const int BATCH_SIZE = 100000;
-        private const int MAX_TASK_COUNT = 6;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.Random;
+        private const int BATCH_SIZE = 50;
+        private const int MAX_TASK_COUNT = 10;
+        private const bool SHOW_TASK_SUCESS = true;
+        private const bool SHOW_TASK_ERROR = false;
         private const bool ENABLE_PARRALEL_READING = false;
         private const bool IS_ACTIVATION_ENABLED = false;
         private const int CANCEL_AFTER = 0;
@@ -38,7 +40,7 @@ namespace TestApplication
             try
             {
                 svc.Start();
-                var callBack = new CallBack(svc, _serializer);
+                var callBack = new CallBack(svc, _serializer, SHOW_TASK_SUCESS, SHOW_TASK_ERROR);
                 svc.RegisterCallback(ClientID, callBack);
 
                 await Task.Run(() =>
@@ -50,6 +52,8 @@ namespace TestApplication
                     }
                     var batchInfo = callBack.UpdateBatchSize(BATCH_SIZE, false);
                 });
+                await Task.Delay(5000);
+                Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}");
                 await Task.Run(() =>
                 {
                     for (int i = 0; i < BATCH_SIZE; ++i)

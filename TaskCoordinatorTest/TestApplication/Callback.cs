@@ -11,8 +11,8 @@ namespace TestApplication
 {
     public class CallBack : BaseCallback<Message>
     {
-        private const bool SHOW_TASK_SUCESS = false;
-        private const bool SHOW_TASK_ERROR = false;
+        private readonly bool showSuccess;
+        private readonly bool showError;
 
         private volatile int _ProcessedCount;
         private volatile int _ErrorCount;
@@ -24,10 +24,12 @@ namespace TestApplication
         public int ProcessedCount { get => this._ProcessedCount; }
         public int ErrorCount { get => _ErrorCount; }
 
-        public CallBack(TestService svc, ISerializer serializer)
+        public CallBack(TestService svc, ISerializer serializer, bool showSuccess= false, bool showError = false)
         {
             this._svc = svc;
             this._serializer = serializer;
+            this.showSuccess = showSuccess;
+            this.showError = showError;
             this.stopwatch = new Stopwatch();
         }
 
@@ -41,7 +43,7 @@ namespace TestApplication
             Interlocked.Increment(ref _ProcessedCount);
             var payload = _serializer.Deserialize<Payload>(message.Body);
             string result = System.Text.Encoding.UTF8.GetString(payload.Result);
-            if (SHOW_TASK_SUCESS)
+            if (showSuccess)
             {
                 Console.WriteLine($"SEQNUM: {message.SequenceNumber} Result: {result}");
             }
@@ -50,7 +52,7 @@ namespace TestApplication
         {
             await Task.FromResult(0);
             Interlocked.Increment(ref _ErrorCount);
-            if (SHOW_TASK_ERROR)
+            if (showError)
             {
                 Console.WriteLine($"SEQNUM: {message.SequenceNumber} Error: {error}");
             }
