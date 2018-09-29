@@ -21,16 +21,16 @@ namespace TasksCoordinator
         private readonly ILog _log;
         private readonly object _lock = new object();
         private readonly object _semaphoreLock = new object();
-        private CancellationTokenSource _stopSource;
-        private CancellationToken _cancellation;
+        private CancellationTokenSource _stopTokenSource;
+        private CancellationToken _token;
         private readonly bool _isQueueActivationEnabled;
         private readonly bool _isEnableParallelReading;
-        private readonly int _maxReadersCount;
+        private volatile int _maxReadersCount;
         private volatile int _taskIdSeq;
         private volatile IMessageReader _primaryReader;
         private volatile int  _isStarted;
         private volatile bool _isPaused;
-        private int _semaphore;
+        private volatile int _semaphore;
         private readonly ConcurrentDictionary<int, Task> _tasks;
         private readonly IMessageReaderFactory<M> _readerFactory;
 
@@ -39,8 +39,8 @@ namespace TasksCoordinator
         {
             this._log = LogFactory.GetInstance("BaseTasksCoordinator");
             this._semaphore = 0;
-            this._stopSource = new CancellationTokenSource();
-            this._cancellation = this._stopSource.Token;
+            this._stopTokenSource = new CancellationTokenSource();
+            this._token = this._stopTokenSource.Token;
             this._readerFactory = messageReaderFactory;
             this._maxReadersCount = maxReadersCount;
             this._isQueueActivationEnabled = isQueueActivationEnabled;
@@ -53,9 +53,6 @@ namespace TasksCoordinator
 
         public bool Start()
         {
-            if (this._maxReadersCount == 0)
-                return false;
-
             var oldStarted = Interlocked.CompareExchange(ref this._isStarted, 1, 0);
             if (oldStarted == 1)
                 return true;
@@ -64,9 +61,9 @@ namespace TasksCoordinator
 
             lock (this._semaphoreLock)
             {
-                this._semaphore = this.MaxReadersCount;
+                this._semaphore = this._maxReadersCount;
             }
-            this._StartNewTask();
+            this._TryStartNewTask();
             return true;
         }
 
@@ -78,10 +75,10 @@ namespace TasksCoordinator
 
             try
             {
-                this._stopSource.Cancel();
+                this._stopTokenSource.Cancel();
                 this.IsPaused = false;
                 await Task.Delay(1000).ConfigureAwait(false);
-                var tasks = this._tasks.ToArray().Select(p => p.Value).ToArray();
+                var tasks = this._tasks.Select(p => p.Value).ToArray();
                 if (tasks.Length > 0)
                 {
                     await Task.WhenAny(Task.WhenAll(tasks), Task.Delay(STOP_TIMEOUT)).ConfigureAwait(false);
@@ -99,10 +96,10 @@ namespace TasksCoordinator
             {
                 this._tasks.Clear();
                 this._semaphore = 0;
-                var oldSource = this._stopSource;
+                var oldSource = this._stopTokenSource;
                 // set new source and token
-                this._stopSource = new CancellationTokenSource();
-                this._cancellation = this._stopSource.Token;
+                this._stopTokenSource = new CancellationTokenSource();
+                this._token = this._stopTokenSource.Token;
                 oldSource.Dispose();
             }
         }
@@ -119,7 +116,7 @@ namespace TasksCoordinator
             }
         }
 
-        private void _StartNewTask()
+        private void _TryStartNewTask()
         {
             bool result = false;
             bool semaphoreOK = false;
@@ -127,7 +124,7 @@ namespace TasksCoordinator
             
             try
             {
-                var cancellation = this.Cancellation;
+                var token = this.Token;
                 lock (this._semaphoreLock)
                 {
                     var newcount = this._semaphore - 1;
@@ -160,7 +157,7 @@ namespace TasksCoordinator
                         }
                         throw;
                     }
-                    Task<int> task = Task.Run(() => JobRunner(cancellation, taskId), cancellation);
+                    Task<int> task = Task.Run(() => JobRunner(token, taskId), token);
                     this._tasks.TryUpdate(taskId, task, dummy);
                     task.ContinueWith((antecedent, state) => {
                         this._ExitTask((int)state);
@@ -232,7 +229,7 @@ namespace TasksCoordinator
                     //Цикл обработки сообщений
                     while (!readerResult.IsRemoved && !token.IsCancellationRequested)
                     {
-                        readerResult = await mr.ProcessMessage().ConfigureAwait(false);
+                        readerResult = await mr.ProcessMessage(token).ConfigureAwait(false);
                     }
                     token.ThrowIfCancellationRequested();
                 }
@@ -276,15 +273,24 @@ namespace TasksCoordinator
 
         void ITaskCoordinatorAdvanced<M>.StartNewTask()
         {
-            this._StartNewTask();
+            this._TryStartNewTask();
         }
 
         bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader reader)
         {
+            bool res = false;
             lock (this._lock)
             {
-                return  this._stopSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader);
+                res = this._stopTokenSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader);
             }
+            if (res)
+                return res;
+
+            lock (this._semaphoreLock)
+            {
+                res = (this.TasksCount == 1 && this._semaphore < 0);
+            }
+            return res;
         }
 
         bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader reader)
@@ -301,8 +307,8 @@ namespace TasksCoordinator
             //очередь не прослушивается этим потоком
             //пробуем передать эту роль другому свободному потоку
             this.RemoveReader(reader);
-            this._cancellation.ThrowIfCancellationRequested();
-            this._StartNewTask();
+            this._token.ThrowIfCancellationRequested();
+            this._TryStartNewTask();
             return true;
         }
 
@@ -325,7 +331,7 @@ namespace TasksCoordinator
             {
                 return false;
             }
-            this._StartNewTask();
+            this._TryStartNewTask();
             return true;
         }
 
@@ -343,6 +349,33 @@ namespace TasksCoordinator
             get {
                 return this._maxReadersCount;
             }
+            set
+            {
+                if (value < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(MaxReadersCount));
+                }
+
+                lock (this._semaphoreLock)
+                {
+                    int diff = value - this._maxReadersCount;
+                    this._maxReadersCount = value;
+                    // It can be negative temporarily (before the excess of the tasks stop) 
+                    this._semaphore += diff;
+                    if (this._semaphore > 0 && this.TasksCount == 0)
+                    {
+                        this._TryStartNewTask();
+                    }
+                }
+            }
+        }
+
+        public int FreeReadersAvailable
+        {
+            get
+            {
+                return this._semaphore;
+            }
         }
 
         /// <summary>
@@ -356,11 +389,11 @@ namespace TasksCoordinator
             }
         }
 
-        public CancellationToken Cancellation
+        public CancellationToken Token
         {
             get
             {
-                return this._cancellation;
+                return this._token;
             }
         }
 

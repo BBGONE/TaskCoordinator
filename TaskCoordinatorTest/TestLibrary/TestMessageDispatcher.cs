@@ -73,7 +73,10 @@ namespace TasksCoordinator.Test
 
         #region HELPER FUNCTIONS
         private async Task RUN_SYNC_ACTION(Action action, int taskId, Message message, Payload payload , CancellationToken token) {
+            // Console.WriteLine($"Sync Thread: {Thread.CurrentThread.ManagedThreadId} Task: {taskId}");
+
             await Task.Factory.StartNew(async () => {
+                // Console.WriteLine($"Async Thread: {Thread.CurrentThread.ManagedThreadId} Task: {taskId}");
                 ICallbackProxy<Message> callback;
                 if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
                 {
@@ -106,6 +109,7 @@ namespace TasksCoordinator.Test
             }
             try
             {
+                // Console.WriteLine($"Thread: {Thread.CurrentThread.ManagedThreadId} Task: {taskId}");
                 await action();
                 await callback.TaskCompleted(message, null);
             }

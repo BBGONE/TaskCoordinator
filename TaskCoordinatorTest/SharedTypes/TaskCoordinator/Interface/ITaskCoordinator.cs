@@ -8,10 +8,11 @@ namespace TasksCoordinator.Interface
         bool Start();
         Task Stop();
         bool IsPaused { get; set; }
-        int MaxReadersCount { get; }
+        int MaxReadersCount { get; set; }
+        int FreeReadersAvailable { get; }
         int TasksCount { get; }
         bool IsEnableParallelReading { get; }
         bool IsQueueActivationEnabled { get; }
-        CancellationToken Cancellation { get; }
+        CancellationToken Token { get; }
     }
 }

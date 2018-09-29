@@ -12,7 +12,6 @@ namespace TasksCoordinator
         #region Private Fields
         private int _taskId;
         private readonly ITaskCoordinatorAdvanced<TMessage> _coordinator;
-        private readonly CancellationToken _token;
         private readonly ILog _log;
        
         #endregion
@@ -21,7 +20,6 @@ namespace TasksCoordinator
         {
             this._taskId = taskId;
             this._coordinator = tasksCoordinator;
-            this._token = this._coordinator.Cancellation;
             this._log = log;
         }
 
@@ -31,7 +29,7 @@ namespace TasksCoordinator
       
         protected abstract Task<int> DoWork(bool isPrimaryReader, CancellationToken cancellation);
 
-        protected virtual void OnRollback(TMessage msg, CancellationToken cancellation)
+        protected virtual void OnRollback(TMessage msg, CancellationToken token)
         {
             // NOOP
         }
@@ -41,7 +39,7 @@ namespace TasksCoordinator
             // NOOP
         }
 
-        async Task<MessageReaderResult> IMessageReader.ProcessMessage()
+        async Task<MessageReaderResult> IMessageReader.ProcessMessage(CancellationToken token)
         {
             if (this._coordinator.IsPaused)
             {
@@ -54,22 +52,26 @@ namespace TasksCoordinator
             bool canRead = (isPrimaryReader || this._coordinator.IsEnableParallelReading);
             if (canRead)
             {
-                isDidWork = await this.DoWork(isPrimaryReader, this._token).ConfigureAwait(false) > 0;
+                isDidWork = await this.DoWork(isPrimaryReader, token).ConfigureAwait(false) > 0;
             }
 
-            return this.AfterProcessedMessage(isDidWork);
+            return this.AfterProcessedMessage(isDidWork, token);
         }
 
-        protected MessageReaderResult AfterProcessedMessage(bool workDone)
+        protected MessageReaderResult AfterProcessedMessage(bool workDone, CancellationToken token)
         {
             bool isRemoved = false;
-            if (this._token.IsCancellationRequested)
+            if (token.IsCancellationRequested)
             {
                 isRemoved = true;
             }
             else if (!workDone)
             {
                 isRemoved = this._coordinator.IsSafeToRemoveReader(this);
+            }
+            else
+            {
+                isRemoved = this._coordinator.FreeReadersAvailable < 0;
             }
 
             return new MessageReaderResult() { IsRemoved = isRemoved, IsWorkDone = workDone };

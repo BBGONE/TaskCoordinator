@@ -225,7 +225,7 @@ namespace TasksCoordinator.Test
         #endregion
 
         public void RegisterCallback(Guid clientID, ICallback<Message> callback) {
-            this._messageDispatcher.RegisterCallback(clientID, new CallbackProxy<Message>(callback, this._tasksCoordinator.Cancellation));
+            this._messageDispatcher.RegisterCallback(clientID, new CallbackProxy<Message>(callback, this._tasksCoordinator.Token));
         }
 
         public bool UnRegisterCallback(Guid clientID)
@@ -242,6 +242,18 @@ namespace TasksCoordinator.Test
         public int QueueLength
         {
             get { return this._messageQueue.Count; }
+        }
+
+        public int MaxReadersCount
+        {
+            get
+            {
+                return this._tasksCoordinator.MaxReadersCount;
+            }
+            set
+            {
+                this._tasksCoordinator.MaxReadersCount = value;
+            }
         }
 
         protected ILog Log
