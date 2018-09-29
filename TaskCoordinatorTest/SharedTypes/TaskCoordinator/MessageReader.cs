@@ -13,7 +13,6 @@ namespace TasksCoordinator
         private int _taskId;
         private readonly ITaskCoordinatorAdvanced<TMessage> _coordinator;
         private readonly ILog _log;
-       
         #endregion
 
         public MessageReader(int taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log)
@@ -47,13 +46,7 @@ namespace TasksCoordinator
                 return new MessageReaderResult() { IsWorkDone = true, IsRemoved = false };
             }
 
-            bool isDidWork = false;
-            bool isPrimaryReader = this.IsPrimaryReader;
-            bool canRead = (isPrimaryReader || this._coordinator.IsEnableParallelReading);
-            if (canRead)
-            {
-                isDidWork = await this.DoWork(isPrimaryReader, token).ConfigureAwait(false) > 0;
-            }
+            bool isDidWork = await this.DoWork(this.IsPrimaryReader, token).ConfigureAwait(false) > 0;
 
             return this.AfterProcessedMessage(isDidWork, token);
         }

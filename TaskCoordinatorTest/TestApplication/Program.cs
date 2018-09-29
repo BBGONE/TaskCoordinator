@@ -15,12 +15,12 @@ namespace TestApplication
         private static readonly Guid ClientID = Guid.NewGuid();
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.Random;
-        private const int BATCH_SIZE = 50;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
+        private const int BATCH_SIZE = 1000;
         private const int MAX_TASK_COUNT = 10;
         private const bool SHOW_TASK_SUCESS = false;
-        private const bool SHOW_TASK_ERROR = true;
-        private const bool ENABLE_PARRALEL_READING = false;
+        private const bool SHOW_TASK_ERROR = false;
+        private const int PARRALEL_READING_LIMIT = 4;
         private const bool IS_ACTIVATION_ENABLED = false;
         private const int CANCEL_AFTER = 0;
         private static readonly double ERROR_MESSAGES_PERCENT = 0;
@@ -52,12 +52,14 @@ namespace TestApplication
 
         private static async Task Start()
         {
+            /*
             int minWork, minIO;
             ThreadPool.GetMinThreads(out minWork, out minIO);
             ThreadPool.SetMinThreads((MAX_TASK_COUNT+2) > minWork? (MAX_TASK_COUNT + 2) : minWork, minIO);
-         
+            */
+
             SEQUENCE_NUM = 0;
-            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED, ENABLE_PARRALEL_READING);
+            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED, PARRALEL_READING_LIMIT);
             try
             {
                 svc.Start();
@@ -69,6 +71,7 @@ namespace TestApplication
                 Console.WriteLine(string.Format("Enqueued Data QueueLength: {0}", svc.QueueLength));
                 callBack.StartTiming();
                 svc.MaxReadersCount = MAX_TASK_COUNT;
+                /*
                 Console.WriteLine($"Set MaxReadersCount to {MAX_TASK_COUNT}");
                 await Task.Delay(1000);
                 Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}");
@@ -82,6 +85,7 @@ namespace TestApplication
                 await Task.Delay(1000);
                 Console.WriteLine($"Resumed Processing TasksCount: {svc.TasksCoordinator.TasksCount} MaxReadersCount: {svc.MaxReadersCount}");
                 Console.WriteLine(string.Format("Resumed Processing  QueueLength: {0}", svc.QueueLength));
+                */
 
                 if (CANCEL_AFTER > 0)
                 {

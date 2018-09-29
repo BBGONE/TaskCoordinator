@@ -19,32 +19,34 @@ namespace TasksCoordinator
         private const int MAX_TASK_NUM = int.MaxValue;
         private const int STOP_TIMEOUT = 30000;
         private readonly ILog _log;
-        private readonly object _lock = new object();
+        private readonly object _primaryReaderLock = new object();
         private readonly object _semaphoreLock = new object();
         private CancellationTokenSource _stopTokenSource;
         private CancellationToken _token;
         private readonly bool _isQueueActivationEnabled;
-        private readonly bool _isEnableParallelReading;
-        private volatile int _maxReadersCount;
+        private readonly int _parallelReadingLimit;
+        private volatile int _readingCount;
+        private volatile int _maxTasksCount;
         private volatile int _taskIdSeq;
-        private volatile IMessageReader _primaryReader;
         private volatile int  _isStarted;
         private volatile bool _isPaused;
         private volatile int _semaphore;
+        private volatile IMessageReader _primaryReader;
         private readonly ConcurrentDictionary<int, Task> _tasks;
         private readonly IMessageReaderFactory<M> _readerFactory;
 
         public BaseTasksCoordinator(IMessageReaderFactory<M> messageReaderFactory,
-            int maxReadersCount, bool isEnableParallelReading = false, bool isQueueActivationEnabled = false)
+            int maxTasksCount, int parallelReadingLimit = 1, bool isQueueActivationEnabled = false)
         {
             this._log = LogFactory.GetInstance("BaseTasksCoordinator");
             this._semaphore = 0;
+            this._readingCount = 0;
             this._stopTokenSource = new CancellationTokenSource();
             this._token = this._stopTokenSource.Token;
             this._readerFactory = messageReaderFactory;
-            this._maxReadersCount = maxReadersCount;
+            this._maxTasksCount = maxTasksCount;
             this._isQueueActivationEnabled = isQueueActivationEnabled;
-            this._isEnableParallelReading = isEnableParallelReading;
+            this._parallelReadingLimit = parallelReadingLimit <= 0 ? 1: parallelReadingLimit;
             this._taskIdSeq = 0;
             this._primaryReader = null;
             this._tasks = new ConcurrentDictionary<int, Task>();
@@ -61,7 +63,7 @@ namespace TasksCoordinator
 
             lock (this._semaphoreLock)
             {
-                this._semaphore = this._maxReadersCount;
+                this._semaphore = this._maxTasksCount;
             }
             this._TryStartNewTask();
             return true;
@@ -189,7 +191,7 @@ namespace TasksCoordinator
         /// <param name="reader"></param>
         private void RemoveReader(IMessageReader reader)
         {
-            lock (this._lock)
+            lock (this._primaryReaderLock)
             {
                 if (Object.ReferenceEquals(this._primaryReader, reader))
                 {
@@ -205,7 +207,7 @@ namespace TasksCoordinator
         /// <param name="reader"></param>
         private void AddReader(IMessageReader reader)
         {
-            lock (this._lock)
+            lock (this._primaryReaderLock)
             {
                 if (this._primaryReader == null)
                 {
@@ -271,6 +273,27 @@ namespace TasksCoordinator
             return this._readerFactory.CreateReader(taskId, this);
         }
 
+        #region  ITaskCoordinatorAdvanced<M>
+        bool ITaskCoordinatorAdvanced<M>.TryBeginRead(IMessageReader reader)
+        {
+            lock (this._primaryReaderLock)
+            {
+                if (this._primaryReader == reader || this._parallelReadingLimit > this._readingCount)
+                {
+                    Interlocked.Increment(ref this._readingCount);
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+        int ITaskCoordinatorAdvanced<M>.EndRead()
+        {
+            return Interlocked.Decrement(ref this._readingCount);
+        }
+
         void ITaskCoordinatorAdvanced<M>.StartNewTask()
         {
             this._TryStartNewTask();
@@ -279,7 +302,7 @@ namespace TasksCoordinator
         bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader reader)
         {
             bool res = false;
-            lock (this._lock)
+            lock (this._primaryReaderLock)
             {
                 res = this._stopTokenSource.IsCancellationRequested || this._isQueueActivationEnabled || !(this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader);
             }
@@ -295,7 +318,7 @@ namespace TasksCoordinator
 
         bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader reader)
         {
-            lock (this._lock)
+            lock (this._primaryReaderLock)
             {
                 return this._primaryReader != null && object.ReferenceEquals(this._primaryReader, reader);
             }
@@ -316,6 +339,7 @@ namespace TasksCoordinator
         {
             this.AddReader(reader);
         }
+        #endregion
 
         #region IQueueActivator
         bool IQueueActivator.ActivateQueue()
@@ -344,22 +368,22 @@ namespace TasksCoordinator
         }
         #endregion
 
-        public int MaxReadersCount
+        public int MaxTasksCount
         {
             get {
-                return this._maxReadersCount;
+                return this._maxTasksCount;
             }
             set
             {
                 if (value < 0)
                 {
-                    throw new ArgumentOutOfRangeException(nameof(MaxReadersCount));
+                    throw new ArgumentOutOfRangeException(nameof(MaxTasksCount));
                 }
 
                 lock (this._semaphoreLock)
                 {
-                    int diff = value - this._maxReadersCount;
-                    this._maxReadersCount = value;
+                    int diff = value - this._maxTasksCount;
+                    this._maxTasksCount = value;
                     // It can be negative temporarily (before the excess of the tasks stop) 
                     this._semaphore += diff;
                     if (this._semaphore > 0 && this.TasksCount == 0)
@@ -397,11 +421,11 @@ namespace TasksCoordinator
             }
         }
 
-        public bool IsEnableParallelReading
+        public int ParallelReadingLimit
         {
             get
             {
-                return _isEnableParallelReading;
+                return _parallelReadingLimit;
             }
         }
 

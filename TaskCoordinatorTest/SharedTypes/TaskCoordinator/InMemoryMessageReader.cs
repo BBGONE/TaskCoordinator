@@ -31,10 +31,11 @@ namespace TasksCoordinator
             await NOOP;
             TMessage msg;
             bool isOK = false;
-
-            // for the Primary reader (it waits for messages when the queue is empty)
+            // Make an artificial slight dalay resembling reading over network
+            Thread.SpinWait(10000);
             if (isPrimaryReader)
             {
+                // for the Primary reader (it waits for messages when the queue is empty)
                 // Console.WriteLine(string.Format("Primary reading {0}", taskId));
                 isOK = _messageQueue.TryTake(out msg, Convert.ToInt32(DefaultWaitForTimeout.TotalMilliseconds), token);
             }
@@ -60,10 +61,22 @@ namespace TasksCoordinator
         protected override async Task<int> DoWork(bool isPrimaryReader, CancellationToken token)
         {
             int cnt = 0;
-            // Console.WriteLine(string.Format("begin {0} Thread: {1}", this.taskId, Thread.CurrentThread.ManagedThreadId));
-            TMessage msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
-            cnt = msg == null ? 0 : 1;
-            // Console.WriteLine(string.Format("end {0} {1} {2}", this.taskId, isPrimaryReader, Thread.CurrentThread.ManagedThreadId));
+            TMessage msg = null;
+            bool canRead = this.Coordinator.TryBeginRead(this);
+            if (!canRead)
+            {
+                return cnt;
+            }
+
+            try
+            {
+                msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
+                cnt = msg == null ? 0 : 1;
+            }
+            finally
+            {
+                this.Coordinator.EndRead();
+            }
             if (cnt > 0)
             {
                 bool isOk = this.Coordinator.OnBeforeDoWork(this);

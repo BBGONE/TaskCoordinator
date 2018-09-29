@@ -10,5 +10,7 @@ namespace TasksCoordinator.Interface
 
         bool OnBeforeDoWork(IMessageReader reader);
         void OnAfterDoWork(IMessageReader reader);
+        bool TryBeginRead(IMessageReader reader);
+        int EndRead();
     }
 }

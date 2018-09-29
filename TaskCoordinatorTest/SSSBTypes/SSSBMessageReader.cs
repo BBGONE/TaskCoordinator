@@ -116,36 +116,68 @@ namespace SSSB
             return res;
         }
 
+        protected async Task<SqlConnection> TryGetConnection(CancellationToken token)
+        {
+            SqlConnection dbconnection = null;
+            Exception error = null;
+            try
+            {
+                dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(token).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                error = ex;
+            }
+
+            if (error != null)
+            {
+                await _errorHandler.Handle(Log, error, token).ConfigureAwait(false);
+                throw error;
+            }
+
+            return dbconnection;
+        }
+
         protected override async Task<int> DoWork(bool isPrimaryReader, CancellationToken token)
         {
             int cnt = 0;
-            TransactionOptions tranOptions = new TransactionOptions();
-            tranOptions.IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted;
-            tranOptions.Timeout = TimeSpan.FromMinutes(60);
-            using (TransactionScope transactionScope = new TransactionScope(TransactionScopeOption.RequiresNew, tranOptions, TransactionScopeAsyncFlowOption.Enabled))
+            SSSBMessage msg = null;
+            SqlConnection dbconnection = null;
+            TransactionScope transactionScope = null;
+
+            bool canRead = this.Coordinator.TryBeginRead(this);
+            if (!canRead)
             {
-                SqlConnection dbconnection = null;
-                Exception error = null;
+                return cnt;
+            }
+            try
+            {
+                TransactionOptions tranOptions = new TransactionOptions();
+                tranOptions.IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted;
+                tranOptions.Timeout = TimeSpan.FromMinutes(60);
+                transactionScope = new TransactionScope(TransactionScopeOption.RequiresNew, tranOptions, TransactionScopeAsyncFlowOption.Enabled);
+            }
+            catch (Exception)
+            {
+                this.Coordinator.EndRead();
+                throw;
+            }
+
+            using (transactionScope)
+            {
                 try
                 {
-                    dbconnection = await ConnectionManager.GetNewPPSConnectionAsync(token).ConfigureAwait(false);
+                    dbconnection = await this.TryGetConnection(token);
+                    msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, dbconnection).ConfigureAwait(false);
+                    cnt = msg == null ? 0 : 1;
                 }
-                catch (Exception ex)
+                finally
                 {
-                    error = ex;
-                }
-
-                if (error != null)
-                {
-                    await _errorHandler.Handle(Log, error, token).ConfigureAwait(false);
-                    return 0;
+                    this.Coordinator.EndRead();
                 }
 
                 using (dbconnection)
                 {
-                    //dbconnection
-                    SSSBMessage msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, dbconnection).ConfigureAwait(false);
-                    cnt = msg == null ? 0 : 1;
                     if (msg != null)
                     {
                         bool isOk = this.Coordinator.OnBeforeDoWork(this);

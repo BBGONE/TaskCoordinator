@@ -11,10 +11,13 @@ namespace TasksCoordinator.Test
     {
         private readonly ISerializer _serializer;
         private readonly ConcurrentDictionary<Guid, ICallbackProxy<Message>> _callbacks;
+        private readonly TaskScheduler _longRunningTasksScheduler;
 
-        public TestMessageDispatcher(ISerializer serializer)
+
+        public TestMessageDispatcher(ISerializer serializer, TaskScheduler longRunningTasksScheduler)
         {
-            this._serializer = serializer;
+            this._serializer = serializer ?? throw new ArgumentException(nameof(serializer));
+            this._longRunningTasksScheduler = longRunningTasksScheduler ?? throw new ArgumentException(nameof(longRunningTasksScheduler));
             this._callbacks = new ConcurrentDictionary<Guid, ICallbackProxy<Message>>();
         }
 
@@ -28,7 +31,7 @@ namespace TasksCoordinator.Test
             switch (workType)
             {
                 case TaskWorkType.LongCPUBound:
-                    await RUN_SYNC_ACTION(() =>
+                    await RUN_LONG_RUN_SYNC_ACTION(() =>
                     {
                         LONG_RUN_CPU_TASK(message, payload, token, taskId);
                     }, taskId, message, payload, token);
@@ -72,11 +75,8 @@ namespace TasksCoordinator.Test
         }
 
         #region HELPER FUNCTIONS
-        private async Task RUN_SYNC_ACTION(Action action, int taskId, Message message, Payload payload , CancellationToken token) {
-            // Console.WriteLine($"Sync Thread: {Thread.CurrentThread.ManagedThreadId} Task: {taskId}");
-
+        private async Task RUN_LONG_RUN_SYNC_ACTION(Action action, int taskId, Message message, Payload payload , CancellationToken token) {
             await Task.Factory.StartNew(async () => {
-                // Console.WriteLine($"Async Thread: {Thread.CurrentThread.ManagedThreadId} Task: {taskId}");
                 ICallbackProxy<Message> callback;
                 if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
                 {
@@ -97,7 +97,7 @@ namespace TasksCoordinator.Test
                     message.Body = this._serializer.Serialize(payload);
                     await callback.TaskCompleted(message, ex.Message);
                 }
-            }, token, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
+            }, token, TaskCreationOptions.DenyChildAttach, this._longRunningTasksScheduler).Unwrap();
         }
 
         private async Task RUN_ASYNC_ACTION(Func<Task> action, int taskId, Message message, Payload payload, CancellationToken token)

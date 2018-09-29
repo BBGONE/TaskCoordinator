@@ -5,6 +5,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Schedulers;
 using TasksCoordinator.Callbacks;
 using TasksCoordinator.Interface;
 using TasksCoordinator.Test.Interface;
@@ -14,7 +15,7 @@ namespace TasksCoordinator.Test
     /// <summary>
     /// Message Dispatcher to process messages read from queue.
     /// </summary>
-    public class TestService : ITaskService
+    public class TestService : ITaskService, IDisposable
     {
         private readonly ILog _log = LogFactory.GetInstance("TestService");
 
@@ -25,22 +26,24 @@ namespace TasksCoordinator.Test
         private TestMessageDispatcher _messageDispatcher;
         private BlockingCollection<Message> _messageQueue;
         private ISerializer _serializer;
+        WorkStealingTaskScheduler _customScheduler;
         #endregion
 
         public event EventHandler<EventArgs> ServiceStarting;
         public event EventHandler<EventArgs> ServiceStarted;
         public event EventHandler<EventArgs> ServiceStopped;
 
-        public TestService(ISerializer serializer, string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false)
+        public TestService(ISerializer serializer, string name, int maxReadersCount, bool isQueueActivationEnabled,  int ParallelReadingLimit = 1)
         {
             this._name = name;
             this._isStopped = true;
             this.isQueueActivationEnabled = isQueueActivationEnabled;
             this._serializer = serializer;
+            this._customScheduler = new WorkStealingTaskScheduler();
             this._messageQueue = new BlockingCollection<Message>();
-            this._messageDispatcher = new TestMessageDispatcher(this._serializer);
+            this._messageDispatcher = new TestMessageDispatcher(this._serializer, this._customScheduler);
             var readerFactory = new TestMessageReaderFactory(this._messageQueue, this._messageDispatcher);
-            this._tasksCoordinator = new TestTasksCoordinator(readerFactory, maxReadersCount, isEnableParallelReading, this.isQueueActivationEnabled);
+            this._tasksCoordinator = new TestTasksCoordinator(readerFactory, maxReadersCount, ParallelReadingLimit, this.isQueueActivationEnabled);
         }
 
 
@@ -239,6 +242,12 @@ namespace TasksCoordinator.Test
             this._messageQueue.Add(message);
         }
 
+        public void Dispose()
+        {
+            this._customScheduler?.Dispose();
+            this._customScheduler = null;
+        }
+
         public int QueueLength
         {
             get { return this._messageQueue.Count; }
@@ -248,11 +257,11 @@ namespace TasksCoordinator.Test
         {
             get
             {
-                return this._tasksCoordinator.MaxReadersCount;
+                return this._tasksCoordinator.MaxTasksCount;
             }
             set
             {
-                this._tasksCoordinator.MaxReadersCount = value;
+                this._tasksCoordinator.MaxTasksCount = value;
             }
         }
 
