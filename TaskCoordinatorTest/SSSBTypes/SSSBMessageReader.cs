@@ -148,8 +148,12 @@ namespace SSSB
             bool canRead = this.Coordinator.TryBeginRead(this);
             if (!canRead)
             {
-                return cnt;
+                await Task.Delay(100);
+                canRead = this.Coordinator.TryBeginRead(this);
+                if (!canRead)
+                    return cnt;
             }
+
             try
             {
                 TransactionOptions tranOptions = new TransactionOptions();

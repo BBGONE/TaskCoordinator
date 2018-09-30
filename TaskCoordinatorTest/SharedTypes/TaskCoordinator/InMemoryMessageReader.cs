@@ -31,12 +31,11 @@ namespace TasksCoordinator
             await NOOP;
             TMessage msg;
             bool isOK = false;
-            // Make an artificial slight dalay resembling reading over network
-            Thread.SpinWait(10000);
+            // Make an artificial slight delay resembling reading over network
+            // Thread.SpinWait(5000);
             if (isPrimaryReader)
             {
                 // for the Primary reader (it waits for messages when the queue is empty)
-                // Console.WriteLine(string.Format("Primary reading {0}", taskId));
                 isOK = _messageQueue.TryTake(out msg, Convert.ToInt32(DefaultWaitForTimeout.TotalMilliseconds), token);
             }
             else
@@ -52,8 +51,6 @@ namespace TasksCoordinator
 
         protected override async Task<MessageProcessingResult> DispatchMessage(TMessage message, int taskId, CancellationToken token, object state)
         {
-            // Console.WriteLine(string.Format("DO WORK {0}", taskId));
-            // Console.WriteLine(string.Format("Task: {0} Thread: {1}", taskId, Thread.CurrentThread.ManagedThreadId));
             var res = await this._dispatcher.DispatchMessage(message, taskId, token, null).ConfigureAwait(false);
             return res;
         }
@@ -65,7 +62,10 @@ namespace TasksCoordinator
             bool canRead = this.Coordinator.TryBeginRead(this);
             if (!canRead)
             {
-                return cnt;
+                await Task.Delay(100);
+                canRead = this.Coordinator.TryBeginRead(this);
+                if (!canRead)
+                    return cnt;
             }
 
             try

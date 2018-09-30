@@ -30,10 +30,11 @@ namespace SSSB
         {
             _name = name;
             _isStopped = true;
+            int ParallelReadingLimit = isEnableParallelReading ? 2 : 1;
             this.isQueueActivationEnabled = isQueueActivationEnabled;
             this._messageDispatcher = new SSSBMessageDispatcher(this);
             this._readerFactory = new SSSBMessageReaderFactory(this, this._messageDispatcher);
-            this._tasksCoordinator = new SSSBTasksCoordinator(this._readerFactory, maxReadersCount, isEnableParallelReading? 2 : 1, this.isQueueActivationEnabled);
+            this._tasksCoordinator = new SSSBTasksCoordinator(this._readerFactory, maxReadersCount, ParallelReadingLimit, this.isQueueActivationEnabled);
         }
 
         public EventHandler OnStartedEvent;

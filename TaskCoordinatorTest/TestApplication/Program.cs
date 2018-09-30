@@ -15,12 +15,12 @@ namespace TestApplication
         private static readonly Guid ClientID = Guid.NewGuid();
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
-        private const int BATCH_SIZE = 1000;
-        private const int MAX_TASK_COUNT = 10;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.Random;
+        private const int BATCH_SIZE = 20;
+        private const int MAX_TASK_COUNT = 2;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
-        private const int PARRALEL_READING_LIMIT = 4;
+        private const int PARRALEL_READING_LIMIT = 2;
         private const bool IS_ACTIVATION_ENABLED = false;
         private const int CANCEL_AFTER = 0;
         private static readonly double ERROR_MESSAGES_PERCENT = 0;
@@ -71,7 +71,8 @@ namespace TestApplication
                 Console.WriteLine(string.Format("Enqueued Data QueueLength: {0}", svc.QueueLength));
                 callBack.StartTiming();
                 svc.MaxReadersCount = MAX_TASK_COUNT;
-                /*
+                
+
                 Console.WriteLine($"Set MaxReadersCount to {MAX_TASK_COUNT}");
                 await Task.Delay(1000);
                 Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}");
@@ -85,7 +86,7 @@ namespace TestApplication
                 await Task.Delay(1000);
                 Console.WriteLine($"Resumed Processing TasksCount: {svc.TasksCoordinator.TasksCount} MaxReadersCount: {svc.MaxReadersCount}");
                 Console.WriteLine(string.Format("Resumed Processing  QueueLength: {0}", svc.QueueLength));
-                */
+                
 
                 if (CANCEL_AFTER > 0)
                 {
@@ -93,7 +94,7 @@ namespace TestApplication
                     svc.Stop();
                 }
                 await callBack.ResultAsync.ConfigureAwait(false);
-                
+                await Task.Delay(500);
                 Console.WriteLine($"Idle TasksCount: {svc.TasksCoordinator.TasksCount}");
             }
             catch (OperationCanceledException)
