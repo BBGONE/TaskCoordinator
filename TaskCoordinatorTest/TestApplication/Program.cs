@@ -15,9 +15,9 @@ namespace TestApplication
         private static readonly Guid ClientID = Guid.NewGuid();
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.Random;
-        private const int BATCH_SIZE = 20;
-        private const int MAX_TASK_COUNT = 2;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
+        private const int BATCH_SIZE = 100000;
+        private const int MAX_TASK_COUNT = 8;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
         private const int PARRALEL_READING_LIMIT = 2;
@@ -72,7 +72,7 @@ namespace TestApplication
                 callBack.StartTiming();
                 svc.MaxReadersCount = MAX_TASK_COUNT;
                 
-
+                /*
                 Console.WriteLine($"Set MaxReadersCount to {MAX_TASK_COUNT}");
                 await Task.Delay(1000);
                 Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}");
@@ -86,7 +86,7 @@ namespace TestApplication
                 await Task.Delay(1000);
                 Console.WriteLine($"Resumed Processing TasksCount: {svc.TasksCoordinator.TasksCount} MaxReadersCount: {svc.MaxReadersCount}");
                 Console.WriteLine(string.Format("Resumed Processing  QueueLength: {0}", svc.QueueLength));
-                
+                */
 
                 if (CANCEL_AFTER > 0)
                 {
