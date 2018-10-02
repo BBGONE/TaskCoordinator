@@ -110,6 +110,7 @@
     <Compile Include="TaskCoordinator\Interface\ITaskService.cs" />
     <Compile Include="Shared\Log\LogFactory.cs" />
     <Compile Include="Database\NullableHelper.cs" />
+    <Compile Include="TaskCoordinator\SemaphoreAsync.cs" />
     <Compile Include="Threading\WorkStealingTaskScheduler.cs" />
   </ItemGroup>
   <ItemGroup>

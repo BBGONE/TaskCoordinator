@@ -32,7 +32,7 @@ namespace TasksCoordinator
             TMessage msg;
             bool isOK = false;
             // Make an artificial slight delay resembling reading over network
-            // await Task.Delay(10);
+            // Thread.SpinWait(5000);
             if (isPrimaryReader)
             {
                 // for the Primary reader (it waits for messages when the queue is empty)

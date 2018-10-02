@@ -1,6 +1,7 @@
 ﻿using Shared;
 using Shared.Errors;
 using Shared.Services;
+using Shared.TaskCoordinator;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -21,8 +22,7 @@ namespace TasksCoordinator
         private readonly ILog _log;
         private readonly object _primaryReaderLock = new object();
         private readonly object _semaphoreLock = new object();
-        private readonly ConcurrentQueue<TaskCompletionSource<IDisposable>> _readWaitQueue;
-        private volatile int _readingCount;
+        private SemaphoreAsync _waitReadAsync;
         private CancellationTokenSource _stopTokenSource;
         private CancellationToken _token;
         private readonly bool _isQueueActivationEnabled;
@@ -37,11 +37,10 @@ namespace TasksCoordinator
         private readonly IMessageReaderFactory<M> _readerFactory;
 
         public BaseTasksCoordinator(IMessageReaderFactory<M> messageReaderFactory,
-            int maxTasksCount, int parallelReadingLimit = 1, bool isQueueActivationEnabled = false)
+            int maxTasksCount, int parallelReadingLimit = 2, bool isQueueActivationEnabled = false)
         {
             this._log = LogFactory.GetInstance("BaseTasksCoordinator");
             this._semaphore = 0;
-            this._readingCount = 0;
             this._stopTokenSource = null;
             this._token = CancellationToken.None;
             this._readerFactory = messageReaderFactory;
@@ -52,24 +51,7 @@ namespace TasksCoordinator
             this._primaryReader = null;
             this._tasks = new ConcurrentDictionary<int, Task>();
             this._isStarted = 0;
-            this._readWaitQueue = new ConcurrentQueue<TaskCompletionSource<IDisposable>>();
-        }
-
-        private class AsyncReadWait : IDisposable
-        {
-            private readonly BaseTasksCoordinator<M> _owner;
-
-            public AsyncReadWait(BaseTasksCoordinator<M> owner)
-            {
-                this._owner = owner;
-                Interlocked.Increment(ref this._owner._readingCount);
-            }
-
-            void IDisposable.Dispose()
-            {
-                Interlocked.Decrement(ref this._owner._readingCount);
-                this._owner._LetNextToRead();
-            }
+            this._waitReadAsync = null;
         }
 
         public bool Start()
@@ -79,6 +61,7 @@ namespace TasksCoordinator
                 return true;
             this._stopTokenSource = new CancellationTokenSource();
             this._token = this._stopTokenSource.Token;
+            this._waitReadAsync = new SemaphoreAsync(this._parallelReadingLimit, this._stopTokenSource.Token);
             this._taskIdSeq = 0;
             this._primaryReader = null;
 
@@ -98,7 +81,6 @@ namespace TasksCoordinator
             try
             {
                 this._stopTokenSource.Cancel();
-                this._CancelWaitForRead();
                 this.IsPaused = false;
                 await Task.Delay(1000).ConfigureAwait(false);
                 var tasks = this._tasks.Select(p => p.Value).ToArray();
@@ -117,6 +99,7 @@ namespace TasksCoordinator
             }
             finally
             {
+                this._waitReadAsync.Dispose();
                 this._tasks.Clear();
                 this._semaphore = 0;
             }
@@ -142,7 +125,6 @@ namespace TasksCoordinator
             
             try
             {
-                var token = this.Token;
                 lock (this._semaphoreLock)
                 {
                     var newcount = this._semaphore - 1;
@@ -175,6 +157,8 @@ namespace TasksCoordinator
                         }
                         throw;
                     }
+
+                    var token = this._stopTokenSource.Token;
                     Task<int> task = Task.Run(() => JobRunner(token, taskId), token);
                     this._tasks.TryUpdate(taskId, task, dummy);
                     task.ContinueWith((antecedent, state) => {
@@ -199,40 +183,7 @@ namespace TasksCoordinator
                 }
             }
         }
-
-        private void _LetNextToRead()
-        {
-            TaskCompletionSource<IDisposable> temp = null;
-            if (this._readWaitQueue.TryPeek(out temp))
-            {
-                var token = this.Token;
-                Task.Run(() =>
-                {
-                    TaskCompletionSource<IDisposable> tcs = null;
-                    if (this._readWaitQueue.TryDequeue(out tcs))
-                    {
-                        if (token.IsCancellationRequested)
-                            tcs.SetCanceled();
-                        else
-                            tcs.SetResult(new AsyncReadWait(this));
-                    }
-                }, token);
-            }
-        }
-
-        private void _CancelWaitForRead()
-        {
-            TaskCompletionSource<IDisposable> temp = null;
-            while (this._readWaitQueue.TryDequeue(out temp))
-            {
-                var tcs = temp;
-                Task.Run(() =>
-                {
-                    tcs.SetCanceled();
-                });
-            }
-        }
-
+      
         /// <summary>
         /// снимает с учета слушателя
         /// он может впасть в спячку (ждет события), либо начать обработку сообщения
@@ -325,16 +276,7 @@ namespace TasksCoordinator
         #region  ITaskCoordinatorAdvanced<M>
         Task<IDisposable> ITaskCoordinatorAdvanced<M>.WaitReadAsync(IMessageReader reader)
         {
-            if (this._parallelReadingLimit > this._readingCount)
-            {
-                return Task.FromResult<IDisposable>(new AsyncReadWait(this));
-            }
-            else
-            {
-                TaskCompletionSource<IDisposable> tcs = new TaskCompletionSource<IDisposable>();
-                this._readWaitQueue.Enqueue(tcs);
-                return tcs.Task;
-            }
+            return this._waitReadAsync.WaitEnterAsync();
         }
 
         void ITaskCoordinatorAdvanced<M>.StartNewTask()
