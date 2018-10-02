@@ -59,7 +59,7 @@ namespace TasksCoordinator
         {
             int cnt = 0;
             TMessage msg = null;
-            IDisposable readDisposable = await this.Coordinator.TryBeginRead(this).ConfigureAwait(false);
+            IDisposable readDisposable = await this.Coordinator.WaitReadAsync(this).ConfigureAwait(false);
             try
             {
                 msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);

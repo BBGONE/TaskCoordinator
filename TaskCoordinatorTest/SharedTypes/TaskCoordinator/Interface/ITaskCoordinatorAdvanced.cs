@@ -12,6 +12,6 @@ namespace TasksCoordinator.Interface
 
         bool OnBeforeDoWork(IMessageReader reader);
         void OnAfterDoWork(IMessageReader reader);
-        Task<IDisposable> TryBeginRead(IMessageReader reader);
+        Task<IDisposable> WaitReadAsync(IMessageReader reader);
     }
 }

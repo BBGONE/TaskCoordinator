@@ -145,7 +145,7 @@ namespace SSSB
             SqlConnection dbconnection = null;
             TransactionScope transactionScope = null;
 
-            var readDisposable = await this.Coordinator.TryBeginRead(this);
+            var readDisposable = await this.Coordinator.WaitReadAsync(this);
             try
             {
                 TransactionOptions tranOptions = new TransactionOptions();

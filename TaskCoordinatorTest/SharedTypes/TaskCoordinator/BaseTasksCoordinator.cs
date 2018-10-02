@@ -323,7 +323,7 @@ namespace TasksCoordinator
         }
 
         #region  ITaskCoordinatorAdvanced<M>
-        Task<IDisposable> ITaskCoordinatorAdvanced<M>.TryBeginRead(IMessageReader reader)
+        Task<IDisposable> ITaskCoordinatorAdvanced<M>.WaitReadAsync(IMessageReader reader)
         {
             if ((this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader))
             {
