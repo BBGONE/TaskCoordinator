@@ -21,11 +21,12 @@ namespace TasksCoordinator
         private readonly ILog _log;
         private readonly object _primaryReaderLock = new object();
         private readonly object _semaphoreLock = new object();
+        private readonly ConcurrentQueue<TaskCompletionSource<IDisposable>> _readWaitQueue;
+        private volatile int _readingCount;
         private CancellationTokenSource _stopTokenSource;
         private CancellationToken _token;
         private readonly bool _isQueueActivationEnabled;
         private readonly int _parallelReadingLimit;
-        private volatile int _readingCount;
         private volatile int _maxTasksCount;
         private volatile int _taskIdSeq;
         private volatile int  _isStarted;
@@ -41,8 +42,8 @@ namespace TasksCoordinator
             this._log = LogFactory.GetInstance("BaseTasksCoordinator");
             this._semaphore = 0;
             this._readingCount = 0;
-            this._stopTokenSource = new CancellationTokenSource();
-            this._token = this._stopTokenSource.Token;
+            this._stopTokenSource = null;
+            this._token = CancellationToken.None;
             this._readerFactory = messageReaderFactory;
             this._maxTasksCount = maxTasksCount;
             this._isQueueActivationEnabled = isQueueActivationEnabled;
@@ -51,6 +52,24 @@ namespace TasksCoordinator
             this._primaryReader = null;
             this._tasks = new ConcurrentDictionary<int, Task>();
             this._isStarted = 0;
+            this._readWaitQueue = new ConcurrentQueue<TaskCompletionSource<IDisposable>>();
+        }
+
+        private class AsyncReadWait : IDisposable
+        {
+            private readonly BaseTasksCoordinator<M> _owner;
+
+            public AsyncReadWait(BaseTasksCoordinator<M> owner)
+            {
+                this._owner = owner;
+                Interlocked.Increment(ref this._owner._readingCount);
+            }
+
+            void IDisposable.Dispose()
+            {
+                Interlocked.Decrement(ref this._owner._readingCount);
+                this._owner._LetNextToRead();
+            }
         }
 
         public bool Start()
@@ -58,6 +77,8 @@ namespace TasksCoordinator
             var oldStarted = Interlocked.CompareExchange(ref this._isStarted, 1, 0);
             if (oldStarted == 1)
                 return true;
+            this._stopTokenSource = new CancellationTokenSource();
+            this._token = this._stopTokenSource.Token;
             this._taskIdSeq = 0;
             this._primaryReader = null;
 
@@ -74,10 +95,10 @@ namespace TasksCoordinator
             var oldStarted = Interlocked.CompareExchange(ref this._isStarted, 0, 1);
             if (oldStarted == 0)
                 return;
-
             try
             {
                 this._stopTokenSource.Cancel();
+                this._CancelWaitForRead();
                 this.IsPaused = false;
                 await Task.Delay(1000).ConfigureAwait(false);
                 var tasks = this._tasks.Select(p => p.Value).ToArray();
@@ -98,11 +119,6 @@ namespace TasksCoordinator
             {
                 this._tasks.Clear();
                 this._semaphore = 0;
-                var oldSource = this._stopTokenSource;
-                // set new source and token
-                this._stopTokenSource = new CancellationTokenSource();
-                this._token = this._stopTokenSource.Token;
-                oldSource.Dispose();
             }
         }
 
@@ -181,6 +197,39 @@ namespace TasksCoordinator
                 {
                     _log.Error(ex);
                 }
+            }
+        }
+
+        private void _LetNextToRead()
+        {
+            TaskCompletionSource<IDisposable> temp = null;
+            if (this._readWaitQueue.TryPeek(out temp))
+            {
+                var token = this.Token;
+                Task.Run(() =>
+                {
+                    TaskCompletionSource<IDisposable> tcs = null;
+                    if (this._readWaitQueue.TryDequeue(out tcs))
+                    {
+                        if (token.IsCancellationRequested)
+                            tcs.SetCanceled();
+                        else
+                            tcs.SetResult(new AsyncReadWait(this));
+                    }
+                }, token);
+            }
+        }
+
+        private void _CancelWaitForRead()
+        {
+            TaskCompletionSource<IDisposable> temp = null;
+            while (this._readWaitQueue.TryDequeue(out temp))
+            {
+                var tcs = temp;
+                Task.Run(() =>
+                {
+                    tcs.SetCanceled();
+                });
             }
         }
 
@@ -274,24 +323,22 @@ namespace TasksCoordinator
         }
 
         #region  ITaskCoordinatorAdvanced<M>
-        bool ITaskCoordinatorAdvanced<M>.TryBeginRead(IMessageReader reader)
+        Task<IDisposable> ITaskCoordinatorAdvanced<M>.TryBeginRead(IMessageReader reader)
         {
-            lock (this._primaryReaderLock)
+            if ((this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader))
             {
-                if (this._primaryReader == reader || this._parallelReadingLimit > this._readingCount)
-                {
-                    Interlocked.Increment(ref this._readingCount);
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
+                return Task.FromResult<IDisposable>(new AsyncReadWait(this));
             }
-        }
-        int ITaskCoordinatorAdvanced<M>.EndRead()
-        {
-            return Interlocked.Decrement(ref this._readingCount);
+            else if (this._parallelReadingLimit > this._readingCount)
+            {
+                return Task.FromResult<IDisposable>(new AsyncReadWait(this));
+            }
+            else
+            {
+                TaskCompletionSource<IDisposable> tcs = new TaskCompletionSource<IDisposable>();
+                this._readWaitQueue.Enqueue(tcs);
+                return tcs.Task;
+            }
         }
 
         void ITaskCoordinatorAdvanced<M>.StartNewTask()

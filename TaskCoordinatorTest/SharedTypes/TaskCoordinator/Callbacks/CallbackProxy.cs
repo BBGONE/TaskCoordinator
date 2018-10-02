@@ -104,7 +104,7 @@ namespace TasksCoordinator.Callbacks
             {
                 try
                 {
-                    var task = Task.Factory.StartNew(() =>
+                    var task = Task.Run(() =>
                     {
                         try
                         {
@@ -142,7 +142,7 @@ namespace TasksCoordinator.Callbacks
             {
                 try
                 {
-                    var task = Task.Factory.StartNew(() =>
+                    var task = Task.Run(() =>
                     {
                         try
                         {

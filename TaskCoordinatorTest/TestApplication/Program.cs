@@ -15,8 +15,8 @@ namespace TestApplication
         private static readonly Guid ClientID = Guid.NewGuid();
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
-        private const int BATCH_SIZE = 100000;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.ShortCPUBound;
+        private const int BATCH_SIZE = 2000;
         private const int MAX_TASK_COUNT = 8;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
@@ -94,8 +94,8 @@ namespace TestApplication
                     svc.Stop();
                 }
                 await callBack.ResultAsync.ConfigureAwait(false);
-                await Task.Delay(500);
-                Console.WriteLine($"Idle TasksCount: {svc.TasksCoordinator.TasksCount}");
+                await Task.Delay(1000);
+                Console.WriteLine($"Idled TasksCount: {svc.TasksCoordinator.TasksCount} MaxReadersCount: {svc.MaxReadersCount}");
             }
             catch (OperationCanceledException)
             {

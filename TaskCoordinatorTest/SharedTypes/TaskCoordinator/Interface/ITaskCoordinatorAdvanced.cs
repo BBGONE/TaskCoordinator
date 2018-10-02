@@ -1,4 +1,6 @@
 ﻿using Shared.Services;
+using System;
+using System.Threading.Tasks;
 
 namespace TasksCoordinator.Interface
 {
@@ -10,7 +12,6 @@ namespace TasksCoordinator.Interface
 
         bool OnBeforeDoWork(IMessageReader reader);
         void OnAfterDoWork(IMessageReader reader);
-        bool TryBeginRead(IMessageReader reader);
-        int EndRead();
+        Task<IDisposable> TryBeginRead(IMessageReader reader);
     }
 }

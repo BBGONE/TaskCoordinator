@@ -32,7 +32,7 @@ namespace TasksCoordinator
             TMessage msg;
             bool isOK = false;
             // Make an artificial slight delay resembling reading over network
-            // Thread.SpinWait(1000);
+            // await Task.Delay(10);
             if (isPrimaryReader)
             {
                 // for the Primary reader (it waits for messages when the queue is empty)
@@ -59,15 +59,7 @@ namespace TasksCoordinator
         {
             int cnt = 0;
             TMessage msg = null;
-            bool canRead = this.Coordinator.TryBeginRead(this);
-            if (!canRead)
-            {
-                await Task.Delay(100);
-                canRead = this.Coordinator.TryBeginRead(this);
-                if (!canRead)
-                    return cnt;
-            }
-
+            IDisposable readDisposable = await this.Coordinator.TryBeginRead(this).ConfigureAwait(false);
             try
             {
                 msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
@@ -75,7 +67,7 @@ namespace TasksCoordinator
             }
             finally
             {
-                this.Coordinator.EndRead();
+                readDisposable.Dispose();
             }
             if (cnt > 0)
             {

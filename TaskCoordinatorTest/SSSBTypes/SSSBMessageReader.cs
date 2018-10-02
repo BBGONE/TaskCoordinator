@@ -145,15 +145,7 @@ namespace SSSB
             SqlConnection dbconnection = null;
             TransactionScope transactionScope = null;
 
-            bool canRead = this.Coordinator.TryBeginRead(this);
-            if (!canRead)
-            {
-                await Task.Delay(100);
-                canRead = this.Coordinator.TryBeginRead(this);
-                if (!canRead)
-                    return cnt;
-            }
-
+            var readDisposable = await this.Coordinator.TryBeginRead(this);
             try
             {
                 TransactionOptions tranOptions = new TransactionOptions();
@@ -163,7 +155,7 @@ namespace SSSB
             }
             catch (Exception)
             {
-                this.Coordinator.EndRead();
+                readDisposable.Dispose();
                 throw;
             }
 
@@ -177,7 +169,7 @@ namespace SSSB
                 }
                 finally
                 {
-                    this.Coordinator.EndRead();
+                    readDisposable.Dispose();
                 }
 
                 using (dbconnection)
