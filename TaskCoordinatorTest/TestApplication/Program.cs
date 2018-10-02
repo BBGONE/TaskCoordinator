@@ -16,8 +16,8 @@ namespace TestApplication
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
         private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
-        private const int BATCH_SIZE = 100000;
-        private const int MAX_TASK_COUNT = 8;
+        private const int BATCH_SIZE = 10000;
+        private const int MAX_TASK_COUNT = 4;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
         private const int PARRALEL_READING_LIMIT = 2;
@@ -120,6 +120,7 @@ namespace TestApplication
 
             Console.WriteLine("**************************************");
             Console.WriteLine("Service is stopped.");
+            Console.WriteLine($"Stopped TasksCount: {svc.TasksCoordinator.TasksCount} MaxReadersCount: {svc.MaxReadersCount}");
             Console.WriteLine(string.Format("QueueLength: {0}", svc.QueueLength));
         
 

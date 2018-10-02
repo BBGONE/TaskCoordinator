@@ -1,7 +1,7 @@
-﻿using Shared;
+﻿using Rebus.Threading;
+using Shared;
 using Shared.Errors;
 using Shared.Services;
-using Shared.TaskCoordinator;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -22,7 +22,7 @@ namespace TasksCoordinator
         private readonly ILog _log;
         private readonly object _primaryReaderLock = new object();
         private readonly object _semaphoreLock = new object();
-        private SemaphoreAsync _waitReadAsync;
+        private AsyncBottleneck _waitReadAsync;
         private CancellationTokenSource _stopTokenSource;
         private CancellationToken _token;
         private readonly bool _isQueueActivationEnabled;
@@ -61,7 +61,7 @@ namespace TasksCoordinator
                 return true;
             this._stopTokenSource = new CancellationTokenSource();
             this._token = this._stopTokenSource.Token;
-            this._waitReadAsync = new SemaphoreAsync(this._parallelReadingLimit, this._stopTokenSource.Token);
+            this._waitReadAsync = new AsyncBottleneck(this._parallelReadingLimit);
             this._taskIdSeq = 0;
             this._primaryReader = null;
 
@@ -99,7 +99,6 @@ namespace TasksCoordinator
             }
             finally
             {
-                this._waitReadAsync.Dispose();
                 this._tasks.Clear();
                 this._semaphore = 0;
             }
@@ -276,7 +275,7 @@ namespace TasksCoordinator
         #region  ITaskCoordinatorAdvanced<M>
         Task<IDisposable> ITaskCoordinatorAdvanced<M>.WaitReadAsync(IMessageReader reader)
         {
-            return this._waitReadAsync.WaitEnterAsync();
+            return this._waitReadAsync.Enter(this._stopTokenSource.Token);
         }
 
         void ITaskCoordinatorAdvanced<M>.StartNewTask()
