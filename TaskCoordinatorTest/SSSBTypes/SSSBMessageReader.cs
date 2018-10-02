@@ -145,32 +145,16 @@ namespace SSSB
             SqlConnection dbconnection = null;
             TransactionScope transactionScope = null;
 
-            var readDisposable = await this.Coordinator.WaitReadAsync(this);
-            try
-            {
-                TransactionOptions tranOptions = new TransactionOptions();
-                tranOptions.IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted;
-                tranOptions.Timeout = TimeSpan.FromMinutes(60);
-                transactionScope = new TransactionScope(TransactionScopeOption.RequiresNew, tranOptions, TransactionScopeAsyncFlowOption.Enabled);
-            }
-            catch (Exception)
-            {
-                readDisposable.Dispose();
-                throw;
-            }
+            TransactionOptions tranOptions = new TransactionOptions();
+            tranOptions.IsolationLevel = System.Transactions.IsolationLevel.ReadCommitted;
+            tranOptions.Timeout = TimeSpan.FromMinutes(60);
+            transactionScope = new TransactionScope(TransactionScopeOption.RequiresNew, tranOptions, TransactionScopeAsyncFlowOption.Enabled);
 
             using (transactionScope)
             {
-                try
-                {
-                    dbconnection = await this.TryGetConnection(token);
-                    msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, dbconnection).ConfigureAwait(false);
-                    cnt = msg == null ? 0 : 1;
-                }
-                finally
-                {
-                    readDisposable.Dispose();
-                }
+                dbconnection = await this.TryGetConnection(token);
+                msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, dbconnection).ConfigureAwait(false);
+                cnt = msg == null ? 0 : 1;
 
                 using (dbconnection)
                 {

@@ -59,16 +59,8 @@ namespace TasksCoordinator
         {
             int cnt = 0;
             TMessage msg = null;
-            IDisposable readDisposable = await this.Coordinator.WaitReadAsync(this).ConfigureAwait(false);
-            try
-            {
-                msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
-                cnt = msg == null ? 0 : 1;
-            }
-            finally
-            {
-                readDisposable.Dispose();
-            }
+            msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
+            cnt = msg == null ? 0 : 1;
             if (cnt > 0)
             {
                 bool isOk = this.Coordinator.OnBeforeDoWork(this);

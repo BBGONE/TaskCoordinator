@@ -11,7 +11,6 @@ namespace TasksCoordinator.Interface
         int MaxTasksCount { get; set; }
         int FreeReadersAvailable { get; }
         int TasksCount { get; }
-        int ParallelReadingLimit { get; }
         bool IsQueueActivationEnabled { get; }
         CancellationToken Token { get; }
     }

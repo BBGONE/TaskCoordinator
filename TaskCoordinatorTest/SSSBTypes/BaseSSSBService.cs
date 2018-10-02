@@ -26,15 +26,14 @@ namespace SSSB
         private readonly ISSSBDispatcher _messageDispatcher;
         #endregion
 
-        public BaseSSSBService(string name, int maxReadersCount, bool isQueueActivationEnabled, bool isEnableParallelReading = false)
+        public BaseSSSBService(string name, int maxReadersCount, bool isQueueActivationEnabled)
         {
             _name = name;
             _isStopped = true;
-            int ParallelReadingLimit = isEnableParallelReading ? 2 : 1;
             this.isQueueActivationEnabled = isQueueActivationEnabled;
             this._messageDispatcher = new SSSBMessageDispatcher(this);
             this._readerFactory = new SSSBMessageReaderFactory(this, this._messageDispatcher);
-            this._tasksCoordinator = new SSSBTasksCoordinator(this._readerFactory, maxReadersCount, ParallelReadingLimit, this.isQueueActivationEnabled);
+            this._tasksCoordinator = new SSSBTasksCoordinator(this._readerFactory, maxReadersCount, this.isQueueActivationEnabled);
         }
 
         public EventHandler OnStartedEvent;

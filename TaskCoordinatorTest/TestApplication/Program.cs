@@ -15,12 +15,11 @@ namespace TestApplication
         private static readonly Guid ClientID = Guid.NewGuid();
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
-        private const int BATCH_SIZE = 10000;
-        private const int MAX_TASK_COUNT = 4;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.LongCPUBound;
+        private const int BATCH_SIZE = 10;
+        private const int MAX_TASK_COUNT = 6;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
-        private const int PARRALEL_READING_LIMIT = 2;
         private const bool IS_ACTIVATION_ENABLED = false;
         private const int CANCEL_AFTER = 0;
         private static readonly double ERROR_MESSAGES_PERCENT = 0;
@@ -59,7 +58,7 @@ namespace TestApplication
             */
 
             SEQUENCE_NUM = 0;
-            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED, PARRALEL_READING_LIMIT);
+            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED);
             try
             {
                 svc.Start();

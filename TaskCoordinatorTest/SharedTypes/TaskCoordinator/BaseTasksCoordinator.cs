@@ -1,5 +1,4 @@
-﻿using Rebus.Threading;
-using Shared;
+﻿using Shared;
 using Shared.Errors;
 using Shared.Services;
 using System;
@@ -22,11 +21,9 @@ namespace TasksCoordinator
         private readonly ILog _log;
         private readonly object _primaryReaderLock = new object();
         private readonly object _semaphoreLock = new object();
-        private AsyncBottleneck _waitReadAsync;
         private CancellationTokenSource _stopTokenSource;
         private CancellationToken _token;
         private readonly bool _isQueueActivationEnabled;
-        private readonly int _parallelReadingLimit;
         private volatile int _maxTasksCount;
         private volatile int _taskIdSeq;
         private volatile int  _isStarted;
@@ -37,7 +34,7 @@ namespace TasksCoordinator
         private readonly IMessageReaderFactory<M> _readerFactory;
 
         public BaseTasksCoordinator(IMessageReaderFactory<M> messageReaderFactory,
-            int maxTasksCount, int parallelReadingLimit = 2, bool isQueueActivationEnabled = false)
+            int maxTasksCount,bool isQueueActivationEnabled = false)
         {
             this._log = LogFactory.GetInstance("BaseTasksCoordinator");
             this._semaphore = 0;
@@ -46,12 +43,10 @@ namespace TasksCoordinator
             this._readerFactory = messageReaderFactory;
             this._maxTasksCount = maxTasksCount;
             this._isQueueActivationEnabled = isQueueActivationEnabled;
-            this._parallelReadingLimit = parallelReadingLimit <= 0 ? 1: parallelReadingLimit;
             this._taskIdSeq = 0;
             this._primaryReader = null;
             this._tasks = new ConcurrentDictionary<int, Task>();
             this._isStarted = 0;
-            this._waitReadAsync = null;
         }
 
         public bool Start()
@@ -61,7 +56,6 @@ namespace TasksCoordinator
                 return true;
             this._stopTokenSource = new CancellationTokenSource();
             this._token = this._stopTokenSource.Token;
-            this._waitReadAsync = new AsyncBottleneck(this._parallelReadingLimit);
             this._taskIdSeq = 0;
             this._primaryReader = null;
 
@@ -273,11 +267,6 @@ namespace TasksCoordinator
         }
 
         #region  ITaskCoordinatorAdvanced<M>
-        Task<IDisposable> ITaskCoordinatorAdvanced<M>.WaitReadAsync(IMessageReader reader)
-        {
-            return this._waitReadAsync.Enter(this._stopTokenSource.Token);
-        }
-
         void ITaskCoordinatorAdvanced<M>.StartNewTask()
         {
             this._TryStartNewTask();
@@ -402,14 +391,6 @@ namespace TasksCoordinator
             get
             {
                 return this._token;
-            }
-        }
-
-        public int ParallelReadingLimit
-        {
-            get
-            {
-                return _parallelReadingLimit;
             }
         }
 
