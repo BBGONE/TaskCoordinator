@@ -325,11 +325,7 @@ namespace TasksCoordinator
         #region  ITaskCoordinatorAdvanced<M>
         Task<IDisposable> ITaskCoordinatorAdvanced<M>.WaitReadAsync(IMessageReader reader)
         {
-            if ((this as ITaskCoordinatorAdvanced<M>).IsPrimaryReader(reader))
-            {
-                return Task.FromResult<IDisposable>(new AsyncReadWait(this));
-            }
-            else if (this._parallelReadingLimit > this._readingCount)
+            if (this._parallelReadingLimit > this._readingCount)
             {
                 return Task.FromResult<IDisposable>(new AsyncReadWait(this));
             }

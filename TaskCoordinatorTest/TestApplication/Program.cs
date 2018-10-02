@@ -16,7 +16,7 @@ namespace TestApplication
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
         private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.ShortCPUBound;
-        private const int BATCH_SIZE = 2000;
+        private const int BATCH_SIZE = 50000;
         private const int MAX_TASK_COUNT = 8;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;

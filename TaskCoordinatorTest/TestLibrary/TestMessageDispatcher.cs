@@ -45,7 +45,7 @@ namespace TasksCoordinator.Test
                 case TaskWorkType.ShortCPUBound:
                     await RUN_ASYNC_ACTION(async () =>
                     {
-                        await CPU_TASK(message, payload, token, 10000, taskId).ConfigureAwait(false);
+                        await CPU_TASK(message, payload, token, 100, taskId).ConfigureAwait(false);
                     }, taskId, message, payload, token);
                     break;
                 case TaskWorkType.ShortIOBound:
