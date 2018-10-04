@@ -31,10 +31,14 @@ The only difference that the TaskCoordinator does not keep one task endlessly to
 When there are no messages in the queue then all tasks are destroyed (<i>after processing their current messages</i>) and 
 then the TaskCoordinator needs a new external activation when in the queue will appear messages (<i>it just needs a kick to start</i>).
 <br/>
-The TaskCoordinator has one more parameter <i>isEnableParallelReading</i>, which is false by default. It can boost performance when it is enabled
-in cases when the time taken to obtain a message from the queue is on a par with the time taken to process the message. But it rarely happens in  practice.
+The TaskCoordinator has one more parameter <i>maxParallelReading</i>, which is 2 by default. It can boost performance if tweaked in some cases when
+reading messages from the queue is a lengthy operation - (<i>mostly in cases when the time taken to obtain a message from the queue is on a par with the time taken
+ to process the message. But it rarely happens in  practice - because message processing is usually longer than reading it from the queue</i>)
 <br/>
 The repository contains a console application which uses the TaskCoordinator. It can be used as a lab and a testing ground for experimenting
 with different parameters.
+I will soon commit to the github the Rebus (https://github.com/rebus-org/Rebus) implementation which uses my taskcoordinator to schedule messages
+(<i>because its implementation is very ineffective to read and dispatch messages from transport as the SqlServer Transport - too much concurrency and
+every worker reads messages when its idle - i think one is enough to monitor the queue</i>).
 <br/><br/>
 LICENSE: Use it as you like!
