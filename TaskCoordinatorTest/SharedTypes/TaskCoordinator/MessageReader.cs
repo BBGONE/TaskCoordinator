@@ -60,7 +60,7 @@ namespace TasksCoordinator
             }
             else 
             {
-                isRemoved = this._coordinator.IsSafeToRemoveReader(this) || this._coordinator.FreeReadersAvailable < 0;
+                isRemoved = this._coordinator.IsSafeToRemoveReader(this, workDone) || this._coordinator.FreeReadersAvailable < 0;
             }
         
 

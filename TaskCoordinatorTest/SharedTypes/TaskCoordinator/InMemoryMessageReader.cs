@@ -13,10 +13,8 @@ namespace TasksCoordinator
         public static readonly TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(10);
         private static readonly Task NOOP = Task.FromResult(0);
 
-        #region Private Fields
         private readonly BlockingCollection<TMessage> _messageQueue;
         private readonly IMessageDispatcher<TMessage, object> _dispatcher;
-        #endregion
 
         public InMemoryMessageReader(int taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log, 
             BlockingCollection<TMessage> messageQueue, IMessageDispatcher<TMessage, object> dispatcher) :
@@ -31,8 +29,7 @@ namespace TasksCoordinator
             await NOOP;
             TMessage msg;
             bool isOK = false;
-            // Make an artificial slight delay resembling reading over network
-            //Thread.SpinWait(5000);
+          
             if (isPrimaryReader)
             {
                 // for the Primary reader (it waits for messages when the queue is empty)
@@ -91,5 +88,9 @@ namespace TasksCoordinator
         {
             _messageQueue.Add(msg, cancellation);
         }
+
+        protected BlockingCollection<TMessage> MessageQueue => _messageQueue;
+
+        protected IMessageDispatcher<TMessage, object> Dispatcher => _dispatcher;
     }
 }

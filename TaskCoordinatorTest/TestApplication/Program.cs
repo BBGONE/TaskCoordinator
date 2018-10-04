@@ -15,12 +15,14 @@ namespace TestApplication
         private static readonly Guid ClientID = Guid.NewGuid();
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.LongCPUBound;
-        private const int BATCH_SIZE = 10;
-        private const int MAX_TASK_COUNT = 6;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.ShortCPUBound;
+        private const int BATCH_SIZE = 500;
+        private const int MAX_TASK_COUNT = 8;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
         private const bool IS_ACTIVATION_ENABLED = false;
+        private const int MAX_PARALLEL_READING = 2;
+        private const int ARTIFICIAL_READ_DELAY = 20;
         private const int CANCEL_AFTER = 0;
         private static readonly double ERROR_MESSAGES_PERCENT = 0;
 
@@ -51,14 +53,14 @@ namespace TestApplication
 
         private static async Task Start()
         {
-            /*
             int minWork, minIO;
+            int needThreads = MAX_TASK_COUNT + 2;
             ThreadPool.GetMinThreads(out minWork, out minIO);
-            ThreadPool.SetMinThreads((MAX_TASK_COUNT+2) > minWork? (MAX_TASK_COUNT + 2) : minWork, minIO);
-            */
+            ThreadPool.SetMinThreads(needThreads > minWork? needThreads : minWork, minIO);
+            
 
             SEQUENCE_NUM = 0;
-            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED);
+            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED, MAX_PARALLEL_READING, ARTIFICIAL_READ_DELAY);
             try
             {
                 svc.Start();
@@ -70,7 +72,23 @@ namespace TestApplication
                 Console.WriteLine(string.Format("Enqueued Data QueueLength: {0}", svc.QueueLength));
                 callBack.StartTiming();
                 svc.MaxReadersCount = MAX_TASK_COUNT;
-                
+
+                if (CANCEL_AFTER > 0)
+                {
+                    await Task.Delay(CANCEL_AFTER).ConfigureAwait(false);
+                    svc.Stop();
+                }
+
+                bool complete = false;
+                var task = callBack.ResultAsync;
+                while (!complete){
+                    complete = task ==  await Task.WhenAny(task, Task.Delay(2000));
+                    if (!complete)
+                    {
+                        Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}  QueueLength: {svc.QueueLength}");
+                    }
+                }
+
                 /*
                 Console.WriteLine($"Set MaxReadersCount to {MAX_TASK_COUNT}");
                 await Task.Delay(1000);
@@ -85,14 +103,8 @@ namespace TestApplication
                 await Task.Delay(1000);
                 Console.WriteLine($"Resumed Processing TasksCount: {svc.TasksCoordinator.TasksCount} MaxReadersCount: {svc.MaxReadersCount}");
                 Console.WriteLine(string.Format("Resumed Processing  QueueLength: {0}", svc.QueueLength));
-                */
-
-                if (CANCEL_AFTER > 0)
-                {
-                    await Task.Delay(CANCEL_AFTER).ConfigureAwait(false);
-                    svc.Stop();
-                }
                 await callBack.ResultAsync.ConfigureAwait(false);
+                */
                 await Task.Delay(1000);
                 Console.WriteLine($"Idled TasksCount: {svc.TasksCoordinator.TasksCount} MaxReadersCount: {svc.MaxReadersCount}");
             }
