@@ -51,18 +51,22 @@ namespace TasksCoordinator
             private readonly int _maxParallelReading;
             private readonly bool _isQueueActivationEnabled;
             private volatile IMessageReader _primaryReader;
-            private readonly IMessageReader[] _activeReaders;
+            private readonly ConcurrentDictionary<int, IMessageReader> _activeReaders;
             private CancellationToken _token;
             private int _counter;
 
             public ReadersRegister(int maxParallelReading, bool isQueueActivationEnabled)
             {
+                if (maxParallelReading <= 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(maxParallelReading));
+                }
                 this._maxParallelReading = maxParallelReading;
                 this._isQueueActivationEnabled = isQueueActivationEnabled;
                 this._primaryReader = null;
                 this._token = CancellationToken.None;
                 this._counter = 0;
-                this._activeReaders = new IMessageReader[this._maxParallelReading];
+                this._activeReaders = new ConcurrentDictionary<int, IMessageReader>();
             }
 
             public void Register(IMessageReader reader)
@@ -76,15 +80,9 @@ namespace TasksCoordinator
                     // counter helps to optimize access to the array
                     if (this._counter < this._maxParallelReading)
                     {
-                        var arr = this._activeReaders;
-                        for (int i = 0; i < arr.Length; ++i)
+                        if (this._activeReaders.TryAdd(reader.taskId, reader))
                         {
-                            if (arr[i] == null)
-                            {
-                                arr[i] = reader;
-                                ++this._counter;
-                                break;
-                            }
+                            ++this._counter;
                         }
                     }
                 }
@@ -101,15 +99,10 @@ namespace TasksCoordinator
 
                     if (this._counter > 0)
                     {
-                        var arr = this._activeReaders;
-                        for (int i = 0; i < arr.Length; ++i)
+                        IMessageReader temp;
+                        if (this._activeReaders.TryRemove(reader.taskId, out temp))
                         {
-                            if (arr[i] != null && Object.ReferenceEquals(arr[i], reader))
-                            {
-                                arr[i] = null;
-                                --this._counter;
-                                break;
-                            }
+                            --this._counter;
                         }
                     }
                 }
@@ -139,34 +132,24 @@ namespace TasksCoordinator
 
             public bool IsSafeToRemove(IMessageReader reader, bool workDone)
             {
-                bool res = false;
+                bool canRemove = false;
                 lock (this._primaryReaderLock)
                 {
-                    res = this._token.IsCancellationRequested || this._isQueueActivationEnabled || !this.IsPrimaryReader(reader);
-                    if (_maxParallelReading > 1 && res && workDone)
+                    canRemove = this._token.IsCancellationRequested || this._isQueueActivationEnabled || !this.IsPrimaryReader(reader);
+                    if (canRemove && workDone)
                     {
-                        var arr = this._activeReaders;
-                        for (int i = 0; i < arr.Length; ++i)
-                        {
-                            if (arr[i] != null && Object.ReferenceEquals(arr[i], reader))
-                            {
-                                res = false;
-                                break;
-                            }
-                        }
+                        IMessageReader temp;
+                        if (this._activeReaders.TryGetValue(reader.taskId, out temp))
+                            canRemove = false;
                     }
                 }
 
-                return res;
+                return canRemove;
             }
 
             public void Start(CancellationToken token) {
                 this._token = token;
-                var arr = this._activeReaders;
-                for (int i = 0; i < arr.Length; ++i)
-                {
-                    arr[i] = null;
-                }
+                this._activeReaders.Clear();
                 this._counter = 0;
             }
         }
