@@ -16,7 +16,7 @@ namespace TasksCoordinator
         private readonly BlockingCollection<TMessage> _messageQueue;
         private readonly IMessageDispatcher<TMessage, object> _dispatcher;
 
-        public InMemoryMessageReader(int taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log, 
+        public InMemoryMessageReader(long taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log, 
             BlockingCollection<TMessage> messageQueue, IMessageDispatcher<TMessage, object> dispatcher) :
             base(taskId, tasksCoordinator, log)
         {
@@ -24,7 +24,7 @@ namespace TasksCoordinator
             this._dispatcher = dispatcher;
         }
 
-        protected override async Task<TMessage> ReadMessage(bool isPrimaryReader, int taskId, CancellationToken token, object state)
+        protected override async Task<TMessage> ReadMessage(bool isPrimaryReader, long taskId, CancellationToken token, object state)
         {
             await NOOP;
             TMessage msg;
@@ -46,7 +46,7 @@ namespace TasksCoordinator
             return isOK? msg: null;
         }
 
-        protected override async Task<MessageProcessingResult> DispatchMessage(TMessage message, int taskId, CancellationToken token, object state)
+        protected override async Task<MessageProcessingResult> DispatchMessage(TMessage message, long taskId, CancellationToken token, object state)
         {
             var res = await this._dispatcher.DispatchMessage(message, taskId, token, null).ConfigureAwait(false);
             return res;

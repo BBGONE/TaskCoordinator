@@ -20,9 +20,7 @@ namespace TasksCoordinator.Test
         private readonly ILog _log = LogFactory.GetInstance("TestService");
 
         #region Private Fields
-        private string _name;
         private volatile bool _isStopped;
-        private ITaskCoordinator _tasksCoordinator;
         private TestMessageDispatcher _messageDispatcher;
         private BlockingCollection<Message> _messageQueue;
         private ISerializer _serializer;
@@ -37,7 +35,7 @@ namespace TasksCoordinator.Test
             bool isQueueActivationEnabled = false,
             int maxParallelReading = 2, int artificialDelay = 0)
         {
-            this._name = name;
+            this.Name = name;
             this._isStopped = true;
             this.isQueueActivationEnabled = isQueueActivationEnabled;
             this._serializer = serializer;
@@ -45,12 +43,12 @@ namespace TasksCoordinator.Test
             this._messageQueue = new BlockingCollection<Message>();
             this._messageDispatcher = new TestMessageDispatcher(this._serializer, this._customScheduler);
             var readerFactory = new TestMessageReaderFactory(this._messageQueue, this._messageDispatcher, artificialDelay);
-            this._tasksCoordinator = new TestTasksCoordinator(readerFactory, maxReadersCount, isQueueActivationEnabled, maxParallelReading);
+            this.TasksCoordinator = new TestTasksCoordinator(readerFactory, maxReadersCount, isQueueActivationEnabled, maxParallelReading);
         }
 
 
         #region Properties
-        public ITaskCoordinator TasksCoordinator { get => _tasksCoordinator; }
+        public ITaskCoordinator TasksCoordinator { get; }
 
         public bool IsStopped
         {
@@ -61,24 +59,21 @@ namespace TasksCoordinator.Test
         {
             get
             {
-                return this._tasksCoordinator.IsPaused;
+                return this.TasksCoordinator.IsPaused;
             }
         }
 
         /// <summary>
         /// Название сервиса.
         /// </summary>
-        public string Name
-        {
-            get { return _name; }
-        }
+        public string Name { get; }
         #endregion
 
         internal void InternalStart()
         {
             try
             {
-                this._tasksCoordinator.Start();
+                this.TasksCoordinator.Start();
                 this.OnStart();
             }
             catch (Exception ex)
@@ -128,7 +123,7 @@ namespace TasksCoordinator.Test
                 lock (this)
                 {
                     _isStopped = true;
-                    _tasksCoordinator.Stop().Wait();
+                    TasksCoordinator.Stop().Wait();
                 }
             }
             catch (AggregateException ex)
@@ -159,7 +154,7 @@ namespace TasksCoordinator.Test
         /// </summary>
         public void Pause()
         {
-            this._tasksCoordinator.IsPaused = true;
+            this.TasksCoordinator.IsPaused = true;
         }
 
         /// <summary>
@@ -167,7 +162,7 @@ namespace TasksCoordinator.Test
         /// </summary>
         public void Resume()
         {
-            this._tasksCoordinator.IsPaused = false;
+            this.TasksCoordinator.IsPaused = false;
         }
         #endregion
 
@@ -186,7 +181,7 @@ namespace TasksCoordinator.Test
         {
             get
             {
-                return _tasksCoordinator as IQueueActivator;
+                return TasksCoordinator as IQueueActivator;
             }
         }
 
@@ -198,7 +193,7 @@ namespace TasksCoordinator.Test
         // immitate an activator
         public void StartActivator(int delay)
         {
-            if (!this._tasksCoordinator.IsQueueActivationEnabled)
+            if (!this.TasksCoordinator.IsQueueActivationEnabled)
                 return;
             var task = Activator(delay);
         }
@@ -230,7 +225,7 @@ namespace TasksCoordinator.Test
         #endregion
 
         public void RegisterCallback(Guid clientID, ICallback<Message> callback) {
-            this._messageDispatcher.RegisterCallback(clientID, new CallbackProxy<Message>(callback, this._tasksCoordinator.Token));
+            this._messageDispatcher.RegisterCallback(clientID, new CallbackProxy<Message>(callback, this.TasksCoordinator.Token));
         }
 
         public bool UnRegisterCallback(Guid clientID)
@@ -255,15 +250,27 @@ namespace TasksCoordinator.Test
             get { return this._messageQueue.Count; }
         }
 
-        public int MaxReadersCount
+        public int MaxTasksCount
         {
             get
             {
-                return this._tasksCoordinator.MaxTasksCount;
+                return this.TasksCoordinator.MaxTasksCount;
             }
             set
             {
-                this._tasksCoordinator.MaxTasksCount = value;
+                this.TasksCoordinator.MaxTasksCount = value;
+            }
+        }
+
+        public int MaxParallelReading
+        {
+            get
+            {
+                return this.TasksCoordinator.MaxParallelReading;
+            }
+            set
+            {
+                this.TasksCoordinator.MaxParallelReading = value;
             }
         }
 

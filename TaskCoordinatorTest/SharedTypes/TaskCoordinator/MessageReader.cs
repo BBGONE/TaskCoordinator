@@ -10,21 +10,21 @@ namespace TasksCoordinator
         where TMessage:class
     {
         #region Private Fields
-        private int _taskId;
+        private long _taskId;
         private readonly ITaskCoordinatorAdvanced<TMessage> _coordinator;
         private readonly ILog _log;
         #endregion
 
-        public MessageReader(int taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log)
+        public MessageReader(long taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log)
         {
             this._taskId = taskId;
             this._coordinator = tasksCoordinator;
             this._log = log;
         }
 
-        protected abstract Task<TMessage> ReadMessage(bool isPrimaryReader, int taskId, CancellationToken token, TState state);
+        protected abstract Task<TMessage> ReadMessage(bool isPrimaryReader, long taskId, CancellationToken token, TState state);
 
-        protected abstract Task<MessageProcessingResult> DispatchMessage(TMessage message, int taskId, CancellationToken token, TState state);
+        protected abstract Task<MessageProcessingResult> DispatchMessage(TMessage message, long taskId, CancellationToken token, TState state);
       
         protected abstract Task<int> DoWork(bool isPrimaryReader, CancellationToken cancellation);
 
@@ -72,7 +72,7 @@ namespace TasksCoordinator
             get { return _log; }
         }
 
-        public int taskId
+        public long taskId
         {
             get
             {

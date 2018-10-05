@@ -2,6 +2,7 @@
 using Shared.Errors;
 using Shared.Services;
 using System;
+using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
@@ -16,17 +17,17 @@ namespace TasksCoordinator
     /// </summary>
     public class BaseTasksCoordinator<M> : ITaskCoordinatorAdvanced<M>, IQueueActivator
     {
-        private const int MAX_TASK_NUM = int.MaxValue;
+        private const long MAX_TASK_NUM = long.MaxValue;
         private const int STOP_TIMEOUT = 30000;
         private readonly ILog _log;
         private CancellationTokenSource _stopTokenSource;
         private CancellationToken _token;
+        private long _taskIdSeq;
         private volatile int _maxTasksCount;
-        private volatile int _taskIdSeq;
         private volatile int  _isStarted;
         private volatile bool _isPaused;
-        private volatile int _tasksCanbeStarted;
-        private readonly ConcurrentDictionary<int, Task> _tasks;
+        private volatile int _tasksCanBeStarted;
+        private readonly ConcurrentDictionary<long, Task> _tasks;
         private readonly IMessageReaderFactory<M> _readerFactory;
         private readonly ReadersRegister _readersRegister;
 
@@ -34,55 +35,84 @@ namespace TasksCoordinator
             int maxTasksCount, bool isQueueActivationEnabled = false, int maxParallelReading = 2)
         {
             this._log = LogFactory.GetInstance("BaseTasksCoordinator");
-            this._tasksCanbeStarted = 0;
+            this._tasksCanBeStarted = 0;
             this._stopTokenSource = null;
             this._token = CancellationToken.None;
             this._readerFactory = messageReaderFactory;
             this._maxTasksCount = maxTasksCount;
             this._readersRegister = new ReadersRegister(maxParallelReading, isQueueActivationEnabled);
             this._taskIdSeq = 0;
-            this._tasks = new ConcurrentDictionary<int, Task>();
+            this._tasks = new ConcurrentDictionary<long, Task>();
             this._isStarted = 0;
         }
 
         private class ReadersRegister
         {
             private readonly object _primaryReaderLock = new object();
-            private readonly int _maxParallelReading;
-            private readonly bool _isQueueActivationEnabled;
+            private volatile int _maxParallelReading;
             private volatile IMessageReader _primaryReader;
-            private readonly ConcurrentDictionary<int, IMessageReader> _activeReaders;
+            private readonly ConcurrentDictionary<long, IMessageReader> _activeReaders;
             private CancellationToken _token;
-            private int _counter;
+            private volatile int _counter;
 
             public ReadersRegister(int maxParallelReading, bool isQueueActivationEnabled)
             {
-                if (maxParallelReading <= 0)
+                if (maxParallelReading < 0)
                 {
                     throw new ArgumentOutOfRangeException(nameof(maxParallelReading));
                 }
                 this._maxParallelReading = maxParallelReading;
-                this._isQueueActivationEnabled = isQueueActivationEnabled;
+                this.IsQueueActivationEnabled = isQueueActivationEnabled;
                 this._primaryReader = null;
                 this._token = CancellationToken.None;
                 this._counter = 0;
-                this._activeReaders = new ConcurrentDictionary<int, IMessageReader>();
+                this._activeReaders = new ConcurrentDictionary<long, IMessageReader>();
             }
 
             public void Register(IMessageReader reader)
             {
+                var prev = Interlocked.CompareExchange(ref this._primaryReader, reader, null);
                 lock (this._primaryReaderLock)
                 {
-                    if (this._primaryReader == null)
+                    // if maxParallelReading < 2 then the current primary reader is the only reader
+                    if (this._maxParallelReading < 2)
                     {
-                        this._primaryReader = reader;
+                        return;
                     }
-                    // counter helps to optimize access to the array
-                    if (this._counter < this._maxParallelReading)
+
+                    bool hasFreeSlots = this._counter < this._maxParallelReading;
+                    if (hasFreeSlots)
                     {
                         if (this._activeReaders.TryAdd(reader.taskId, reader))
                         {
                             ++this._counter;
+                        }
+                    }
+                    else
+                    {
+                        // If primary reader was set now
+                        if (prev == null)
+                        {
+                            // if No free  slots available ensure we set primary reader to the set of active readers
+                            // even if we must replace one slot with it
+                            IMessageReader temp;
+                            if (!this._activeReaders.TryGetValue(reader.taskId, out temp))
+                            {
+                                KeyValuePair<long,IMessageReader> kv = this._activeReaders.FirstOrDefault();
+                                // taskId starts with 1
+                                if (kv.Key > 0)
+                                {
+                                    // remove the first found active reader
+                                    if (this._activeReaders.TryRemove(kv.Key, out temp))
+                                    {
+                                        // and replace it with the primary reader
+                                        if (this._activeReaders.TryAdd(reader.taskId, reader))
+                                        {
+                                            ++this._counter;
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -90,13 +120,9 @@ namespace TasksCoordinator
       
             public void UnRegister(IMessageReader reader)
             {
+                Interlocked.CompareExchange(ref this._primaryReader, null, reader);
                 lock (this._primaryReaderLock)
                 {
-                    if (Object.ReferenceEquals(this._primaryReader, reader))
-                    {
-                        this._primaryReader = null;
-                    }
-
                     if (this._counter > 0)
                     {
                         IMessageReader temp;
@@ -108,17 +134,24 @@ namespace TasksCoordinator
                 }
             }
 
-            public int MaxParallelReading => _maxParallelReading;
-
-            public bool IsQueueActivationEnabled => _isQueueActivationEnabled;
+            public bool IsQueueActivationEnabled { get; }
 
             public int Counter => _counter;
 
-            public int FreeSlots
+            public int MaxParallelReading
             {
-                get
+                get { return _maxParallelReading; }
+                set
                 {
-                    return  this._maxParallelReading - this._counter;
+                    if (value < 0)
+                    {
+                        throw new ArgumentOutOfRangeException(nameof(MaxParallelReading));
+                    }
+
+                    lock (this._primaryReaderLock)
+                    {
+                        _maxParallelReading = value;
+                    }
                 }
             }
 
@@ -135,7 +168,7 @@ namespace TasksCoordinator
                 bool canRemove = false;
                 lock (this._primaryReaderLock)
                 {
-                    canRemove = this._token.IsCancellationRequested || this._isQueueActivationEnabled || !this.IsPrimaryReader(reader);
+                    canRemove = this._token.IsCancellationRequested || this.IsQueueActivationEnabled || !this.IsPrimaryReader(reader);
                     if (canRemove && workDone)
                     {
                         IMessageReader temp;
@@ -163,7 +196,7 @@ namespace TasksCoordinator
             this._token = this._stopTokenSource.Token;
             this._taskIdSeq = 0;
             this._readersRegister.Start(this._stopTokenSource.Token);
-            this._tasksCanbeStarted = this._maxTasksCount;
+            this._tasksCanBeStarted = this._maxTasksCount;
             this._TryStartNewTask();
             return true;
         }
@@ -195,30 +228,30 @@ namespace TasksCoordinator
             finally
             {
                 this._tasks.Clear();
-                this._tasksCanbeStarted = 0;
+                this._tasksCanBeStarted = 0;
             }
         }
 
-        private void _ExitTask(int id)
+        private void _ExitTask(long id)
         {
             Task res;
             if (this._tasks.TryRemove(id, out res))
             {
-                Interlocked.Increment(ref this._tasksCanbeStarted);
+                Interlocked.Increment(ref this._tasksCanBeStarted);
             }
         }
 
         private int _TryDecrementTasksCanbeStarted()
         {
-            int beforeChanged = this._tasksCanbeStarted;
-            if (beforeChanged > 0 && Interlocked.CompareExchange(ref this._tasksCanbeStarted, beforeChanged - 1, beforeChanged) != beforeChanged)
+            int beforeChanged = this._tasksCanBeStarted;
+            if (beforeChanged > 0 && Interlocked.CompareExchange(ref this._tasksCanBeStarted, beforeChanged - 1, beforeChanged) != beforeChanged)
             {
                 var spinner = new SpinWait();
                 do
                 {
                     spinner.SpinOnce();
-                    beforeChanged = this._tasksCanbeStarted;
-                } while (beforeChanged > 0 && Interlocked.CompareExchange(ref this._tasksCanbeStarted, beforeChanged - 1, beforeChanged) != beforeChanged);
+                    beforeChanged = this._tasksCanBeStarted;
+                } while (beforeChanged > 0 && Interlocked.CompareExchange(ref this._tasksCanBeStarted, beforeChanged - 1, beforeChanged) != beforeChanged);
             }
             return beforeChanged;
         }
@@ -227,7 +260,7 @@ namespace TasksCoordinator
         {
             bool result = false;
             bool semaphoreOK = false;
-            int taskId = -1;
+            long taskId = -1;
             
             try
             {
@@ -248,7 +281,7 @@ namespace TasksCoordinator
                     }
                     catch (Exception)
                     {
-                        Interlocked.Increment(ref this._tasksCanbeStarted);
+                        Interlocked.Increment(ref this._tasksCanBeStarted);
                         Task res;
                         if (result)
                         {
@@ -258,7 +291,7 @@ namespace TasksCoordinator
                     }
 
                     var token = this._stopTokenSource.Token;
-                    Task<int> task = Task.Run(() => JobRunner(token, taskId), token);
+                    Task<long> task = Task.Run(() => JobRunner(token, taskId), token);
                     this._tasks.TryUpdate(taskId, task, dummy);
                     task.ContinueWith((antecedent, state) => {
                         this._ExitTask((int)state);
@@ -283,7 +316,7 @@ namespace TasksCoordinator
             }
         }
       
-        private async Task<int> JobRunner(CancellationToken token, int taskId)
+        private async Task<long> JobRunner(CancellationToken token, long taskId)
         {
             try
             {
@@ -329,7 +362,7 @@ namespace TasksCoordinator
             get { return _log; }
         }
 
-        protected IMessageReader GetMessageReader(int taskId)
+        protected IMessageReader GetMessageReader(long taskId)
         {
             return this._readerFactory.CreateReader(taskId, this);
         }
@@ -343,7 +376,7 @@ namespace TasksCoordinator
         bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader reader, bool workDone)
         {
             bool res = this._readersRegister.IsSafeToRemove(reader, workDone);
-            return res  || this._tasksCanbeStarted < 0;
+            return res  || this._tasksCanBeStarted < 0;
         }
 
         bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader reader)
@@ -373,8 +406,7 @@ namespace TasksCoordinator
         {
             if (!this._readersRegister.IsQueueActivationEnabled)
                 return false;
-            var oldStarted = Interlocked.CompareExchange(ref this._isStarted, 1, 1);
-            if (oldStarted == 0)
+            if (this._isStarted == 0)
             {
                 return false;
             }
@@ -395,6 +427,17 @@ namespace TasksCoordinator
         }
         #endregion
 
+        public int MaxParallelReading
+        {
+            get
+            {
+                return this._readersRegister.MaxParallelReading;
+            }
+            set
+            {
+                this._readersRegister.MaxParallelReading = value;
+            }
+        }
         public int MaxTasksCount
         {
             get {
@@ -410,8 +453,8 @@ namespace TasksCoordinator
                 int diff = value - this._maxTasksCount;
                 this._maxTasksCount = value;
                 // It can be negative temporarily (before the excess of the tasks stop) 
-                int canBeStarted = Interlocked.Add(ref this._tasksCanbeStarted, diff);
-                if (canBeStarted > 0 && this.TasksCount == 0)
+                int canBeStarted = Interlocked.Add(ref this._tasksCanBeStarted, diff);
+                if (this.TasksCount == 0)
                 {
                     this._TryStartNewTask();
                 }
@@ -422,7 +465,7 @@ namespace TasksCoordinator
         {
             get
             {
-                return this._tasksCanbeStarted;
+                return this._tasksCanBeStarted;
             }
         }
 

@@ -9,6 +9,7 @@ namespace TasksCoordinator.Interface
         Task Stop();
         bool IsPaused { get; set; }
         int MaxTasksCount { get; set; }
+        int MaxParallelReading { get; set; }
         int FreeReadersAvailable { get; }
         int TasksCount { get; }
         bool IsQueueActivationEnabled { get; }

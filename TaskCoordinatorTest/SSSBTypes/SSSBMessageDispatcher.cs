@@ -150,7 +150,7 @@ namespace SSSB
             return rollBack;
         }
 
-        async Task<MessageProcessingResult> IMessageDispatcher<SSSBMessage, SqlConnection>.DispatchMessage(SSSBMessage message, int taskId, CancellationToken token, SqlConnection dbconnection)
+        async Task<MessageProcessingResult> IMessageDispatcher<SSSBMessage, SqlConnection>.DispatchMessage(SSSBMessage message, long taskId, CancellationToken token, SqlConnection dbconnection)
         {
             bool rollBack = false;
 

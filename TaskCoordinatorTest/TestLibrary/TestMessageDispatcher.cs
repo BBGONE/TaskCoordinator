@@ -21,7 +21,7 @@ namespace TasksCoordinator.Test
             this._callbacks = new ConcurrentDictionary<Guid, ICallbackProxy<Message>>();
         }
 
-        private async Task<bool> _DispatchMessage(Message message, int taskId, CancellationToken token)
+        private async Task<bool> _DispatchMessage(Message message, long taskId, CancellationToken token)
         {
             // возвратить ли сообщение назад в очередь?
             bool rollBack = false;
@@ -75,7 +75,7 @@ namespace TasksCoordinator.Test
         }
 
         #region HELPER FUNCTIONS
-        private async Task RUN_LONG_RUN_SYNC_ACTION(Action action, int taskId, Message message, Payload payload , CancellationToken token) {
+        private async Task RUN_LONG_RUN_SYNC_ACTION(Action action, long taskId, Message message, Payload payload , CancellationToken token) {
             await Task.Factory.StartNew(async () => {
                 ICallbackProxy<Message> callback;
                 if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
@@ -100,7 +100,7 @@ namespace TasksCoordinator.Test
             }, token, TaskCreationOptions.DenyChildAttach, this._longRunningTasksScheduler).Unwrap();
         }
 
-        private async Task RUN_ASYNC_ACTION(Func<Task> action, int taskId, Message message, Payload payload, CancellationToken token)
+        private async Task RUN_ASYNC_ACTION(Func<Task> action, long taskId, Message message, Payload payload, CancellationToken token)
         {
             ICallbackProxy<Message> callback;
             if (!this._callbacks.TryGetValue(payload.ClientID, out callback))
@@ -128,7 +128,7 @@ namespace TasksCoordinator.Test
 
         #region TEST TASKS
         // Sync TASK CPU Bound
-        private void LONG_RUN_CPU_TASK(Message message, Payload payload, CancellationToken token, int taskId)
+        private void LONG_RUN_CPU_TASK(Message message, Payload payload, CancellationToken token, long taskId)
         {
             int iterations = 10000000;
             int cnt = iterations;
@@ -151,7 +151,7 @@ namespace TasksCoordinator.Test
         }
 
         // Async Task CPU Bound
-        private async Task CPU_TASK(Message message, Payload payload, CancellationToken token, int iterations, int taskId)
+        private async Task CPU_TASK(Message message, Payload payload, CancellationToken token, int iterations, long taskId)
         {
             await Task.FromResult(0);
             int cnt = iterations;
@@ -187,7 +187,7 @@ namespace TasksCoordinator.Test
         }
         #endregion
 
-        async Task<MessageProcessingResult> IMessageDispatcher<Message, object>.DispatchMessage(Message message, int taskId, CancellationToken token, object state)
+        async Task<MessageProcessingResult> IMessageDispatcher<Message, object>.DispatchMessage(Message message, long taskId, CancellationToken token, object state)
         {
             bool rollBack = false;
             rollBack = await this._DispatchMessage(message, taskId, token).ConfigureAwait(false);

@@ -20,7 +20,7 @@ namespace SSSB
         private readonly ISSSBService _service;
         private readonly ISSSBDispatcher _dispatcher;
 
-        public SSSBMessageReader(int taskId, BaseTasksCoordinator<SSSBMessage> tasksCoordinator, ILog log,
+        public SSSBMessageReader(long taskId, BaseTasksCoordinator<SSSBMessage> tasksCoordinator, ILog log,
             ISSSBService service, ISSSBDispatcher dispatcher) :
             base(taskId, tasksCoordinator, log)
         {
@@ -72,7 +72,7 @@ namespace SSSB
             return message;
         }
 
-        protected override async Task<SSSBMessage> ReadMessage(bool isPrimaryReader, int taskId, CancellationToken token, SqlConnection state)
+        protected override async Task<SSSBMessage> ReadMessage(bool isPrimaryReader, long taskId, CancellationToken token, SqlConnection state)
         {
             SqlConnection dbconnection = state;
             // reading messages from the queue
@@ -110,7 +110,7 @@ namespace SSSB
             }
         }
 
-        protected override async Task<MessageProcessingResult> DispatchMessage(SSSBMessage message, int taskId, CancellationToken token, SqlConnection state)
+        protected override async Task<MessageProcessingResult> DispatchMessage(SSSBMessage message, long taskId, CancellationToken token, SqlConnection state)
         {
             var res = await this._dispatcher.DispatchMessage(message, taskId, token, state).ConfigureAwait(false);
             return res;

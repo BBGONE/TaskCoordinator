@@ -19,7 +19,7 @@ namespace TasksCoordinator.Test
             this._artificialDelay = artificialDelay;
         }
 
-        public IMessageReader CreateReader(int taskId, BaseTasksCoordinator<Message> coordinator)
+        public IMessageReader CreateReader(long taskId, BaseTasksCoordinator<Message> coordinator)
         {
             return new TestMessageReader<Message>(taskId, coordinator, _log, _messageQueue, _messageDispatcher, this._artificialDelay);
         }

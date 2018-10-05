@@ -5,6 +5,6 @@ namespace TasksCoordinator.Interface
 {
     public interface IMessageDispatcher<TMessage, TState>
     {
-        Task<MessageProcessingResult> DispatchMessage(TMessage message, int taskId, CancellationToken token, TState state);
+        Task<MessageProcessingResult> DispatchMessage(TMessage message, long taskId, CancellationToken token, TState state);
     }
 }

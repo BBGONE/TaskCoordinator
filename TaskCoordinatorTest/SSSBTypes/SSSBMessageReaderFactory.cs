@@ -17,7 +17,7 @@ namespace SSSB
             this._messageDispatcher = messageDispatcher;
         }
 
-        public IMessageReader CreateReader(int taskId, BaseTasksCoordinator<SSSBMessage> coordinator)
+        public IMessageReader CreateReader(long taskId, BaseTasksCoordinator<SSSBMessage> coordinator)
         {
             return new SSSBMessageReader(taskId, coordinator, _log, _service, _messageDispatcher);
         }

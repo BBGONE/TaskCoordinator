@@ -12,14 +12,14 @@ namespace TasksCoordinator.Test
     {
         private readonly int _artificialDelay;
 
-        public TestMessageReader(int taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log, 
+        public TestMessageReader(long taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log, 
             BlockingCollection<TMessage> messageQueue, IMessageDispatcher<TMessage, object> dispatcher, int artificialDelay = 0) :
             base(taskId, tasksCoordinator, log, messageQueue, dispatcher)
         {
             this._artificialDelay = artificialDelay;
         }
 
-        protected override async Task<TMessage> ReadMessage(bool isPrimaryReader, int taskId, CancellationToken token, object state)
+        protected override async Task<TMessage> ReadMessage(bool isPrimaryReader, long taskId, CancellationToken token, object state)
         {
             if (this._artificialDelay > 0)
                 await Task.Delay(this._artificialDelay);
