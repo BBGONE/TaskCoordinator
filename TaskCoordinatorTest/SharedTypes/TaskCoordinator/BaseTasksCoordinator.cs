@@ -105,6 +105,8 @@ namespace TasksCoordinator
                                     // remove the first found active reader
                                     if (this._activeReaders.TryRemove(kv.Key, out temp))
                                     {
+                                        --this._counter;
+
                                         // and replace it with the primary reader
                                         if (this._activeReaders.TryAdd(reader.taskId, reader))
                                         {
