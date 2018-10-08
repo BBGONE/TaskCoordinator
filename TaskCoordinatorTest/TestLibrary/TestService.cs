@@ -32,7 +32,7 @@ namespace TasksCoordinator.Test
         public event EventHandler<EventArgs> ServiceStopped;
 
         public TestService(ISerializer serializer, string name, int maxReadersCount, 
-            bool isQueueActivationEnabled = false,
+            bool isQueueActivationEnabled = false, int maxReadParallelism = 4,
             int artificialDelay = 0)
         {
             this.Name = name;
@@ -43,7 +43,7 @@ namespace TasksCoordinator.Test
             this._messageQueue = new BlockingCollection<Message>();
             this._messageDispatcher = new TestMessageDispatcher(this._serializer, this._customScheduler);
             var readerFactory = new TestMessageReaderFactory(this._messageQueue, this._messageDispatcher, artificialDelay);
-            this.TasksCoordinator = new TestTasksCoordinator(readerFactory, maxReadersCount, isQueueActivationEnabled);
+            this.TasksCoordinator = new TestTasksCoordinator(readerFactory, maxReadersCount, isQueueActivationEnabled, maxReadParallelism);
         }
 
 

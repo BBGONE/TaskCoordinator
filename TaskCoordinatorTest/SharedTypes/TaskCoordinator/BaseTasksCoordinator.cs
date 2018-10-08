@@ -1,5 +1,6 @@
 ﻿using Shared;
 using Shared.Services;
+using Shared.Threading;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -28,9 +29,10 @@ namespace TasksCoordinator
         private readonly ConcurrentDictionary<long, Task> _tasks;
         private readonly IMessageReaderFactory _readerFactory;
         private volatile IMessageReader _primaryReader;
+        private readonly AsyncBottleneck _readBottleNeck;
 
         public BaseTasksCoordinator(IMessageReaderFactory messageReaderFactory,
-            int maxTasksCount, bool isQueueActivationEnabled = false)
+            int maxTasksCount, bool isQueueActivationEnabled = false, int maxReadParallelism = 4)
         {
             this._log = LogFactory.GetInstance("BaseTasksCoordinator");
             this._tasksCanBeStarted = 0;
@@ -42,6 +44,7 @@ namespace TasksCoordinator
             this._taskIdSeq = 0;
             this._tasks = new ConcurrentDictionary<long, Task>();
             this._isStarted = 0;
+            this._readBottleNeck = new AsyncBottleneck(maxReadParallelism);
         }
 
         public bool Start()
@@ -229,9 +232,7 @@ namespace TasksCoordinator
         {
             bool canRemove = false;
             bool isPrimary = (object)reader == this._primaryReader;
-            if (this._token.IsCancellationRequested)
-                return true;
-            canRemove = this.IsQueueActivationEnabled || !isPrimary;
+            canRemove = this._token.IsCancellationRequested || this.IsQueueActivationEnabled || !isPrimary;
             return canRemove || this._tasksCanBeStarted < 0;
         }
 
@@ -250,6 +251,11 @@ namespace TasksCoordinator
         void ITaskCoordinatorAdvanced.OnAfterDoWork(IMessageReader reader)
         {
             Interlocked.CompareExchange(ref this._primaryReader, reader, null);
+        }
+
+        async Task<IDisposable> ITaskCoordinatorAdvanced.WaitReadAsync()
+        {
+            return await this._readBottleNeck.Enter(this._stopTokenSource.Token);
         }
         #endregion
 

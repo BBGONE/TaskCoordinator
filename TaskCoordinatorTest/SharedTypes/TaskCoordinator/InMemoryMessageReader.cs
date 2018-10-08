@@ -56,7 +56,11 @@ namespace TasksCoordinator
         {
             int cnt = 0;
             TMessage msg = null;
-            msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
+            using (var disposable = await this.Coordinator.WaitReadAsync())
+            {
+                msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
+            }
+
             cnt = msg == null ? 0 : 1;
             if (cnt > 0)
             {

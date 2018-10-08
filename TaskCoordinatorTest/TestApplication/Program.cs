@@ -16,8 +16,9 @@ namespace TestApplication
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
         private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
-        private const int BATCH_SIZE = 250000;
+        private const int BATCH_SIZE = 100000;
         private const int MAX_TASK_COUNT = 8;
+        private const int MAX_READ_PARALLELISM = 4;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
         private const bool IS_ACTIVATION_ENABLED = false;
@@ -59,7 +60,7 @@ namespace TestApplication
             
 
             SEQUENCE_NUM = 0;
-            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED, ARTIFICIAL_READ_DELAY);
+            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED, MAX_READ_PARALLELISM, ARTIFICIAL_READ_DELAY);
             try
             {
                 svc.Start();

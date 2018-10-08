@@ -1,4 +1,6 @@
 ﻿using Shared.Services;
+using System;
+using System.Threading.Tasks;
 
 namespace TasksCoordinator.Interface
 {
@@ -10,5 +12,6 @@ namespace TasksCoordinator.Interface
 
         void OnBeforeDoWork(IMessageReader reader);
         void OnAfterDoWork(IMessageReader reader);
+        Task<IDisposable> WaitReadAsync();
     }
 }
