@@ -8,7 +8,7 @@ namespace TasksCoordinator.Interface
         bool IsSafeToRemoveReader(IMessageReader reader, bool workDone);
         bool IsPrimaryReader(IMessageReader reader);
 
-        bool OnBeforeDoWork(IMessageReader reader);
+        void OnBeforeDoWork(IMessageReader reader);
         void OnAfterDoWork(IMessageReader reader);
     }
 }

@@ -11,6 +11,8 @@ namespace TasksCoordinator.Test
         where TMessage: class
     {
         private readonly int _artificialDelay;
+        private static volatile int _current_cnt = 0;
+        public static volatile int MaxConcurrentReading = 0;
 
         public TestMessageReader(long taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log, 
             BlockingCollection<TMessage> messageQueue, IMessageDispatcher<TMessage, object> dispatcher, int artificialDelay = 0) :
@@ -21,10 +23,23 @@ namespace TasksCoordinator.Test
 
         protected override async Task<TMessage> ReadMessage(bool isPrimaryReader, long taskId, CancellationToken token, object state)
         {
-            if (this._artificialDelay > 0)
-                await Task.Delay(this._artificialDelay);
+            int cnt = Interlocked.Increment(ref _current_cnt);
+            if (cnt > MaxConcurrentReading)
+            {
+                MaxConcurrentReading = cnt;
+            }
+            try
+            {
+                if (this._artificialDelay > 0)
+                    Thread.SpinWait(10000);
+                var res = await base.ReadMessage(isPrimaryReader, taskId, token, state);
+                return res;
 
-            return await base.ReadMessage(isPrimaryReader, taskId, token, state);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _current_cnt);
+            }
         }
     }
 }

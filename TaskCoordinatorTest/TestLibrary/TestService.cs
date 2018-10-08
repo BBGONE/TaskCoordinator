@@ -33,7 +33,7 @@ namespace TasksCoordinator.Test
 
         public TestService(ISerializer serializer, string name, int maxReadersCount, 
             bool isQueueActivationEnabled = false,
-            int maxParallelReading = 2, int artificialDelay = 0)
+            int artificialDelay = 0)
         {
             this.Name = name;
             this._isStopped = true;
@@ -43,7 +43,7 @@ namespace TasksCoordinator.Test
             this._messageQueue = new BlockingCollection<Message>();
             this._messageDispatcher = new TestMessageDispatcher(this._serializer, this._customScheduler);
             var readerFactory = new TestMessageReaderFactory(this._messageQueue, this._messageDispatcher, artificialDelay);
-            this.TasksCoordinator = new TestTasksCoordinator(readerFactory, maxReadersCount, isQueueActivationEnabled, maxParallelReading);
+            this.TasksCoordinator = new TestTasksCoordinator(readerFactory, maxReadersCount, isQueueActivationEnabled);
         }
 
 
@@ -259,18 +259,6 @@ namespace TasksCoordinator.Test
             set
             {
                 this.TasksCoordinator.MaxTasksCount = value;
-            }
-        }
-
-        public int MaxParallelReading
-        {
-            get
-            {
-                return this.TasksCoordinator.MaxParallelReading;
-            }
-            set
-            {
-                this.TasksCoordinator.MaxParallelReading = value;
             }
         }
 

@@ -160,7 +160,7 @@ namespace SSSB
                 {
                     if (msg != null)
                     {
-                        bool isOk = this.Coordinator.OnBeforeDoWork(this);
+                        this.Coordinator.OnBeforeDoWork(this);
                         try
                         {
                             MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, dbconnection).ConfigureAwait(false);
@@ -177,8 +177,7 @@ namespace SSSB
                         }
                         finally
                         {
-                            if (isOk)
-                                this.Coordinator.OnAfterDoWork(this);
+                            this.Coordinator.OnAfterDoWork(this);
                         }
 
                         transactionScope.Complete();

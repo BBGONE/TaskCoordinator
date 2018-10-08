@@ -63,7 +63,6 @@ namespace TasksCoordinator
                 isRemoved = this._coordinator.IsSafeToRemoveReader(this, workDone) || this._coordinator.FreeReadersAvailable < 0;
             }
         
-
             return new MessageReaderResult() { IsRemoved = isRemoved, IsWorkDone = workDone };
         }
 

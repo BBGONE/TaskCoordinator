@@ -15,14 +15,13 @@ namespace TestApplication
         private static readonly Guid ClientID = Guid.NewGuid();
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
-        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.ShortCPUBound;
-        private const int BATCH_SIZE = 250;
+        private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
+        private const int BATCH_SIZE = 50000;
         private const int MAX_TASK_COUNT = 8;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
         private const bool IS_ACTIVATION_ENABLED = false;
-        private const int MAX_PARALLEL_READING = 2;
-        private const int ARTIFICIAL_READ_DELAY = 20;
+        private const int ARTIFICIAL_READ_DELAY = 100;
         private const int CANCEL_AFTER = 0;
         private static readonly double ERROR_MESSAGES_PERCENT = 0;
 
@@ -60,7 +59,7 @@ namespace TestApplication
             
 
             SEQUENCE_NUM = 0;
-            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED, MAX_PARALLEL_READING, ARTIFICIAL_READ_DELAY);
+            svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED, ARTIFICIAL_READ_DELAY);
             try
             {
                 svc.Start();
@@ -68,6 +67,8 @@ namespace TestApplication
                 svc.RegisterCallback(ClientID, callBack);
                 Console.WriteLine($"Initial TasksCount: {svc.TasksCoordinator.TasksCount}");
                 Console.WriteLine(string.Format("Initial QueueLength: {0}", svc.QueueLength));
+                TestMessageReader<Message>.MaxConcurrentReading = 0;
+
                 await EnqueueData(svc, callBack);
                 Console.WriteLine(string.Format("Enqueued Data QueueLength: {0}", svc.QueueLength));
                 callBack.StartTiming();
@@ -78,18 +79,18 @@ namespace TestApplication
                     await Task.Delay(CANCEL_AFTER).ConfigureAwait(false);
                     svc.Stop();
                 }
-                /*
+               
                 Console.WriteLine($"Set MaxTasksCount to {MAX_TASK_COUNT}");
                 await Task.Delay(1000);
                 Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}  QueueLength: {svc.QueueLength}");
                 svc.MaxTasksCount = 0;
-                Console.WriteLine($"Set MaxReadersCount to 0");
+                Console.WriteLine($"Set MaxTasksCount to 0");
                 await Task.Delay(5000);
                 Console.WriteLine($"Suspended TasksCount: {svc.TasksCoordinator.TasksCount} MaxTasksCount: {svc.MaxTasksCount}  QueueLength: {svc.QueueLength}");
                 svc.MaxTasksCount = MAX_TASK_COUNT;
                 await Task.Delay(1000);
                 Console.WriteLine($"Resumed Processing TasksCount: {svc.TasksCoordinator.TasksCount} MaxTasksCount: {svc.MaxTasksCount}  QueueLength: {svc.QueueLength}");
-                */
+               
 
                 bool complete = false;
                 var task = callBack.ResultAsync;
@@ -101,9 +102,10 @@ namespace TestApplication
                         Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}  QueueLength: {svc.QueueLength}");
                     }
                 }
-
+                Console.WriteLine($"*** MaxConcurrentReading: { TestMessageReader<Message>.MaxConcurrentReading} ***");
+               
                 await Task.Delay(1000);
-                Console.WriteLine($"Idled TasksCount: {svc.TasksCoordinator.TasksCount} MaxTasksCount: {svc.MaxTasksCount}");
+                Console.WriteLine($"Idled TasksCount: {svc.TasksCoordinator.TasksCount} QueueLength: {svc.QueueLength}");
             }
             catch (OperationCanceledException)
             {
@@ -128,7 +130,7 @@ namespace TestApplication
 
             Console.WriteLine("**************************************");
             Console.WriteLine("Service is stopped.");
-            Console.WriteLine($"Stopped TasksCount: {svc.TasksCoordinator.TasksCount} MaxReadersCount: {svc.MaxTasksCount}");
+            Console.WriteLine($"Stopped TasksCount: {svc.TasksCoordinator.TasksCount}");
             Console.WriteLine(string.Format("QueueLength: {0}", svc.QueueLength));
         
 

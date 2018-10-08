@@ -60,7 +60,7 @@ namespace TasksCoordinator
             cnt = msg == null ? 0 : 1;
             if (cnt > 0)
             {
-                bool isOk = this.Coordinator.OnBeforeDoWork(this);
+                this.Coordinator.OnBeforeDoWork(this);
                 try
                 {
                     MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, null).ConfigureAwait(false);
@@ -76,8 +76,7 @@ namespace TasksCoordinator
                 }
                 finally
                 {
-                    if (isOk)
-                        this.Coordinator.OnAfterDoWork(this);
+                    this.Coordinator.OnAfterDoWork(this);
                 }
             }
 
