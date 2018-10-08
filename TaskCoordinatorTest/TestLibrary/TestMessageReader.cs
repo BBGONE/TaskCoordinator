@@ -31,7 +31,7 @@ namespace TasksCoordinator.Test
             try
             {
                 if (this._artificialDelay > 0)
-                    Thread.SpinWait(10000);
+                    await Task.Delay (this._artificialDelay);
                 var res = await base.ReadMessage(isPrimaryReader, taskId, token, state);
                 return res;
 
