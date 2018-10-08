@@ -20,7 +20,7 @@ namespace SSSB
         private readonly ISSSBService _service;
         private readonly ISSSBDispatcher _dispatcher;
 
-        public SSSBMessageReader(long taskId, BaseTasksCoordinator<SSSBMessage> tasksCoordinator, ILog log,
+        public SSSBMessageReader(long taskId, BaseTasksCoordinator tasksCoordinator, ILog log,
             ISSSBService service, ISSSBDispatcher dispatcher) :
             base(taskId, tasksCoordinator, log)
         {

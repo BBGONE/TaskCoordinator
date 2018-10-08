@@ -1,7 +1,7 @@
 ﻿namespace TasksCoordinator.Interface
 {
-    public interface IMessageReaderFactory<M>
+    public interface IMessageReaderFactory
     {
-        IMessageReader CreateReader(long taskId, BaseTasksCoordinator<M> coordinator);
+        IMessageReader CreateReader(long taskId, BaseTasksCoordinator coordinator);
     }
 }

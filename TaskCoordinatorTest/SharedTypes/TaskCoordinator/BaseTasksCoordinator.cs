@@ -1,8 +1,6 @@
 ﻿using Shared;
-using Shared.Errors;
 using Shared.Services;
 using System;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
@@ -15,7 +13,7 @@ namespace TasksCoordinator
     /// используется для регулирования количества слушающих очередь потоков
     /// в случае необходимости освобождает из спячки один поток
     /// </summary>
-    public class BaseTasksCoordinator<M> : ITaskCoordinatorAdvanced<M>, IQueueActivator
+    public class BaseTasksCoordinator : ITaskCoordinatorAdvanced, IQueueActivator
     {
         private const long MAX_TASK_NUM = long.MaxValue;
         private const int STOP_TIMEOUT = 30000;
@@ -28,10 +26,10 @@ namespace TasksCoordinator
         private volatile bool _isPaused;
         private volatile int _tasksCanBeStarted;
         private readonly ConcurrentDictionary<long, Task> _tasks;
-        private readonly IMessageReaderFactory<M> _readerFactory;
+        private readonly IMessageReaderFactory _readerFactory;
         private volatile IMessageReader _primaryReader;
 
-        public BaseTasksCoordinator(IMessageReaderFactory<M> messageReaderFactory,
+        public BaseTasksCoordinator(IMessageReaderFactory messageReaderFactory,
             int maxTasksCount, bool isQueueActivationEnabled = false)
         {
             this._log = LogFactory.GetInstance("BaseTasksCoordinator");
@@ -199,10 +197,6 @@ namespace TasksCoordinator
             {
                 // NOOP
             }
-            catch (PPSException)
-            {
-                //already logged
-            }
             catch (Exception ex)
             {
                 _log.Error(ex);
@@ -225,33 +219,35 @@ namespace TasksCoordinator
             return this._readerFactory.CreateReader(taskId, this);
         }
 
-        #region  ITaskCoordinatorAdvanced<M>
-        void ITaskCoordinatorAdvanced<M>.StartNewTask()
+        #region  ITaskCoordinatorAdvanced
+        void ITaskCoordinatorAdvanced.StartNewTask()
         {
             this._TryStartNewTask();
         }
 
-        bool ITaskCoordinatorAdvanced<M>.IsSafeToRemoveReader(IMessageReader reader, bool workDone)
+        bool ITaskCoordinatorAdvanced.IsSafeToRemoveReader(IMessageReader reader, bool workDone)
         {
             bool canRemove = false;
             bool isPrimary = (object)reader == this._primaryReader;
-            canRemove = this._token.IsCancellationRequested || this.IsQueueActivationEnabled || !isPrimary;
+            if (this._token.IsCancellationRequested)
+                return true;
+            canRemove = this.IsQueueActivationEnabled || !isPrimary;
             return canRemove || this._tasksCanBeStarted < 0;
         }
 
-        bool ITaskCoordinatorAdvanced<M>.IsPrimaryReader(IMessageReader reader)
+        bool ITaskCoordinatorAdvanced.IsPrimaryReader(IMessageReader reader)
         {
             return this._primaryReader == (object)reader;
         }
 
-        void ITaskCoordinatorAdvanced<M>.OnBeforeDoWork(IMessageReader reader)
+        void ITaskCoordinatorAdvanced.OnBeforeDoWork(IMessageReader reader)
         {
             Interlocked.CompareExchange(ref this._primaryReader, null, reader);
             this._token.ThrowIfCancellationRequested();
             this._TryStartNewTask();
         }
 
-        void ITaskCoordinatorAdvanced<M>.OnAfterDoWork(IMessageReader reader)
+        void ITaskCoordinatorAdvanced.OnAfterDoWork(IMessageReader reader)
         {
             Interlocked.CompareExchange(ref this._primaryReader, reader, null);
         }

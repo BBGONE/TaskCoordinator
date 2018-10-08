@@ -4,7 +4,7 @@ using TasksCoordinator.Interface;
 
 namespace TasksCoordinator.Test
 {
-    public class TestMessageReaderFactory: IMessageReaderFactory<Message>
+    public class TestMessageReaderFactory: IMessageReaderFactory
     {
         private readonly ILog _log;
         private readonly BlockingCollection<Message> _messageQueue;
@@ -19,7 +19,7 @@ namespace TasksCoordinator.Test
             this._artificialDelay = artificialDelay;
         }
 
-        public IMessageReader CreateReader(long taskId, BaseTasksCoordinator<Message> coordinator)
+        public IMessageReader CreateReader(long taskId, BaseTasksCoordinator coordinator)
         {
             return new TestMessageReader<Message>(taskId, coordinator, _log, _messageQueue, _messageDispatcher, this._artificialDelay);
         }

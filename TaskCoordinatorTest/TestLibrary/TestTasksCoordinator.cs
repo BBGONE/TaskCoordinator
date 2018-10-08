@@ -2,9 +2,9 @@
 
 namespace TasksCoordinator.Test
 {
-    public class TestTasksCoordinator: BaseTasksCoordinator<Message>
+    public class TestTasksCoordinator: BaseTasksCoordinator
     {
-        public TestTasksCoordinator(IMessageReaderFactory<Message> readerFactory,
+        public TestTasksCoordinator(IMessageReaderFactory readerFactory,
             int maxReadersCount, bool isQueueActivationEnabled = false) :
             base(readerFactory, maxReadersCount,  isQueueActivationEnabled)
         {

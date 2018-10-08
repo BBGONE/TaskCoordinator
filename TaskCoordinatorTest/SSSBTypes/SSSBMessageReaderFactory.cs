@@ -4,7 +4,7 @@ using TasksCoordinator.Interface;
 
 namespace SSSB
 {
-    public class SSSBMessageReaderFactory : IMessageReaderFactory<SSSBMessage>
+    public class SSSBMessageReaderFactory : IMessageReaderFactory
     {
         private readonly ISSSBService _service;
         private readonly ILog _log;
@@ -17,7 +17,7 @@ namespace SSSB
             this._messageDispatcher = messageDispatcher;
         }
 
-        public IMessageReader CreateReader(long taskId, BaseTasksCoordinator<SSSBMessage> coordinator)
+        public IMessageReader CreateReader(long taskId, BaseTasksCoordinator coordinator)
         {
             return new SSSBMessageReader(taskId, coordinator, _log, _service, _messageDispatcher);
         }

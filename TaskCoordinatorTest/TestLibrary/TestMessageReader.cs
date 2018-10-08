@@ -14,7 +14,7 @@ namespace TasksCoordinator.Test
         private static volatile int _current_cnt = 0;
         public static volatile int MaxConcurrentReading = 0;
 
-        public TestMessageReader(long taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log, 
+        public TestMessageReader(long taskId, ITaskCoordinatorAdvanced tasksCoordinator, ILog log, 
             BlockingCollection<TMessage> messageQueue, IMessageDispatcher<TMessage, object> dispatcher, int artificialDelay = 0) :
             base(taskId, tasksCoordinator, log, messageQueue, dispatcher)
         {

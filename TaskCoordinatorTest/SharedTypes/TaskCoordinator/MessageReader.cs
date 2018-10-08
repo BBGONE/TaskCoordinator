@@ -11,11 +11,11 @@ namespace TasksCoordinator
     {
         #region Private Fields
         private long _taskId;
-        private readonly ITaskCoordinatorAdvanced<TMessage> _coordinator;
+        private readonly ITaskCoordinatorAdvanced _coordinator;
         private readonly ILog _log;
         #endregion
 
-        public MessageReader(long taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log)
+        public MessageReader(long taskId, ITaskCoordinatorAdvanced tasksCoordinator, ILog log)
         {
             this._taskId = taskId;
             this._coordinator = tasksCoordinator;
@@ -87,7 +87,7 @@ namespace TasksCoordinator
             }
         }
 
-        public ITaskCoordinatorAdvanced<TMessage> Coordinator {
+        public ITaskCoordinatorAdvanced Coordinator {
             get
             {
                return _coordinator;

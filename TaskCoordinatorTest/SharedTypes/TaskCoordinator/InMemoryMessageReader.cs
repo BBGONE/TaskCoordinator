@@ -16,7 +16,7 @@ namespace TasksCoordinator
         private readonly BlockingCollection<TMessage> _messageQueue;
         private readonly IMessageDispatcher<TMessage, object> _dispatcher;
 
-        public InMemoryMessageReader(long taskId, ITaskCoordinatorAdvanced<TMessage> tasksCoordinator, ILog log, 
+        public InMemoryMessageReader(long taskId, ITaskCoordinatorAdvanced tasksCoordinator, ILog log, 
             BlockingCollection<TMessage> messageQueue, IMessageDispatcher<TMessage, object> dispatcher) :
             base(taskId, tasksCoordinator, log)
         {

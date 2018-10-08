@@ -16,12 +16,12 @@ namespace TestApplication
         private static readonly ISerializer _serializer = new Serializer();
         // OPTIONS
         private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
-        private const int BATCH_SIZE = 1000;
+        private const int BATCH_SIZE = 250000;
         private const int MAX_TASK_COUNT = 8;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
         private const bool IS_ACTIVATION_ENABLED = false;
-        private const int ARTIFICIAL_READ_DELAY = 10;
+        private const int ARTIFICIAL_READ_DELAY = 0;
         private const int CANCEL_AFTER = 0;
         private static readonly double ERROR_MESSAGES_PERCENT = 0;
 
@@ -79,7 +79,7 @@ namespace TestApplication
                     await Task.Delay(CANCEL_AFTER).ConfigureAwait(false);
                     svc.Stop();
                 }
-               
+               /*
                 Console.WriteLine($"Set MaxTasksCount to {MAX_TASK_COUNT}");
                 await Task.Delay(1000);
                 Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}  QueueLength: {svc.QueueLength}");
@@ -90,7 +90,7 @@ namespace TestApplication
                 svc.MaxTasksCount = MAX_TASK_COUNT;
                 await Task.Delay(1000);
                 Console.WriteLine($"Resumed Processing TasksCount: {svc.TasksCoordinator.TasksCount} MaxTasksCount: {svc.MaxTasksCount}  QueueLength: {svc.QueueLength}");
-               
+               */
 
                 bool complete = false;
                 var task = callBack.ResultAsync;

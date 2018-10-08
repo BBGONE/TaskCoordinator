@@ -130,7 +130,7 @@ namespace TasksCoordinator.Test
         // Sync TASK CPU Bound
         private void LONG_RUN_CPU_TASK(Message message, Payload payload, CancellationToken token, long taskId)
         {
-            int iterations = 10000000;
+            int iterations = 1000000;
             int cnt = iterations;
             for (int i = 0; i < cnt; ++i)
             {
