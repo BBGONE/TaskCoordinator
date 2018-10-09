@@ -100,7 +100,7 @@ namespace TasksCoordinator
             }
         }
 
-        private int _TryDecrementTasksCanbeStarted()
+        private bool _TryDecrementTasksCanBeStarted()
         {
             int beforeChanged = this._tasksCanBeStarted;
             if (beforeChanged > 0 && Interlocked.CompareExchange(ref this._tasksCanBeStarted, beforeChanged - 1, beforeChanged) != beforeChanged)
@@ -112,7 +112,7 @@ namespace TasksCoordinator
                     beforeChanged = this._tasksCanBeStarted;
                 } while (beforeChanged > 0 && Interlocked.CompareExchange(ref this._tasksCanBeStarted, beforeChanged - 1, beforeChanged) != beforeChanged);
             }
-            return beforeChanged;
+            return beforeChanged > 0;
         }
 
         private void _TryStartNewTask()
@@ -123,11 +123,7 @@ namespace TasksCoordinator
             
             try
             {
-                int beforeChanged = this._TryDecrementTasksCanbeStarted();
-                if (beforeChanged > 0)
-                {
-                    semaphoreOK = true;
-                }
+                semaphoreOK = this._TryDecrementTasksCanBeStarted();
 
                 if (semaphoreOK)
                 {
