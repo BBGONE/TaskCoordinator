@@ -18,9 +18,7 @@ namespace TasksCoordinator
     {
         private const long MAX_TASK_NUM = long.MaxValue;
         private const int STOP_TIMEOUT = 30000;
-        private readonly ILog _log;
         private CancellationTokenSource _stopTokenSource;
-        private CancellationToken _token;
         private long _taskIdSeq;
         private volatile int _maxTasksCount;
         private volatile int  _isStarted;
@@ -34,10 +32,10 @@ namespace TasksCoordinator
         public BaseTasksCoordinator(IMessageReaderFactory messageReaderFactory,
             int maxTasksCount, bool isQueueActivationEnabled = false, int maxReadParallelism = 4)
         {
-            this._log = LogFactory.GetInstance("BaseTasksCoordinator");
+            this.Log = LogFactory.GetInstance("BaseTasksCoordinator");
             this._tasksCanBeStarted = 0;
             this._stopTokenSource = null;
-            this._token = CancellationToken.None;
+            this.Token = CancellationToken.None;
             this._readerFactory = messageReaderFactory;
             this._maxTasksCount = maxTasksCount;
             this.IsQueueActivationEnabled = isQueueActivationEnabled;
@@ -53,7 +51,7 @@ namespace TasksCoordinator
             if (oldStarted == 1)
                 return true;
             this._stopTokenSource = new CancellationTokenSource();
-            this._token = this._stopTokenSource.Token;
+            this.Token = this._stopTokenSource.Token;
             this._taskIdSeq = 0;
             this._tasksCanBeStarted = this._maxTasksCount;
             this._TryStartNewTask();
@@ -82,7 +80,7 @@ namespace TasksCoordinator
             }
             catch (Exception ex)
             {
-                _log.Error(ex);
+                Log.Error(ex);
             }
             finally
             {
@@ -102,20 +100,15 @@ namespace TasksCoordinator
 
         private bool _TryDecrementTasksCanBeStarted()
         {
-            int beforeChanged = this._tasksCanBeStarted;
-            if (beforeChanged > 0 && Interlocked.CompareExchange(ref this._tasksCanBeStarted, beforeChanged - 1, beforeChanged) != beforeChanged)
+            int beforeChanged;
+            do
             {
-                var spinner = new SpinWait();
-                do
-                {
-                    spinner.SpinOnce();
-                    beforeChanged = this._tasksCanBeStarted;
-                } while (beforeChanged > 0 && Interlocked.CompareExchange(ref this._tasksCanBeStarted, beforeChanged - 1, beforeChanged) != beforeChanged);
-            }
+                beforeChanged = this._tasksCanBeStarted;
+            } while (beforeChanged > 0 && Interlocked.CompareExchange(ref this._tasksCanBeStarted, beforeChanged - 1, beforeChanged) != beforeChanged);
             return beforeChanged > 0;
         }
 
-        private void _TryStartNewTask()
+        private bool _TryStartNewTask()
         {
             bool result = false;
             bool semaphoreOK = false;
@@ -148,27 +141,31 @@ namespace TasksCoordinator
                     var token = this._stopTokenSource.Token;
                     Task<long> task = Task.Run(() => JobRunner(token, taskId), token);
                     this._tasks.TryUpdate(taskId, task, dummy);
-                    task.ContinueWith((antecedent, state) => {
-                        this._ExitTask((int)state);
+                    task.ContinueWith((antecedent, id) => {
+                        this._ExitTask((long)id);
                         if (antecedent.IsFaulted)
                         {
                             var err = antecedent.Exception;
                             err.Flatten().Handle((ex) => {
-                                _log.Error(ex);
+                                Log.Error(ex);
                                 return true;
                             });
                         }
                     }, taskId, TaskContinuationOptions.NotOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
                 }
+
+                return semaphoreOK;
             }
             catch (Exception ex)
             {
                 this._ExitTask(taskId);
                 if (!(ex is OperationCanceledException))
                 {
-                    _log.Error(ex);
+                    Log.Error(ex);
                 }
             }
+
+            return false;
         }
       
         private async Task<long> JobRunner(CancellationToken token, long taskId)
@@ -198,20 +195,16 @@ namespace TasksCoordinator
             }
             catch (Exception ex)
             {
-                _log.Error(ex);
+                Log.Error(ex);
             }
             finally
             {
                 this._ExitTask(taskId);
             }
-
             return taskId;
         }
 
-        protected ILog Log
-        {
-            get { return _log; }
-        }
+        protected ILog Log { get; }
 
         protected IMessageReader GetMessageReader(long taskId)
         {
@@ -219,17 +212,17 @@ namespace TasksCoordinator
         }
 
         #region  ITaskCoordinatorAdvanced
-        void ITaskCoordinatorAdvanced.StartNewTask()
+        bool ITaskCoordinatorAdvanced.StartNewTask()
         {
-            this._TryStartNewTask();
+            return this._TryStartNewTask();
         }
 
         bool ITaskCoordinatorAdvanced.IsSafeToRemoveReader(IMessageReader reader, bool workDone)
         {
-            bool canRemove = false;
+            if (this.Token.IsCancellationRequested)
+                return true;
             bool isPrimary = (object)reader == this._primaryReader;
-            canRemove = this._token.IsCancellationRequested || this.IsQueueActivationEnabled || !isPrimary;
-            return canRemove || this._tasksCanBeStarted < 0;
+            return !isPrimary || this.IsQueueActivationEnabled || this._tasksCanBeStarted < 0;
         }
 
         bool ITaskCoordinatorAdvanced.IsPrimaryReader(IMessageReader reader)
@@ -240,7 +233,7 @@ namespace TasksCoordinator
         void ITaskCoordinatorAdvanced.OnBeforeDoWork(IMessageReader reader)
         {
             Interlocked.CompareExchange(ref this._primaryReader, null, reader);
-            this._token.ThrowIfCancellationRequested();
+            this.Token.ThrowIfCancellationRequested();
             this._TryStartNewTask();
         }
 
@@ -320,13 +313,7 @@ namespace TasksCoordinator
             }
         }
 
-        public CancellationToken Token
-        {
-            get
-            {
-                return this._token;
-            }
-        }
+        public CancellationToken Token { get; private set; }
 
         public bool IsPaused
         {

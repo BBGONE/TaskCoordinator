@@ -6,7 +6,7 @@ namespace TasksCoordinator.Interface
 {
     public interface ITaskCoordinatorAdvanced : ITaskCoordinator, IQueueActivator
     {
-        void StartNewTask();
+        bool StartNewTask();
         bool IsSafeToRemoveReader(IMessageReader reader, bool workDone);
         bool IsPrimaryReader(IMessageReader reader);
 
