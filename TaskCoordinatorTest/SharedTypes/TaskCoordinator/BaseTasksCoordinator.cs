@@ -16,6 +16,7 @@ namespace TasksCoordinator
     /// </summary>
     public class BaseTasksCoordinator : ITaskCoordinatorAdvanced, IQueueActivator
     {
+        private readonly Task NOOP = Task.FromResult(0);
         private const long MAX_TASK_NUM = long.MaxValue;
         private const int STOP_TIMEOUT = 30000;
         private CancellationTokenSource _stopTokenSource;
@@ -91,8 +92,7 @@ namespace TasksCoordinator
 
         private void _ExitTask(long id)
         {
-            Task res;
-            if (this._tasks.TryRemove(id, out res))
+            if (this._tasks.TryRemove(id, out var _))
             {
                 Interlocked.Increment(ref this._tasksCanBeStarted);
             }
@@ -110,7 +110,6 @@ namespace TasksCoordinator
 
         private bool _TryStartNewTask()
         {
-            bool result = false;
             bool semaphoreOK = false;
             long taskId = -1;
             
@@ -120,27 +119,22 @@ namespace TasksCoordinator
 
                 if (semaphoreOK)
                 {
-                    var dummy = Task.FromResult(0);
                     try
                     {
                         Interlocked.CompareExchange(ref this._taskIdSeq, 0, MAX_TASK_NUM);
                         taskId = Interlocked.Increment(ref this._taskIdSeq);
-                        result = this._tasks.TryAdd(taskId, dummy);
+                        this._tasks.TryAdd(taskId, NOOP);
                     }
                     catch (Exception)
                     {
                         Interlocked.Increment(ref this._tasksCanBeStarted);
-                        Task res;
-                        if (result)
-                        {
-                            this._tasks.TryRemove(taskId, out res);
-                        }
+                        this._tasks.TryRemove(taskId, out var _);
                         throw;
                     }
 
                     var token = this._stopTokenSource.Token;
                     Task<long> task = Task.Run(() => JobRunner(token, taskId), token);
-                    this._tasks.TryUpdate(taskId, task, dummy);
+                    this._tasks.TryUpdate(taskId, task, NOOP);
                     task.ContinueWith((antecedent, id) => {
                         this._ExitTask((long)id);
                         if (antecedent.IsFaulted)
