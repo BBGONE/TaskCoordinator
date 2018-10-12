@@ -25,6 +25,7 @@ namespace TasksCoordinator
         private volatile int  _isStarted;
         private volatile bool _isPaused;
         private volatile int _tasksCanBeStarted;
+        private CancellationToken _cancellationToken;
         private readonly ConcurrentDictionary<long, Task> _tasks;
         private readonly IMessageReaderFactory _readerFactory;
         private volatile IMessageReader _primaryReader;
@@ -36,7 +37,7 @@ namespace TasksCoordinator
             this.Log = LogFactory.GetInstance("BaseTasksCoordinator");
             this._tasksCanBeStarted = 0;
             this._stopTokenSource = null;
-            this.Token = CancellationToken.None;
+            this._cancellationToken = CancellationToken.None;
             this._readerFactory = messageReaderFactory;
             this._maxTasksCount = maxTasksCount;
             this.IsQueueActivationEnabled = isQueueActivationEnabled;
@@ -52,7 +53,7 @@ namespace TasksCoordinator
             if (oldStarted == 1)
                 return true;
             this._stopTokenSource = new CancellationTokenSource();
-            this.Token = this._stopTokenSource.Token;
+            this._cancellationToken = this._stopTokenSource.Token;
             this._taskIdSeq = 0;
             this._tasksCanBeStarted = this._maxTasksCount;
             this._TryStartNewTask();
@@ -214,7 +215,7 @@ namespace TasksCoordinator
 
         bool ITaskCoordinatorAdvanced.IsSafeToRemoveReader(IMessageReader reader, bool workDone)
         {
-            if (this.Token.IsCancellationRequested || this._tasksCanBeStarted < 0)
+            if (this._cancellationToken.IsCancellationRequested || this._tasksCanBeStarted < 0)
                 return true;
             if (workDone)
             {
@@ -232,7 +233,7 @@ namespace TasksCoordinator
         void ITaskCoordinatorAdvanced.OnBeforeDoWork(IMessageReader reader)
         {
             Interlocked.CompareExchange(ref this._primaryReader, null, reader);
-            this.Token.ThrowIfCancellationRequested();
+            this._cancellationToken.ThrowIfCancellationRequested();
             this._TryStartNewTask();
         }
 
@@ -293,16 +294,8 @@ namespace TasksCoordinator
             }
         }
 
-        public int FreeReadersAvailable
-        {
-            get
-            {
-                return this._tasksCanBeStarted;
-            }
-        }
-
         /// <summary>
-        /// сколько сечас задач создано
+        /// how many tasks we have running now
         /// </summary>
         public int TasksCount
         {
@@ -312,12 +305,12 @@ namespace TasksCoordinator
             }
         }
 
-        public CancellationToken Token { get; private set; }
-
         public bool IsPaused
         {
             get { return this._isPaused; }
             set { this._isPaused = value; }
         }
+
+        public CancellationToken Token { get => _stopTokenSource == null? CancellationToken.None: _stopTokenSource.Token; }
     }
 }
