@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator;
@@ -33,22 +34,30 @@ namespace TestApplication
 
         private static async Task EnqueueData(TestService svc, ICallback<Message> callback)
         {
-            await Task.Run(() =>
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+            var task1= Task.Run(() =>
             {
                 for (int i = 0; i < BATCH_SIZE; ++i)
                 {
                     svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
                 }
-                var batchInfo = callback.UpdateBatchSize(BATCH_SIZE, false);
+                return callback.UpdateBatchSize(BATCH_SIZE, false);
             });
-            await Task.Run(() =>
+            var task2= Task.Run(() =>
             {
                 for (int i = 0; i < BATCH_SIZE; ++i)
                 {
                     svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
                 }
-                var batchInfo = callback.UpdateBatchSize(BATCH_SIZE, true);
+                return callback.UpdateBatchSize(BATCH_SIZE, false);
             });
+
+            await Task.WhenAll(task1, task2);
+
+            var batchInfo = callback.UpdateBatchSize(0, true);
+            stopwatch.Stop();
+            Console.WriteLine($"Enqueued Data QueueLength {batchInfo.BatchSize} time: {stopwatch.ElapsedMilliseconds} ms");
         }
 
         private static async Task Start()
@@ -71,7 +80,7 @@ namespace TestApplication
                 TestMessageReader<Message>.MaxConcurrentReading = 0;
 
                 await EnqueueData(svc, callBack);
-                Console.WriteLine(string.Format("Enqueued Data QueueLength: {0}", svc.QueueLength));
+                // Console.WriteLine(string.Format("Enqueued Data QueueLength: {0}", svc.QueueLength));
                 callBack.StartTiming();
                 svc.MaxTasksCount = MAX_TASK_COUNT;
 
