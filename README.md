@@ -37,8 +37,5 @@ reading messages from the queue is a lengthy operation - (<i>mostly in cases whe
 <br/>
 The repository contains a console application which uses the TaskCoordinator. It can be used as a lab and a testing ground for experimenting
 with different parameters.
-I have commited to the github the Rebus (https://github.com/rebus-org/Rebus) implementation which uses my TaskCoordinator to schedule messages
-(<i>because its implementation is very ineffective to read and dispatch messages from transport as the SqlServer Transport - too much concurrency and
-every worker reads messages when its idle - i think one is enough to monitor the queue</i>).
 <br/><br/>
 LICENSE: MIT LICENSE
