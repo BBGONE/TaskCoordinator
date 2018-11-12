@@ -18,7 +18,7 @@ namespace TestApplication
         // OPTIONS
         private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
         private const int BATCH_SIZE = 250000;
-        private const int MAX_TASK_COUNT = 6;
+        private const int MAX_TASK_COUNT = 8;
         private const int MAX_READ_PARALLELISM = 4;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
@@ -63,9 +63,10 @@ namespace TestApplication
         private static async Task Start()
         {
             int minWork, minIO;
-            int needThreads = MAX_TASK_COUNT + 2;
+            // int needThreads = MAX_TASK_COUNT + 2;
             ThreadPool.GetMinThreads(out minWork, out minIO);
-            ThreadPool.SetMinThreads(needThreads > minWork? needThreads : minWork, minIO);
+            Console.WriteLine($"ThreadPool workerThreads {minWork} completionPortThreads {minIO}");
+            // ThreadPool.SetMinThreads(needThreads > minWork? needThreads : minWork, minIO);
             
 
             SEQUENCE_NUM = 0;
@@ -106,7 +107,7 @@ namespace TestApplication
                 var task = callBack.ResultAsync;
                 while (!complete)
                 {
-                    complete = task == await Task.WhenAny(task, Task.Delay(2000));
+                    complete = task == await Task.WhenAny(task, Task.Delay(1000));
                     if (!complete)
                     {
                         Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}  QueueLength: {svc.QueueLength}");
