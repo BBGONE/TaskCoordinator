@@ -28,9 +28,9 @@ namespace TasksCoordinator
       
         protected abstract Task<int> DoWork(bool isPrimaryReader, CancellationToken cancellation);
 
-        protected virtual void OnRollback(TMessage msg, CancellationToken token)
+        protected virtual Task OnRollback(TMessage msg, CancellationToken token)
         {
-            // NOOP
+            return Task.FromResult(0);
         }
     
         protected virtual void OnProcessMessageException(Exception ex, TMessage message)

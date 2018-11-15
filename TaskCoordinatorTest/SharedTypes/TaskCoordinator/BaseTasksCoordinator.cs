@@ -10,10 +10,6 @@ using TasksCoordinator.Interface;
 
 namespace TasksCoordinator
 {
-    /// <summary>
-    /// используется для регулирования количества слушающих очередь потоков
-    /// в случае необходимости освобождает из спячки один поток
-    /// </summary>
     public class BaseTasksCoordinator : ITaskCoordinatorAdvanced, IQueueActivator
     {
         private readonly Task NOOP = Task.FromResult(0);
@@ -22,19 +18,21 @@ namespace TasksCoordinator
         private CancellationTokenSource _stopTokenSource;
         private long _taskIdSeq;
         private volatile int _maxTasksCount;
-        private volatile int  _isStarted;
+        private volatile int _isStarted;
         private volatile bool _isPaused;
         private volatile int _tasksCanBeStarted;
         private CancellationToken _cancellationToken;
         private readonly ConcurrentDictionary<long, Task> _tasks;
         private readonly IMessageReaderFactory _readerFactory;
         private volatile IMessageReader _primaryReader;
-        private readonly AsyncBottleneck _readBottleNeck;
+        private readonly Bottleneck _readBottleNeck;
 
         public BaseTasksCoordinator(IMessageReaderFactory messageReaderFactory,
             int maxTasksCount, bool isQueueActivationEnabled = false, int maxReadParallelism = 4)
         {
             this.Log = LogFactory.GetInstance("BaseTasksCoordinator");
+            // the current PrimaryReader does not use BottleNeck hence: maxReadParallelism - 1
+            int throttleCount = Math.Max(maxReadParallelism - 1, 1);
             this._tasksCanBeStarted = 0;
             this._stopTokenSource = null;
             this._cancellationToken = CancellationToken.None;
@@ -44,7 +42,7 @@ namespace TasksCoordinator
             this._taskIdSeq = 0;
             this._tasks = new ConcurrentDictionary<long, Task>();
             this._isStarted = 0;
-            this._readBottleNeck = new AsyncBottleneck(maxReadParallelism);
+            this._readBottleNeck = new Bottleneck(throttleCount);
         }
 
         public bool Start()
@@ -113,7 +111,7 @@ namespace TasksCoordinator
         {
             bool semaphoreOK = false;
             long taskId = -1;
-            
+
             try
             {
                 semaphoreOK = this._TryDecrementTasksCanBeStarted();
@@ -162,7 +160,7 @@ namespace TasksCoordinator
 
             return false;
         }
-      
+
         private async Task<long> JobRunner(CancellationToken token, long taskId)
         {
             try
@@ -180,8 +178,7 @@ namespace TasksCoordinator
                         loopAgain = !readerResult.IsRemoved && !token.IsCancellationRequested;
                         // the task is rescheduled to the threadpool which allows other scheduled tasks to be processed
                         // otherwise it could use exclusively the threadpool thread
-                        if (loopAgain)
-                            await Task.Yield();
+                        if (loopAgain) await Task.Yield();
                     } while (loopAgain);
                 }
                 finally
@@ -246,9 +243,29 @@ namespace TasksCoordinator
             Interlocked.CompareExchange(ref this._primaryReader, reader, null);
         }
 
-        async Task<IDisposable> ITaskCoordinatorAdvanced.WaitReadAsync()
+
+        struct DummyReleaser : IDisposable
         {
-            return await this._readBottleNeck.Enter(this._stopTokenSource.Token);
+            public static IDisposable Instance = new DummyReleaser();
+
+            public void Dispose()
+            {
+                // NOOP
+            }
+        }
+
+        async Task<IDisposable> ITaskCoordinatorAdvanced.ReadThrottleAsync(bool isPrimaryReader)
+        {
+            if (isPrimaryReader)
+                return DummyReleaser.Instance;
+            return await this._readBottleNeck.EnterAsync(this._stopTokenSource.Token);
+        }
+
+        IDisposable ITaskCoordinatorAdvanced.ReadThrottle(bool isPrimaryReader)
+        {
+            if (isPrimaryReader)
+                return DummyReleaser.Instance;
+            return this._readBottleNeck.Enter(this._stopTokenSource.Token);
         }
         #endregion
 
@@ -291,6 +308,7 @@ namespace TasksCoordinator
                 this._maxTasksCount = value;
                 // It can be negative temporarily (before the excess of the tasks stop) 
                 int canBeStarted = Interlocked.Add(ref this._tasksCanBeStarted, diff);
+                Console.WriteLine($"this._tasksCanBeStarted: {this._tasksCanBeStarted}");
                 if (this.TasksCount == 0)
                 {
                     this._TryStartNewTask();

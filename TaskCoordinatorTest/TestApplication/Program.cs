@@ -18,7 +18,7 @@ namespace TestApplication
         // OPTIONS
         private const TaskWorkType TASK_WORK_TYPE = TaskWorkType.UltraShortCPUBound;
         private const int BATCH_SIZE = 250000;
-        private const int MAX_TASK_COUNT = 8;
+        private const int MAX_TASK_COUNT = 6;
         private const int MAX_READ_PARALLELISM = 4;
         private const bool SHOW_TASK_SUCESS = false;
         private const bool SHOW_TASK_ERROR = false;
@@ -36,19 +36,21 @@ namespace TestApplication
         {
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
-            var task1= Task.Run(() =>
+            var task1= Task.Run(async () =>
             {
                 for (int i = 0; i < BATCH_SIZE; ++i)
                 {
                     svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
+                    if (i % 250 == 0) await Task.Yield();
                 }
                 return callback.UpdateBatchSize(BATCH_SIZE, false);
             });
-            var task2= Task.Run(() =>
+            var task2= Task.Run(async () =>
             {
                 for (int i = 0; i < BATCH_SIZE; ++i)
                 {
                     svc.AddToQueue(CreateNewPayload(), Interlocked.Increment(ref SEQUENCE_NUM), typeof(Payload).Name);
+                    if (i % 250 == 0) await Task.Yield();
                 }
                 return callback.UpdateBatchSize(BATCH_SIZE, false);
             });
@@ -62,12 +64,12 @@ namespace TestApplication
 
         private static async Task Start()
         {
+/*
             int minWork, minIO;
-            // int needThreads = MAX_TASK_COUNT + 2;
+            int needThreads = MAX_TASK_COUNT + 2;
             ThreadPool.GetMinThreads(out minWork, out minIO);
-            Console.WriteLine($"ThreadPool workerThreads {minWork} completionPortThreads {minIO}");
-            // ThreadPool.SetMinThreads(needThreads > minWork? needThreads : minWork, minIO);
-            
+            ThreadPool.SetMinThreads(needThreads > minWork? needThreads : minWork, minIO);
+ */           
 
             SEQUENCE_NUM = 0;
             svc = new TestService(_serializer, "TestService", 0, IS_ACTIVATION_ENABLED, MAX_READ_PARALLELISM, ARTIFICIAL_READ_DELAY);
@@ -81,7 +83,7 @@ namespace TestApplication
                 TestMessageReader<Message>.MaxConcurrentReading = 0;
 
                 await EnqueueData(svc, callBack);
-                // Console.WriteLine(string.Format("Enqueued Data QueueLength: {0}", svc.QueueLength));
+
                 callBack.StartTiming();
                 svc.MaxTasksCount = MAX_TASK_COUNT;
 
@@ -90,7 +92,8 @@ namespace TestApplication
                     await Task.Delay(CANCEL_AFTER).ConfigureAwait(false);
                     svc.Stop();
                 }
-               /*
+
+               /*               
                 Console.WriteLine($"Set MaxTasksCount to {MAX_TASK_COUNT}");
                 await Task.Delay(1000);
                 Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}  QueueLength: {svc.QueueLength}");
@@ -101,13 +104,13 @@ namespace TestApplication
                 svc.MaxTasksCount = MAX_TASK_COUNT;
                 await Task.Delay(1000);
                 Console.WriteLine($"Resumed Processing TasksCount: {svc.TasksCoordinator.TasksCount} MaxTasksCount: {svc.MaxTasksCount}  QueueLength: {svc.QueueLength}");
-               */
+               */             
 
                 bool complete = false;
                 var task = callBack.ResultAsync;
                 while (!complete)
                 {
-                    complete = task == await Task.WhenAny(task, Task.Delay(1000));
+                    complete = task == await Task.WhenAny(task, Task.Delay(2000));
                     if (!complete)
                     {
                         Console.WriteLine($"In Processing TasksCount: {svc.TasksCoordinator.TasksCount}  QueueLength: {svc.QueueLength}");

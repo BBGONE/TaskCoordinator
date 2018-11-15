@@ -4,15 +4,22 @@ using System.Threading.Tasks;
 
 namespace Shared.Threading
 {
-    public class AsyncBottleneck
+    public class Bottleneck
     {
         readonly SemaphoreSlim _semaphore;
 
-        public AsyncBottleneck(int maxParallelOperationsToAllow) => _semaphore = new SemaphoreSlim(maxParallelOperationsToAllow);
+        public Bottleneck(int maxParallelOperationsToAllow) => _semaphore = new SemaphoreSlim(maxParallelOperationsToAllow);
 
-        public async Task<IDisposable> Enter(CancellationToken cancellationToken) 
+        public async Task<IDisposable> EnterAsync(CancellationToken cancellationToken) 
         {
             await _semaphore.WaitAsync(cancellationToken);
+
+            return new Releaser(_semaphore);
+        }
+
+        public IDisposable Enter(CancellationToken cancellationToken)
+        {
+            _semaphore.Wait(cancellationToken);
 
             return new Releaser(_semaphore);
         }

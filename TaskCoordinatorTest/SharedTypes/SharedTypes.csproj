@@ -77,7 +77,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Threading\AsyncBottleneck.cs" />
     <Compile Include="Shared\LazyExtensions.cs" />
     <Compile Include="TaskCoordinator\Callbacks\BaseCallback.cs" />
     <Compile Include="TaskCoordinator\BaseTasksCoordinator.cs" />
@@ -92,7 +91,6 @@
     <Compile Include="TaskCoordinator\Interface\IMessageWorker.cs" />
     <Compile Include="TaskCoordinator\Message.cs" />
     <Compile Include="TaskCoordinator\MessageProcessingResult.cs" />
-    <Compile Include="TaskCoordinator\InMemoryMessageReader.cs" />
     <Compile Include="TaskCoordinator\MessageReader.cs" />
     <Compile Include="TaskCoordinator\MessageReaderResult.cs" />
     <Compile Include="Database\ConnectionManager.cs" />
@@ -111,6 +109,7 @@
     <Compile Include="TaskCoordinator\Interface\ITaskService.cs" />
     <Compile Include="Shared\Log\LogFactory.cs" />
     <Compile Include="Database\NullableHelper.cs" />
+    <Compile Include="Threading\Bottleneck.cs" />
     <Compile Include="Threading\WorkStealingTaskScheduler.cs" />
   </ItemGroup>
   <ItemGroup>

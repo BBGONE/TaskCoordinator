@@ -42,7 +42,6 @@ namespace TasksCoordinator
 
             token.ThrowIfCancellationRequested();
 
-
             return isOK? msg: null;
         }
 
@@ -56,7 +55,7 @@ namespace TasksCoordinator
         {
             int cnt = 0;
             TMessage msg = null;
-            using (var disposable = await this.Coordinator.WaitReadAsync())
+            using (var disposable = this.Coordinator.ReadThrottle(IsPrimaryReader))
             {
                 msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null).ConfigureAwait(false);
             }
@@ -70,7 +69,7 @@ namespace TasksCoordinator
                     MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, null).ConfigureAwait(false);
                     if (res.isRollBack)
                     {
-                        this.OnRollback(msg, token);
+                        await this.OnRollback(msg, token);
                     }
                 }
                 catch (Exception ex)
@@ -87,8 +86,9 @@ namespace TasksCoordinator
             return cnt;
         }
 
-        protected override void OnRollback(TMessage msg, CancellationToken cancellation)
+        protected override async Task OnRollback(TMessage msg, CancellationToken cancellation)
         {
+            await NOOP;
             _messageQueue.Add(msg, cancellation);
         }
 

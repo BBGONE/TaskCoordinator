@@ -12,6 +12,7 @@ namespace TasksCoordinator.Interface
 
         void OnBeforeDoWork(IMessageReader reader);
         void OnAfterDoWork(IMessageReader reader);
-        Task<IDisposable> WaitReadAsync();
+        Task<IDisposable> ReadThrottleAsync(bool isPrimaryReader);
+        IDisposable ReadThrottle(bool isPrimaryReader);
     }
 }

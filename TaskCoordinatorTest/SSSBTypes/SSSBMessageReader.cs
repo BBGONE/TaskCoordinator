@@ -145,7 +145,7 @@ namespace SSSB
             SqlConnection dbconnection = null;
             TransactionScope transactionScope = null;
 
-            var disposable = await this.Coordinator.WaitReadAsync();
+            var disposable = this.Coordinator.ReadThrottle(isPrimaryReader);
             try
             {
                 TransactionOptions tranOptions = new TransactionOptions();
@@ -183,7 +183,7 @@ namespace SSSB
                             MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, dbconnection).ConfigureAwait(false);
                             if (res.isRollBack)
                             {
-                                this.OnRollback(msg, token);
+                                await this.OnRollback(msg, token);
                                 return cnt;
                             }
                         }
