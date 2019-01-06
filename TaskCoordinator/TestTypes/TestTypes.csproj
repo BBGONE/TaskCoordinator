@@ -8,7 +8,7 @@
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>TasksCoordinator.Test</RootNamespace>
-    <AssemblyName>TestLibrary</AssemblyName>
+    <AssemblyName>TestTypes</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
@@ -63,10 +63,6 @@
     <ProjectReference Include="..\SharedTypes\SharedTypes.csproj">
       <Project>{eaf313d1-2c87-4989-b995-84ed8ac94aaa}</Project>
       <Name>SharedTypes</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\SSSBTypes\SSSB.csproj">
-      <Project>{7edeed80-c546-4f00-a265-1801bda72c07}</Project>
-      <Name>SSSB</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>

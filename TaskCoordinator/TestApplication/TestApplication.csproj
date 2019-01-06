@@ -61,13 +61,9 @@
       <Project>{eaf313d1-2c87-4989-b995-84ed8ac94aaa}</Project>
       <Name>SharedTypes</Name>
     </ProjectReference>
-    <ProjectReference Include="..\SSSBTypes\SSSB.csproj">
-      <Project>{7edeed80-c546-4f00-a265-1801bda72c07}</Project>
-      <Name>SSSB</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\TestLibrary\TestLibrary.csproj">
+    <ProjectReference Include="..\TestTypes\TestTypes.csproj">
       <Project>{9c19a7c3-99cb-4e27-97b8-430ca2472dbe}</Project>
-      <Name>TestLibrary</Name>
+      <Name>TestTypes</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

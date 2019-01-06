@@ -98,7 +98,7 @@ namespace TestApplication
                     Interlocked.Increment(ref sentMessagesCount);
                 }
 
-                Console.WriteLine($"Send patrition #{partion.Key} Size: {sentMessagesCount} offset: {partion.Key * partionSize}");
+                Console.WriteLine($"Send partition #{partion.Key} Size: {sentMessagesCount} offset: {partion.Key * partionSize}");
 
                 callback.UpdateBatchSize(sentMessagesCount, false);
                 return sentMessagesCount;
