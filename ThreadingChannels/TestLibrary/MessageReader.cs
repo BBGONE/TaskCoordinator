@@ -6,12 +6,12 @@ using TasksCoordinator.Interface;
 
 namespace TasksCoordinator.Test
 {
-    public class TestMessageReader<TMessage> : ChannelMessageReader<TMessage>
+    public class MessageReader<TMessage> : ChannelMessageReader<TMessage>
     {
         private static volatile int _current_cnt = 0;
         public static volatile int MaxConcurrentReading = 0;
 
-        public TestMessageReader(long taskId, ITaskCoordinatorAdvanced tasksCoordinator, ILogger logger,
+        public MessageReader(long taskId, ITaskCoordinatorAdvanced tasksCoordinator, ILogger logger,
             ChannelReader<TMessage> messageQueue, IMessageDispatcher<TMessage, object> dispatcher) :
             base(taskId, tasksCoordinator, logger , messageQueue, dispatcher)
         {

@@ -5,11 +5,11 @@ using TasksCoordinator.Test.Interface;
 
 namespace TasksCoordinator.Test
 {
-    public class TestMessageDispatcher<TMessage>: IMessageDispatcher<TMessage, object>
+    public class MessageDispatcher<TMessage>: IMessageDispatcher<TMessage, object>
     {
         private readonly IWorkLoad<TMessage> _workLoad;
 
-        public TestMessageDispatcher(IWorkLoad<TMessage> workLoad)
+        public MessageDispatcher(IWorkLoad<TMessage> workLoad)
         {
             this._workLoad = workLoad;
         }

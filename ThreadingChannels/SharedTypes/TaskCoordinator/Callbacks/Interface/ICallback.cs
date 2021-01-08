@@ -10,15 +10,18 @@ namespace TasksCoordinator.Interface
 
     public interface ICallback<T>
     {
-        BatchInfo BatchInfo { get; }
         void TaskSuccess(T message);
         Task<bool> TaskError(T message, string error);
         void JobCancelled();
         void JobCompleted(string error);
 
-        BatchInfo UpdateBatchSize(int batchSize, bool isComplete);
+        int UpdateBatchSize(int batchSize, bool isComplete);
 
         Task ResultAsync { get; }
         Task CompleteAsync { get; }
+
+        int BatchSize { get; }
+
+        BatchInfo BatchInfo { get; }
     }
 }

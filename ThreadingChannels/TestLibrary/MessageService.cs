@@ -13,48 +13,54 @@ namespace TasksCoordinator.Test
     /// <summary>
     /// Message Dispatcher to process messages read from queue.
     /// </summary>
-    public class TestService : ITaskService, IDisposable
+    public class MessageService<TMsg> : ITaskService, IDisposable
     {
         private readonly ILogger _logger;
-       /*
-        private static readonly UnboundedChannelOptions s_ChannelOptions = new UnboundedChannelOptions
-        {
-            SingleWriter = true,
-            SingleReader = false,
-            AllowSynchronousContinuations = false,
-        };
-        */
-
-        private static readonly BoundedChannelOptions s_ChannelOptions = new BoundedChannelOptions(100)
-        {
-            FullMode = BoundedChannelFullMode.Wait,
-            SingleWriter = true,
-            SingleReader = false,
-            AllowSynchronousContinuations = true,
-        };
-  
+        
         #region Private Fields
         private volatile bool _isStopped;
-        private TestMessageDispatcher<Payload> _messageDispatcher;
-        private Channel<Payload> _channel;
-        private ChannelWriter<Payload> _messageQueue;
+        private MessageDispatcher<TMsg> _messageDispatcher;
+        private Channel<TMsg> _channel;
+        private ChannelWriter<TMsg> _messageQueue;
         #endregion
 
         public event EventHandler<EventArgs> ServiceStarting;
         public event EventHandler<EventArgs> ServiceStarted;
         public event EventHandler<EventArgs> ServiceStopped;
 
-        public TestService(string name, IWorkLoad<Payload> workLoad, ILoggerFactory loggerFactory, int maxReadersCount, 
-            int maxReadParallelism = 4)
+        public MessageService(string name, 
+            IWorkLoad<TMsg> workLoad, 
+            ILoggerFactory loggerFactory, 
+            int maxDegreeOfParallelism, 
+            int maxReadParallelism = 4,
+            int? queueCapacity = null)
         {
             this.Name = name;
             this._isStopped = true;
-            this._logger = loggerFactory.CreateLogger<TestService>();
-            this._channel = Channel.CreateBounded<Payload>(s_ChannelOptions);
+            this._logger = loggerFactory.CreateLogger<MessageService<TMsg>>();
+            if (queueCapacity == null)
+            {
+                this._channel = Channel.CreateUnbounded<TMsg>(new UnboundedChannelOptions
+                {
+                    SingleWriter = true,
+                    SingleReader = false,
+                    AllowSynchronousContinuations = true,
+                });
+            }
+            else
+            {
+                this._channel = Channel.CreateBounded<TMsg>(new BoundedChannelOptions(queueCapacity.Value)
+                {
+                    FullMode = BoundedChannelFullMode.Wait,
+                    SingleWriter = true,
+                    SingleReader = false,
+                    AllowSynchronousContinuations = true,
+                });
+            }
             this._messageQueue = this._channel.Writer;
-            this._messageDispatcher = new TestMessageDispatcher<Payload>(workLoad);
-            var readerFactory = new TestMessageReaderFactory<Payload>(this._channel.Reader, this._messageDispatcher, loggerFactory);
-            this.TasksCoordinator = new TestTasksCoordinator(readerFactory, loggerFactory, maxReadersCount, maxReadParallelism);
+            this._messageDispatcher = new MessageDispatcher<TMsg>(workLoad);
+            var readerFactory = new MessageReaderFactory<TMsg>(this._channel.Reader, this._messageDispatcher, loggerFactory);
+            this.TasksCoordinator = new TasksCoordinator(readerFactory, loggerFactory, maxDegreeOfParallelism, maxReadParallelism);
         }
 
 
@@ -190,7 +196,7 @@ namespace TasksCoordinator.Test
         }
         #endregion
 
-        public async ValueTask<bool> Post(Payload msg, int seqNum, CancellationToken token) {
+        public async ValueTask<bool> Post(TMsg msg, CancellationToken token) {
             await this._messageQueue.WriteAsync(msg, token);
             return true;
         }

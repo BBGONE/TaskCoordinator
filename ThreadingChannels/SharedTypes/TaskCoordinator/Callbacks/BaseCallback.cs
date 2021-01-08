@@ -56,7 +56,8 @@ namespace TasksCoordinator.Callbacks
                 _resultAsyncSource.TrySetException(new Exception(error));
             }
         }
-        public BatchInfo UpdateBatchSize(int batchSize, bool isComplete)
+
+        public int UpdateBatchSize(int batchSize, bool isComplete)
         {
             lock (this._lock)
             {
@@ -69,7 +70,9 @@ namespace TasksCoordinator.Callbacks
                         this._completeAsyncSource.SetResult(1);
                     }
                 }
-                return new BatchInfo { BatchSize = this._batchSize, IsComplete = this._isComplete == 1 };
+                
+                return this._batchSize;
+               // return new BatchInfo { BatchSize = this._batchSize, IsComplete = this._isComplete == 1 };
             }
         }
 
@@ -82,5 +85,7 @@ namespace TasksCoordinator.Callbacks
         {
             get { return this._completeAsyncSource.Task; }
         }
+
+        public int BatchSize { get => _batchSize; }
     }
 }

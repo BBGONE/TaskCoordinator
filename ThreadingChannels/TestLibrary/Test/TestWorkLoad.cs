@@ -6,10 +6,9 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Schedulers;
 using TasksCoordinator.Callbacks;
 using TasksCoordinator.Interface;
-using TasksCoordinator.Test;
 using TasksCoordinator.Test.Interface;
 
-namespace TestApplication
+namespace TasksCoordinator.Test
 {
     public class TestWorkLoad : IWorkLoad<Payload>, IDisposable
     {
