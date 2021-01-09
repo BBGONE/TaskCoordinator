@@ -16,7 +16,7 @@ namespace TestApplication
                 await Task.CompletedTask;
                 // Console.WriteLine(msg);
                 char[] charArray = msg.ToCharArray();
-                for (int i = 0; i < 200; ++i)
+                for (int i = 0; i < 500; ++i)
                 {
                     Array.Reverse(charArray);
                 }
@@ -28,7 +28,7 @@ namespace TestApplication
                 await Task.CompletedTask;
                 // Console.WriteLine(msg);
                 char[] charArray = msg.ToCharArray();
-                for (int i = 0; i < 200; ++i)
+                for (int i = 0; i < 500; ++i)
                 {
                     Array.Reverse(charArray);
                 }
