@@ -142,7 +142,7 @@ namespace TasksCoordinator.Test
                 {
                     _isStopped = true;
                     this._CompletePost();
-                    TasksCoordinator.Stop().Wait();
+                    TasksCoordinator.Stop().GetAwaiter().GetResult();
                 }
             }
             catch (AggregateException ex)
