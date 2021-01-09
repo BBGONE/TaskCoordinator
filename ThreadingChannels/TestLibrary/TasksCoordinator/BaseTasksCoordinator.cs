@@ -66,6 +66,7 @@ namespace TasksCoordinator
             {
                 this._stopTokenSource.Cancel();
                 this.IsPaused = false;
+                await Task.Yield();
                 var tasks = this._tasks.Select(p => p.Value).ToArray();
                 if (tasks.Length > 0)
                 {
