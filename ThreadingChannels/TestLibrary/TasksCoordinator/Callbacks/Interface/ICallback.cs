@@ -4,7 +4,7 @@ namespace TasksCoordinator.Interface
 {
     public struct BatchInfo
     {
-        public int BatchSize;
+        public long BatchSize;
         public bool IsComplete;
     }
 
@@ -15,12 +15,12 @@ namespace TasksCoordinator.Interface
         void JobCancelled();
         void JobCompleted(string error);
 
-        int UpdateBatchSize(int batchSize, bool isComplete);
+        long UpdateBatchSize(long addValue, bool isComplete);
 
         Task ResultAsync { get; }
         Task CompleteAsync { get; }
 
-        int BatchSize { get; }
+        long BatchSize { get; }
 
         BatchInfo BatchInfo { get; }
     }

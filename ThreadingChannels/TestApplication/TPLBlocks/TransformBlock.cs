@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Shared;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,33 +7,9 @@ using TasksCoordinator.Interface;
 using TasksCoordinator.Test;
 using TasksCoordinator.Test.Interface;
 
-namespace TestApplication
+namespace TPLBlocks
 {
-    class TCallBack<TMsg> : BaseCallback<TMsg>
-    {
-        private volatile int _ProcessedCount;
-        private volatile int _ErrorCount;
-        
-        public int ProcessedCount { get => this._ProcessedCount; }
-        public int ErrorCount { get => _ErrorCount; }
-
-        public TCallBack()
-        {
-        }
-
-        public override void TaskSuccess(TMsg message)
-        {
-            Interlocked.Increment(ref _ProcessedCount);
-        }
-        public override async Task<bool> TaskError(TMsg message, string error)
-        {
-            await Task.FromResult(0);
-            Interlocked.Increment(ref _ErrorCount);
-            return false;
-        }
-    }
-
-    public class TransformBlock<TInput, TOutput> : IWorkLoad<TInput>, IDisposable
+    public class TransformBlock<TInput, TOutput> : IWorkLoad<TInput>, IDisposable, ITransformBlock<TInput, TOutput>
     {
         private ICallbackProxy<TInput> _callbackProxy;
         private readonly MessageService<TInput> _svc;
@@ -45,7 +20,7 @@ namespace TestApplication
         private Guid _id = new Guid();
         private TransformBlockOptions _blockOptions;
 
-        public TransformBlock(Func<TInput, Task<TOutput>> body, TransformBlockOptions blockOptions= null)
+        public TransformBlock(Func<TInput, Task<TOutput>> body, TransformBlockOptions blockOptions = null)
         {
             _body = body;
             _blockOptions = blockOptions ?? TransformBlockOptions.Default;
@@ -90,6 +65,7 @@ namespace TestApplication
             (_callbackProxy as IDisposable)?.Dispose();
             _callbackProxy = null;
             _svc.Stop();
+            _outputSink = null;
         }
 
         async Task<bool> IWorkLoad<TInput>.DispatchMessage(TInput message, long taskId, CancellationToken token)
@@ -97,11 +73,16 @@ namespace TestApplication
             try
             {
                 var output = await _body(message);
-                var outputTask = _outputSink?.Invoke(output);
-                if (outputTask != null)
+
+                var sinkDelegates = _outputSink?.GetInvocationList();
+                if (sinkDelegates != null)
                 {
-                    await outputTask;
+                    foreach (var sinkDelegate in sinkDelegates)
+                    {
+                        await ((Func<TOutput, Task>)sinkDelegate)(output);
+                    }
                 }
+
                 await _callbackProxy.TaskCompleted(message, null);
             }
             catch (OperationCanceledException)

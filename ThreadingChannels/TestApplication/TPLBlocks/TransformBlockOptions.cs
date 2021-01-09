@@ -3,7 +3,7 @@ using Shared;
 using System;
 using System.Threading;
 
-namespace TestApplication
+namespace TPLBlocks
 {
     public class TransformBlockOptions
     {

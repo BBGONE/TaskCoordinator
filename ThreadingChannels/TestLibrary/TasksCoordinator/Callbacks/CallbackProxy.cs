@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Shared;
 using Shared.Errors;
 using System;
 using System.Threading;

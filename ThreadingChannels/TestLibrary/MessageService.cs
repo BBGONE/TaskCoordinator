@@ -11,7 +11,7 @@ using TasksCoordinator.Test.Interface;
 namespace TasksCoordinator.Test
 {
     /// <summary>
-    /// Message Dispatcher to process messages read from queue.
+    /// The service which takes messages from the queue and processes them
     /// </summary>
     public class MessageService<TMsg> : ITaskService, IDisposable
     {
@@ -42,7 +42,7 @@ namespace TasksCoordinator.Test
             {
                 this._channel = Channel.CreateUnbounded<TMsg>(new UnboundedChannelOptions
                 {
-                    SingleWriter = true,
+                    SingleWriter = false,
                     SingleReader = false,
                     AllowSynchronousContinuations = true,
                 });
@@ -52,7 +52,7 @@ namespace TasksCoordinator.Test
                 this._channel = Channel.CreateBounded<TMsg>(new BoundedChannelOptions(queueCapacity.Value)
                 {
                     FullMode = BoundedChannelFullMode.Wait,
-                    SingleWriter = true,
+                    SingleWriter = false,
                     SingleReader = false,
                     AllowSynchronousContinuations = true,
                 });

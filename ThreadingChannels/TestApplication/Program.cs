@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
+using TasksCoordinator;
+using TPLBlocks;
 
 namespace TestApplication
 {
@@ -21,13 +24,18 @@ namespace TestApplication
             {
                 await Task.CompletedTask;
                 // Console.WriteLine(msg);
-
-                return "transform2: "+msg;
+                char[] charArray = msg.ToCharArray();
+                Array.Reverse(charArray);
+                return new string(charArray);
             });
 
-            transformBlock2.OutputSink = null;  // = (async (output) => { Console.WriteLine("output: " + output.ToString()); await Task.CompletedTask; });
+            transformBlock2.OutputSink = null;
 
-            transformBlock1.LinkTo(transformBlock2);
+            var lastBlock = transformBlock1.LinkTo(transformBlock2);
+
+            int processedCount = 0;
+            
+            lastBlock.OutputSink += (async (output) => { await Task.CompletedTask;  Interlocked.Increment(ref processedCount); });
 
             Stopwatch sw = new Stopwatch();
 
@@ -41,13 +49,13 @@ namespace TestApplication
             transformBlock1.Complete();
             
             
-            await transformBlock2.Completion;
+            await lastBlock.Completion;
 
             sw.Stop();
 
             await Task.Yield();
 
-            Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds");
+            Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: {transformBlock1.BatchInfo.BatchSize} Processed Count: {processedCount}");
 
             Console.WriteLine("Press any key to continue ...");
             Console.ReadKey();

@@ -21,7 +21,7 @@ namespace TasksCoordinator
             this._logger = logger;
         }
 
-        protected abstract Task<TMessage> ReadMessage(bool isPrimaryReader, long taskId, CancellationToken token, TState state);
+        protected abstract Task<TMessage[]> ReadMessages(bool isPrimaryReader, long taskId, CancellationToken token, TState state);
 
         protected abstract Task<MessageProcessingResult> DispatchMessage(TMessage message, long taskId, CancellationToken token, TState state);
       

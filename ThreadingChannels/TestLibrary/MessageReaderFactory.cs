@@ -19,7 +19,7 @@ namespace TasksCoordinator.Test
 
         public IMessageReader CreateReader(long taskId, BaseTasksCoordinator coordinator)
         {
-            return new MessageReader<TMessage>(taskId, coordinator, this._logger, _messageQueue, _messageDispatcher);
+            return new TestMessageReader<TMessage>(taskId, coordinator, this._logger, _messageQueue, _messageDispatcher);
         }
     }
 }

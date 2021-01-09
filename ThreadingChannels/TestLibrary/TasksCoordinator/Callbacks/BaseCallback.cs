@@ -7,18 +7,16 @@ namespace TasksCoordinator.Callbacks
 {
     public abstract class BaseCallback<T> : ICallback<T>
     {
-        private volatile int _batchSize;
+        private long _batchSize;
         private volatile int _isComplete;
-        private readonly TaskCompletionSource<int> _completeAsyncSource;
-        private readonly TaskCompletionSource<int> _resultAsyncSource;
+        private readonly TaskCompletionSource<long> _completeAsyncSource;
+        private readonly TaskCompletionSource<long> _resultAsyncSource;
         private readonly object _lock = new object();
 
         public BaseCallback()
         {
-            this._batchSize = 0;
-            this._isComplete = 0;
-            this._resultAsyncSource = new TaskCompletionSource<int>();
-            this._completeAsyncSource = new TaskCompletionSource<int>();
+            this._resultAsyncSource = new TaskCompletionSource<long>();
+            this._completeAsyncSource = new TaskCompletionSource<long>();
         }
         public BatchInfo BatchInfo
         {
@@ -27,7 +25,7 @@ namespace TasksCoordinator.Callbacks
                 if (Interlocked.CompareExchange(ref this._isComplete, 1, 1) == 1)
                 {
                     // after isComplete = 1 the batch size can not be changed, and so it can be read without locking
-                    return new BatchInfo { BatchSize = this._batchSize, IsComplete = true };
+                    return new BatchInfo { BatchSize = Interlocked.Read(ref this._batchSize), IsComplete = true };
                 }
                 else
                 {
@@ -57,13 +55,13 @@ namespace TasksCoordinator.Callbacks
             }
         }
 
-        public int UpdateBatchSize(int batchSize, bool isComplete)
+        public long UpdateBatchSize(long addValue, bool isComplete)
         {
             lock (this._lock)
             {
                 if (this._isComplete == 0)
                 {
-                    this._batchSize += batchSize;
+                    this._batchSize += addValue;
                     if (isComplete)
                     {
                         this._isComplete = 1;
@@ -71,21 +69,14 @@ namespace TasksCoordinator.Callbacks
                     }
                 }
                 
-                return this._batchSize;
-               // return new BatchInfo { BatchSize = this._batchSize, IsComplete = this._isComplete == 1 };
+                return Interlocked.Read(ref this._batchSize);
             }
         }
 
-        public Task ResultAsync
-        {
-            get { return this._resultAsyncSource.Task; }
-        }
+        public Task ResultAsync => this._resultAsyncSource.Task; 
 
-        public Task CompleteAsync
-        {
-            get { return this._completeAsyncSource.Task; }
-        }
+        public Task CompleteAsync => this._completeAsyncSource.Task;
 
-        public int BatchSize { get => _batchSize; }
+        public long BatchSize => Interlocked.Read(ref this._batchSize);
     }
 }

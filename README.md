@@ -27,7 +27,12 @@ The TaskCoordinator has one more parameter <i>maxReadParallelism </i>, which is 
 reading messages from the queue is a lengthy operation - (<i>mostly in cases when the time taken to obtain a message from the queue is on a par with the time taken
  to process the message. But it rarely happens in  practice - because message processing is usually longer than reading it from the queue</i>)
 <br/>
-The repository contains a console application which uses the TaskCoordinator. It can be used as a lab and a testing ground for experimenting
-with different parameters.
+The repository contains a console application which uses the TaskCoordinator. 
+It can be used as a lab and a testing ground for usage of the TaskCoordinator.
+<br/>
+<i>
+For example, the testing application implemented a TransformBlock (aka from the TPL Dataflow library), and used it
+to test the TaskCoordinator.
+</i>
 <br/><br/>
 LICENSE: MIT LICENSE

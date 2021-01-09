@@ -10,7 +10,7 @@ namespace TasksCoordinator
     public class ChannelMessageReader<TMessage> : MessageReader<TMessage, object>
     {
         public static readonly TimeSpan DefaultWaitForTimeout = TimeSpan.FromSeconds(10);
-        private static readonly Task NOOP = Task.FromResult(0);
+        private static readonly Task NOOP = Task.CompletedTask;
 
         private readonly ChannelReader<TMessage> _messageQueue;
         private readonly IMessageDispatcher<TMessage, object> _dispatcher;
@@ -23,28 +23,39 @@ namespace TasksCoordinator
             this._dispatcher = dispatcher;
         }
 
-        protected override async Task<TMessage> ReadMessage(bool isPrimaryReader, long taskId, CancellationToken token, object state)
+        protected override async Task<TMessage[]> ReadMessages(bool isPrimaryReader, long taskId, CancellationToken token, object state)
         {
-            await NOOP;
-            TMessage msg = default(TMessage);
-            bool isOK = false;
+            TMessage[] msgs = null;
+
+            bool isOK;
           
             if (isPrimaryReader)
             {
                 // for the Primary reader (it waits for messages when the queue is empty)
-                if (!_messageQueue.TryRead(out  msg))
+                isOK = _messageQueue.TryRead(out var msg);
+                if (!isOK)
                 {
                     msg = await _messageQueue.ReadAsync(token);
+                    isOK = true;
                 }
-                isOK = true;
+
+                if (isOK)
+                {
+                    msgs = new[] { msg };
+                }
             }
             else
             {
-                isOK = _messageQueue.TryRead(out msg);
+                isOK = _messageQueue.TryRead(out var msg);
+
+                if (isOK)
+                {
+                    msgs = new[] { msg };
+                }
             }
 
             token.ThrowIfCancellationRequested();
-            return isOK? msg: default(TMessage);
+            return msgs;
         }
 
         protected override async Task<MessageProcessingResult> DispatchMessage(TMessage message, long taskId, CancellationToken token, object state)
@@ -53,39 +64,47 @@ namespace TasksCoordinator
             return res;
         }
         
+        /// <summary>
+        ///  Reads messages from the queue
+        /// </summary>
+        /// <param name="isPrimaryReader"></param>
+        /// <param name="token"></param>
+        /// <returns>Returns the number of read messages</returns>
         protected override async Task<int> DoWork(bool isPrimaryReader, CancellationToken token)
         {
-            int cnt = 0;
-            TMessage msg = default(TMessage);
+            TMessage[] msgs;
+
             using (var disposable = this.Coordinator.ReadThrottle(isPrimaryReader))
             {
-                msg = await this.ReadMessage(isPrimaryReader, this.taskId, token, null);
+                msgs = await this.ReadMessages(isPrimaryReader, this.taskId, token, null);
             }
 
-            cnt = msg == null ? 0 : 1;
-            if (cnt > 0)
+            if (msgs != null)
             {
-                this.Coordinator.OnBeforeDoWork(this);
-                try
+                for (int i = 0; i < msgs.Length; ++i)
                 {
-                    MessageProcessingResult res = await this.DispatchMessage(msg, this.taskId, token, null);
-                    if (res.isRollBack)
+                    this.Coordinator.OnBeforeDoWork(this);
+                    try
                     {
-                        await this.OnRollback(msg, token);
+                        MessageProcessingResult res = await this.DispatchMessage(msgs[i], this.taskId, token, null);
+                        if (res.isRollBack)
+                        {
+                            await this.OnRollback(msgs[i], token);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        this.OnProcessMessageException(ex, msgs[i]);
+                        throw;
+                    }
+                    finally
+                    {
+                        this.Coordinator.OnAfterDoWork(this);
                     }
                 }
-                catch (Exception ex)
-                {
-                    this.OnProcessMessageException(ex, msg);
-                    throw;
-                }
-                finally
-                {
-                    this.Coordinator.OnAfterDoWork(this);
-                }
             }
 
-            return cnt;
+            return msgs?.Length??0;
         }
 
         protected override async Task OnRollback(TMessage msg, CancellationToken cancellation)
