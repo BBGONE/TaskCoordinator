@@ -11,21 +11,27 @@ namespace TestApplication
     {
         static async Task Main(string[] args)
         {
-            using TransformBlock<string, string> transformBlock1 = new TransformBlock<string, string>(async (msg) =>
+            using ITransformBlock<string, string> transformBlock1 = new TransformBlock<string, string>(async (msg) =>
             {
                 await Task.CompletedTask;
                 // Console.WriteLine(msg);
                 char[] charArray = msg.ToCharArray();
-                Array.Reverse(charArray);
+                for (int i = 0; i < 200; ++i)
+                {
+                    Array.Reverse(charArray);
+                }
                 return new string(charArray);
             });
 
-            using TransformBlock<string, string> transformBlock2 = new TransformBlock<string, string>(async (msg) =>
+            using ITransformBlock<string, string> transformBlock2 = new TransformBlock<string, string>(async (msg) =>
             {
                 await Task.CompletedTask;
                 // Console.WriteLine(msg);
                 char[] charArray = msg.ToCharArray();
-                Array.Reverse(charArray);
+                for (int i = 0; i < 200; ++i)
+                {
+                    Array.Reverse(charArray);
+                }
                 return new string(charArray);
             });
 

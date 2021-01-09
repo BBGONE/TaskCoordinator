@@ -196,8 +196,8 @@ namespace TasksCoordinator.Test
         }
         #endregion
 
-        public async ValueTask<bool> Post(TMsg msg, CancellationToken token) {
-            await this._messageQueue.WriteAsync(msg, token);
+        public async ValueTask<bool> Post(TMsg msg) {
+            await this._messageQueue.WriteAsync(msg, this.TasksCoordinator.Token);
             return true;
         }
 

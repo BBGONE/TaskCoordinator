@@ -1,99 +1,53 @@
-﻿using Microsoft.Extensions.Logging;
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Callbacks;
-using TasksCoordinator.Interface;
 using TasksCoordinator.Test;
-using TasksCoordinator.Test.Interface;
 
 namespace TPLBlocks
 {
-    public class TransformBlock<TInput, TOutput> : IWorkLoad<TInput>, IDisposable, ITransformBlock<TInput, TOutput>
+    public class TransformBlock<TInput, TOutput> : BaseTransformBlock<TInput, TOutput>
     {
-        private ICallbackProxy<TInput> _callbackProxy;
         private readonly MessageService<TInput> _svc;
-        private readonly ILoggerFactory _loggerFactory;
-        private readonly TCallBack<TInput> _callBack;
-        private Func<TInput, Task<TOutput>> _body;
-        private Func<TOutput, Task> _outputSink;
-        private Guid _id = new Guid();
-        private TransformBlockOptions _blockOptions;
+        private volatile int _started = 0;
 
-        public TransformBlock(Func<TInput, Task<TOutput>> body, TransformBlockOptions blockOptions = null)
+        public TransformBlock(Func<TInput, Task<TOutput>> body, TransformBlockOptions blockOptions = null):
+            base(body, (blockOptions?? TransformBlockOptions.Default).LoggerFactory)
         {
-            _body = body;
-            _blockOptions = blockOptions ?? TransformBlockOptions.Default;
-            _outputSink = null;
-            _callbackProxy = null;
-            _loggerFactory = _blockOptions.LoggerFactory;
-            _svc = new MessageService<TInput>(_id.ToString(), this, _loggerFactory, _blockOptions.MaxDegreeOfParallelism, _blockOptions.MaxDegreeOfParallelism, _blockOptions.QueueCapacity);
-            _svc.Start();
-            _callBack = new TCallBack<TInput>();
-            _callbackProxy = new CallbackProxy<TInput>(_callBack, _loggerFactory, _svc.TasksCoordinator.Token);
+            blockOptions = blockOptions ?? TransformBlockOptions.Default;
+            _svc = new MessageService<TInput>(this.Id.ToString(), this, blockOptions.LoggerFactory, blockOptions.MaxDegreeOfParallelism, blockOptions.MaxDegreeOfParallelism, blockOptions.QueueCapacity);
         }
 
-        public async ValueTask<bool> Post(TInput msg)
+        public override async ValueTask<bool> Post(TInput msg)
         {
-            bool res = await _svc.Post(msg, _svc.TasksCoordinator.Token);
+            var oldStarted = Interlocked.CompareExchange(ref _started, 1, 0);
+            if (oldStarted == 0)
+            {
+                _svc.Start();
+            }
+
+            bool res = await _svc.Post(msg);
             if (res)
             {
-                _callBack.UpdateBatchSize(1, false);
+                this.UpdateBatchSize(1, false);
             }
             return res;
         }
 
-        public Task Completion
+        protected override CancellationToken GetCancellationToken()
         {
-            get
-            {
-                return _callBack.ResultAsync;
-            }
+            return _svc.TasksCoordinator.Token;
         }
 
-        public Func<TOutput, Task> OutputSink { get => _outputSink; set => _outputSink = value; }
-
-        public BatchInfo BatchInfo { get => _callBack.BatchInfo; }
-
-        public void Complete()
+        
+        protected override void OnDispose()
         {
-            _callBack.UpdateBatchSize(0, true);
-        }
-
-        public void Dispose()
-        {
-            (_callbackProxy as IDisposable)?.Dispose();
-            _callbackProxy = null;
-            _svc.Stop();
-            _outputSink = null;
-        }
-
-        async Task<bool> IWorkLoad<TInput>.DispatchMessage(TInput message, long taskId, CancellationToken token)
-        {
-            try
+            var oldStarted = Interlocked.CompareExchange(ref _started, 0, 1);
+            if (oldStarted == 1)
             {
-                var output = await _body(message);
-
-                var sinkDelegates = _outputSink?.GetInvocationList();
-                if (sinkDelegates != null)
-                {
-                    foreach (var sinkDelegate in sinkDelegates)
-                    {
-                        await ((Func<TOutput, Task>)sinkDelegate)(output);
-                    }
-                }
-
-                await _callbackProxy.TaskCompleted(message, null);
+                _svc.Stop();
             }
-            catch (OperationCanceledException)
-            {
-                await _callbackProxy.TaskCompleted(message, "CANCELLED");
-            }
-            catch (Exception ex)
-            {
-                await _callbackProxy.TaskCompleted(message, ex.Message);
-            }
-            return false;
+            _svc.Dispose();
+            base.OnDispose();
         }
     }
 }
