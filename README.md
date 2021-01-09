@@ -30,9 +30,11 @@ reading messages from the queue is a lengthy operation - (<i>mostly in cases whe
 The repository contains a console application which uses the TaskCoordinator. 
 It can be used as a lab and a testing ground for usage of the TaskCoordinator.
 <br/>
-<i>
-For example, the testing application implemented a TransformBlock (aka from the TPL Dataflow library), and used it
-to test the TaskCoordinator.
-</i>
+<i><b>
+For example, the testing application implemented a TransformBlock (acts like the one from the TPL Dataflow library), and used it
+to test the TaskCoordinator. But it really (TaskCoordinator) shines for transactional message processing. Sql Server Service Broker and
+optionally Oracle Advanced Queuing uses transactional message processing. So I used the TaskCoordinator for my TaskBroker implementation which uses Sql Server Service Broker
+to provide the messages.
+</b></i>
 <br/><br/>
 LICENSE: MIT LICENSE
