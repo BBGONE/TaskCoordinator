@@ -8,10 +8,11 @@ namespace TPLBlocks
     {
         BatchInfo BatchInfo { get; }
         Task Completion { get; }
-        Func<TOutput, Task> OutputSink { get; set; }
+
+        event Func<TOutput, Task> OutputSink;
 
         long Complete();
-        void Dispose();
+
         ValueTask<bool> Post(TInput msg);
     }
 }

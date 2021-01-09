@@ -70,7 +70,7 @@ namespace TPLBlocks
             }
         }
 
-        public Func<TOutput, Task> OutputSink { get => _outputSink; set => _outputSink = value; }
+        public event Func<TOutput, Task> OutputSink { add => _outputSink+= value; remove => _outputSink -= value; }
 
         public BatchInfo BatchInfo { get => _callBack.BatchInfo; }
         public Guid Id { get => _id; set => _id = value; }
