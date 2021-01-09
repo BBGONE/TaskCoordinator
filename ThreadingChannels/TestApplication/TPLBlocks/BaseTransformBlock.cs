@@ -11,7 +11,7 @@ namespace TPLBlocks
     public abstract class BaseTransformBlock<TInput, TOutput> : IWorkLoad<TInput>, IDisposable, ITransformBlock<TInput, TOutput>
     {
         private ICallbackProxy<TInput> _callbackProxy;
-        private volatile int _isDisposed = 0;
+        private bool _isDisposed = false;
         private readonly ILoggerFactory _loggerFactory;
         private readonly TCallBack<TInput> _callBack;
         private Func<TInput, Task<TOutput>> _body;
@@ -23,14 +23,9 @@ namespace TPLBlocks
         {
             _body = body;
             _outputSink = null;
-            _loggerFactory = loggerFactory;
-            _callBack = new TCallBack<TInput>();
+            _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+            _callBack = new TCallBack<TInput>(_loggerFactory.CreateLogger(this.GetType().Name));
             _callbackProxy = null;
-        }
-
-        protected virtual ICallbackProxy<TInput> CreateCallbackProxy(CancellationToken? token= null)
-        {
-            return new CallbackProxy<TInput>(_callBack, _loggerFactory, token);
         }
 
         public abstract ValueTask<bool> Post(TInput msg);
@@ -46,11 +41,11 @@ namespace TPLBlocks
         {
             get
             {
-                if (_isDisposed == 0)
+                if (!_isDisposed)
                 {
                     if (_callbackProxy == null)
                     {
-                        LazyInitializer.EnsureInitialized(ref _callbackProxy, ref _SyncLock, () => CreateCallbackProxy(this.GetCancellationToken()));
+                        LazyInitializer.EnsureInitialized(ref _callbackProxy, ref _SyncLock, () => new CallbackProxy<TInput>(_callBack, _loggerFactory, this.GetCancellationToken()));
                     }
                 }
                 else
@@ -75,9 +70,52 @@ namespace TPLBlocks
         public BatchInfo BatchInfo { get => _callBack.BatchInfo; }
         public Guid Id { get => _id; set => _id = value; }
 
-        public long Complete()
+        public long Complete(Exception exception = null)
         {
-            return this.UpdateBatchSize(0, true);
+            if (_isDisposed)
+            {
+                throw new ObjectDisposedException(this.GetType().Name);
+            }
+
+            if (exception == null)
+            {
+                return this.UpdateBatchSize(0, true);
+            }
+            else
+            {
+                if (exception is AggregateException aggex)
+                {
+                    Exception firstError = null;
+
+                    aggex.Flatten().Handle((err) => {
+                        if (err is OperationCanceledException)
+                        {
+                            return true;
+                        }
+                        firstError = firstError ?? err;
+                        return true;
+                    });
+
+                    if (firstError != null)
+                    {
+                        CallbackProxy.JobCompleted(firstError);
+                    }
+                    else
+                    {
+                        CallbackProxy.JobCancelled();
+                    }
+                }
+                else if (exception is OperationCanceledException)
+                {
+                    CallbackProxy.JobCancelled();
+                }
+                else
+                {
+                    CallbackProxy.JobCompleted(exception);
+                }
+
+                return this.UpdateBatchSize(0, true);
+            }
         }
 
         protected virtual void OnDispose()
@@ -86,8 +124,7 @@ namespace TPLBlocks
 
         public void Dispose()
         {
-            var old = Interlocked.CompareExchange(ref _isDisposed, 1, 0);
-            if (old == 0)
+            if (!_isDisposed)
             {
                 this.OnDispose();
 
@@ -97,6 +134,8 @@ namespace TPLBlocks
                 {
                     (oldCallbackProxy as IDisposable)?.Dispose();
                 }
+
+                _isDisposed = true;
             }
         }
 
@@ -117,13 +156,9 @@ namespace TPLBlocks
 
                 await CallbackProxy.TaskCompleted(message, null);
             }
-            catch (OperationCanceledException)
-            {
-                await CallbackProxy.TaskCompleted(message, "CANCELLED");
-            }
             catch (Exception ex)
             {
-                await CallbackProxy.TaskCompleted(message, ex.Message);
+                await CallbackProxy.TaskCompleted(message, ex);
             }
             return false;
         }

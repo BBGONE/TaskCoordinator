@@ -38,20 +38,20 @@ namespace TasksCoordinator.Callbacks
         }
 
         public abstract void TaskSuccess(T message);
-        public abstract Task<bool> TaskError(T message, string error);
+        public abstract Task<bool> TaskError(T message, Exception error);
         public virtual void JobCancelled()
         {
             _resultAsyncSource.TrySetCanceled();
         }
-        public virtual void JobCompleted(string error)
+        public virtual void JobCompleted(Exception error)
         {
-            if (string.IsNullOrEmpty(error))
+            if (error == null)
             {
                 _resultAsyncSource.TrySetResult(this._batchSize);
             }
             else
             {
-                _resultAsyncSource.TrySetException(new Exception(error));
+                _resultAsyncSource.TrySetException(error);
             }
         }
 

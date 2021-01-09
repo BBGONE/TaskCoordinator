@@ -11,7 +11,7 @@ namespace TPLBlocks
 
         event Func<TOutput, Task> OutputSink;
 
-        long Complete();
+        long Complete(Exception exception = null);
 
         ValueTask<bool> Post(TInput msg);
     }

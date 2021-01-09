@@ -1,4 +1,7 @@
-﻿using System.Threading;
+﻿using Microsoft.Extensions.Logging;
+using Shared.Errors;
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Callbacks;
 
@@ -6,24 +9,21 @@ namespace TPLBlocks
 {
     class TCallBack<TMsg> : BaseCallback<TMsg>
     {
-        private volatile int _ProcessedCount;
-        private volatile int _ErrorCount;
+        private readonly ILogger _logger;
 
-        public int ProcessedCount { get => this._ProcessedCount; }
-        public int ErrorCount { get => _ErrorCount; }
-
-        public TCallBack()
+        public TCallBack(ILogger logger)
         {
+            _logger = logger;
         }
 
         public override void TaskSuccess(TMsg message)
         {
-            Interlocked.Increment(ref _ProcessedCount);
+            // NOOP
         }
-        public override async Task<bool> TaskError(TMsg message, string error)
+        public override async Task<bool> TaskError(TMsg message, Exception error)
         {
             await Task.CompletedTask;
-            Interlocked.Increment(ref _ErrorCount);
+            _logger.LogError(ErrorHelper.GetFullMessage(error));
             return false;
         }
     }

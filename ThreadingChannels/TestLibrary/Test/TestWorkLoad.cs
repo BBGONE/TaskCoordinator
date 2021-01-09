@@ -144,14 +144,11 @@ namespace TasksCoordinator.Test
                     action();
                     await callback.TaskCompleted(message, null);
                 }
-                catch (OperationCanceledException)
-                {
-                    await callback.TaskCompleted(message, "CANCELLED");
-                }
                 catch (Exception ex)
                 {
-                    await callback.TaskCompleted(message, ex.Message);
+                    await callback.TaskCompleted(message, ex);
                 }
+
             }, token, TaskCreationOptions.DenyChildAttach, this._longRunningTasksScheduler).Unwrap();
         }
 
@@ -168,13 +165,9 @@ namespace TasksCoordinator.Test
                 await action();
                 await callback.TaskCompleted(message, null);
             }
-            catch (OperationCanceledException)
-            {
-                await callback.TaskCompleted(message, "CANCELLED");
-            }
             catch (Exception ex)
             {
-                await callback.TaskCompleted(message, ex.Message);
+                await callback.TaskCompleted(message, ex);
             }
         }
 

@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace TasksCoordinator.Interface
 {
@@ -11,10 +12,9 @@ namespace TasksCoordinator.Interface
     public interface ICallback<T>
     {
         void TaskSuccess(T message);
-        Task<bool> TaskError(T message, string error);
+        Task<bool> TaskError(T message, Exception error);
         void JobCancelled();
-        void JobCompleted(string error);
-
+        void JobCompleted(Exception error);
         long UpdateBatchSize(long addValue, bool isComplete);
 
         Task ResultAsync { get; }
