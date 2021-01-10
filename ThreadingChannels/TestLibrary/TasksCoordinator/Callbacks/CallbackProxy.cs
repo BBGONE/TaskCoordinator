@@ -23,6 +23,7 @@ namespace TasksCoordinator.Callbacks
         private CancellationTokenRegistration _register;
         private volatile int _processedCount;
         private volatile int _status;
+        private SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
         public CallbackProxy(ICallback<T> callback, ILoggerFactory loggerFactory, CancellationToken? token = null)
         {
@@ -46,20 +47,32 @@ namespace TasksCoordinator.Callbacks
                 if (oldstatus == 0)
                 {
                     var batchInfo = this._callback.BatchInfo;
-                    if (batchInfo.IsComplete && this._processedCount == batchInfo.BatchSize && !this._token.IsCancellationRequested)
+
+                    if (t.Exception != null)
+                    {
+                        ((ICallbackProxy<T>)this).JobCompleted(t.Exception).GetAwaiter().GetResult();
+                    }
+                    else if (batchInfo.IsComplete && this._processedCount == batchInfo.BatchSize && !this._token.IsCancellationRequested)
                     {
                         ((ICallbackProxy<T>)this).JobCompleted(null).GetAwaiter().GetResult();
                     }
                 }
-            }, TaskContinuationOptions.ExecuteSynchronously);
+            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+            
             this._status = 0;
         }
 
         async Task ICallbackProxy<T>.TaskCompleted(T message, Exception error)
         {
+            var oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Running, 0);
+            if (oldstatus != (int)JobStatus.Running)
+            {
+                return;
+            }
+
             if (error == null)
             {
-                this.TaskSuccess(message);
+                await this.TaskSuccess(message);
                 int count = Interlocked.Increment(ref this._processedCount);
                 var batchInfo = this._callback.BatchInfo;
                 if (batchInfo.IsComplete && count == batchInfo.BatchSize)
@@ -71,7 +84,8 @@ namespace TasksCoordinator.Callbacks
             {
                 Exception firstError = null;
 
-                aggex.Flatten().Handle((err) => {
+                aggex.Flatten().Handle((err) =>
+                {
                     if (err is OperationCanceledException)
                     {
                         return true;
@@ -99,9 +113,10 @@ namespace TasksCoordinator.Callbacks
             }
         }
 
-        void TaskSuccess(T message)
+        async Task TaskSuccess(T message)
         {
-            var oldstatus =  this._status;
+            await Task.CompletedTask;
+            var oldstatus = this._status;
             if ((JobStatus)oldstatus == JobStatus.Running)
             {
                 this._callback.TaskSuccess(message);
@@ -123,68 +138,73 @@ namespace TasksCoordinator.Callbacks
 
         async Task ICallbackProxy<T>.JobCancelled()
         {
-            var oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Cancelled, 0);
-            if ((JobStatus)oldstatus == JobStatus.Running)
+            await _semaphoreSlim.WaitAsync();
+            try
             {
-                try
+                var oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Cancelled, 0);
+                if ((JobStatus)oldstatus == JobStatus.Running)
                 {
-                    await Task.Run(() =>
+                    try
                     {
-                        try
+                        await this._callback.JobCancelled();
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!(ex is OperationCanceledException))
                         {
-                            this._callback.JobCancelled();
+                            _logger.LogError(ErrorHelper.GetFullMessage(ex));
                         }
-                        catch (Exception ex)
-                        {
-                            if (!(ex is OperationCanceledException))
-                            {
-                                _logger.LogError(ErrorHelper.GetFullMessage(ex));
-                            }
-                        }
-                    });
+                    }
+                    finally
+                    {
+                        this._register.Dispose();
+                    }
                 }
-                finally
-                {
-                    this._register.Dispose();
-                }
+            }
+            finally
+            {
+                _semaphoreSlim.Release();
             }
         }
 
         async Task ICallbackProxy<T>.JobCompleted(Exception error)
         {
-            var oldstatus = 0;
-            if (error == null)
+            await _semaphoreSlim.WaitAsync();
+            try
             {
-                oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Success, 0);
-            }
-            else
-            {
-                oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Error, 0);
-            }
+                var oldstatus = (int)JobStatus.Running;
 
-            if ((JobStatus)oldstatus == JobStatus.Running)
-            {
-                try
+                if (error == null)
                 {
-                    await Task.Run(() =>
+                    oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Success, 0);
+                }
+                else
+                {
+                    oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Error, 0);
+                }
+
+                if ((JobStatus)oldstatus == JobStatus.Running)
+                {
+                    try
                     {
-                        try
+                        await this._callback.JobCompleted(error);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!(ex is OperationCanceledException))
                         {
-                            this._callback.JobCompleted(error);
+                            _logger.LogError(ErrorHelper.GetFullMessage(ex));
                         }
-                        catch (Exception ex)
-                        {
-                            if (!(ex is OperationCanceledException))
-                            {
-                                _logger.LogError(ErrorHelper.GetFullMessage(ex));
-                            }
-                        }
-                    });
+                    }
+                    finally
+                    {
+                        this._register.Dispose();
+                    }
                 }
-                finally
-                {
-                    this._register.Dispose();
-                }
+            }
+            finally
+            {
+                _semaphoreSlim.Release();
             }
         }
 
@@ -200,7 +220,7 @@ namespace TasksCoordinator.Callbacks
             {
                 if (disposing)
                 {
-                    var _task = ((ICallbackProxy<T>)this).JobCancelled();
+                    ((ICallbackProxy<T>)this).JobCancelled().GetAwaiter().GetResult();
                 }
 
                 _disposed = true;

@@ -180,7 +180,7 @@ namespace TestApplication
             using (var inputsDisposal = new CompositeDisposable(inputs))
             using (ITransformBlock<string, string> bufferBlock = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => {
                 Interlocked.Increment(ref processedCount);
-                /*
+               /*
                 if (testException)
                 {
                     if (processedCount == 4999999)
@@ -188,7 +188,7 @@ namespace TestApplication
                         throw new ApplicationException("ApplicationException: Test that all dataflow is stopped");
                     }
                 }
-                */
+               */
                 return Task.FromResult(msg); 
             }))
             {
@@ -215,7 +215,7 @@ namespace TestApplication
                         });
                     }
 
-                    
+                    lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"Lastblock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
 
                     await lastBlock.Completion;
 

@@ -39,11 +39,12 @@ namespace TasksCoordinator.Callbacks
 
         public abstract void TaskSuccess(T message);
         public abstract Task<bool> TaskError(T message, Exception error);
-        public virtual void JobCancelled()
+        public virtual Task JobCancelled()
         {
             _resultAsyncSource.TrySetCanceled();
+            return Task.CompletedTask;
         }
-        public virtual void JobCompleted(Exception error)
+        public virtual Task JobCompleted(Exception error)
         {
             if (error == null)
             {
@@ -53,6 +54,7 @@ namespace TasksCoordinator.Callbacks
             {
                 _resultAsyncSource.TrySetException(error);
             }
+            return Task.CompletedTask;
         }
 
         public long UpdateBatchSize(long addValue, bool isComplete)

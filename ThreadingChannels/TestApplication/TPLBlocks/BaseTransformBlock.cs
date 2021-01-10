@@ -21,7 +21,6 @@ namespace TPLBlocks
         private CancellationToken? _externalCancellationToken;
         private CancellationTokenSource _cts;
         private CancellationTokenSource _linkedCts;
-        private volatile int _completed = 0;
 
         public BaseTransformBlock(Func<TInput, Task<TOutput>> body, ILoggerFactory loggerFactory, CancellationToken? cancellationToken= null)
         {
@@ -30,15 +29,16 @@ namespace TPLBlocks
             _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             _externalCancellationToken = cancellationToken;
             _cts = new CancellationTokenSource();
+            
             if (_externalCancellationToken != null)
                 _linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, _externalCancellationToken.Value);
             else
                 _linkedCts = _cts;
+
             _callBack = new TCallBack<TInput>(_loggerFactory.CreateLogger(this.GetType().Name));
             _callBack.ResultAsync.ContinueWith((antecedent) => {
                 try
                 {
-                    Interlocked.CompareExchange(ref this._completed, 1, 0);
                     _cts.Cancel();
                     this.OnCompetion();
                 }
@@ -47,7 +47,7 @@ namespace TPLBlocks
                     // internal cleanup
                     this._OnCompetion();
                 }
-            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+            }, TaskContinuationOptions.ExecuteSynchronously);
             _callbackProxy = null;
         }
 
@@ -107,7 +107,7 @@ namespace TPLBlocks
 
         public BatchInfo BatchInfo { get => _callBack.BatchInfo; }
         public Guid Id { get => _id; set => _id = value; }
-        public bool IsCompleted { get => _completed == 1; }
+        public bool IsCompleted { get => _callBack.ResultAsync.IsCompleted; }
 
         public long Complete(Exception exception = null)
         {
