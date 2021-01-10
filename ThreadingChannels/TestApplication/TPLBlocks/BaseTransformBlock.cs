@@ -18,19 +18,41 @@ namespace TPLBlocks
         private Func<TOutput, Task> _outputSink;
         private Guid _id = new Guid();
         private Object _SyncLock = new Object();
+        private CancellationToken? _externalCancellationToken;
+        private CancellationTokenSource _cts;
+        private CancellationTokenSource _linkedCts;
 
-        public BaseTransformBlock(Func<TInput, Task<TOutput>> body, ILoggerFactory loggerFactory)
+        public BaseTransformBlock(Func<TInput, Task<TOutput>> body, ILoggerFactory loggerFactory, CancellationToken? cancellationToken= null)
         {
             _body = body;
             _outputSink = null;
             _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+            _externalCancellationToken = cancellationToken;
+            _cts = new CancellationTokenSource();
+            if (_externalCancellationToken != null)
+                _linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, _externalCancellationToken.Value);
+            else
+                _linkedCts = _cts;
             _callBack = new TCallBack<TInput>(_loggerFactory.CreateLogger(this.GetType().Name));
+            _callBack.ResultAsync.ContinueWith((antecedent) => {
+                _cts.Cancel();
+                this.OnCompetion();
+            }, TaskContinuationOptions.ExecuteSynchronously);
             _callbackProxy = null;
         }
 
+        /// <summary>
+        /// Used for stopping all threads in decendants
+        /// </summary>
+        protected abstract void OnCompetion();
+     
+
         public abstract ValueTask<bool> Post(TInput msg);
         
-        protected abstract CancellationToken GetCancellationToken();
+        protected virtual CancellationToken GetCancellationToken()
+        {
+            return _linkedCts.Token;
+        }
 
         protected long UpdateBatchSize(long addValue, bool isComplete)
         {
@@ -135,6 +157,11 @@ namespace TPLBlocks
                     (oldCallbackProxy as IDisposable)?.Dispose();
                 }
 
+                _linkedCts.Dispose();
+                if (_linkedCts != _cts)
+                {
+                    _cts.Dispose();
+                }
                 _isDisposed = true;
             }
         }

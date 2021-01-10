@@ -12,12 +12,13 @@ namespace TPLBlocks
         private Channel<TInput> _channel;
         private ChannelWriter<TInput> _messageQueue;
         private volatile int _started = 0;
+        private volatile int _completed = 0;
 
         public BufferTransformBlock(Func<TInput, Task<TOutput>> body, BufferTransformBlockOptions blockOptions = null):
-            base(body, (blockOptions?? BufferTransformBlockOptions.Default).LoggerFactory)
+            base(body, (blockOptions?? BufferTransformBlockOptions.Default).LoggerFactory, blockOptions?.CancellationToken)
         {
             blockOptions = blockOptions ?? BufferTransformBlockOptions.Default;
-            if (blockOptions.QueueCapacity == null)
+            if (blockOptions.BoundedCapacity == null)
             {
                 this._channel = Channel.CreateUnbounded<TInput>(new UnboundedChannelOptions
                 {
@@ -28,7 +29,7 @@ namespace TPLBlocks
             }
             else
             {
-                this._channel = Channel.CreateBounded<TInput>(new BoundedChannelOptions(blockOptions.QueueCapacity.Value)
+                this._channel = Channel.CreateBounded<TInput>(new BoundedChannelOptions(blockOptions.BoundedCapacity.Value)
                 {
                     FullMode = BoundedChannelFullMode.Wait,
                     SingleWriter = false,
@@ -52,31 +53,34 @@ namespace TPLBlocks
                         await (this as IWorkLoad<TInput>).DispatchMessage(msg, 1, token);
                     }
                 }
-                catch
-                {
-
+                catch(OperationCanceledException)
+                { 
                 }
             });
         }
 
+        protected override void OnCompetion()
+        {
+            Interlocked.CompareExchange(ref _completed, 0, 1);
+            Interlocked.CompareExchange(ref _started, 0, 1);
+        }
+
         public override async ValueTask<bool> Post(TInput msg)
         {
-            var oldStarted = Interlocked.CompareExchange(ref _started, 1, 0);
-            if (oldStarted == 0)
+            if (_completed == 0)
             {
-                this.Start();
+                var oldStarted = Interlocked.CompareExchange(ref _started, 1, 0);
+                if (oldStarted == 0)
+                {
+                    this.Start();
+                }
             }
+
             await _messageQueue.WriteAsync(msg, this.GetCancellationToken());
             this.UpdateBatchSize(1, false);
             return true;
         }
 
-        protected override CancellationToken GetCancellationToken()
-        {
-            return CancellationToken.None;
-        }
-
-        
         protected override void OnDispose()
         {
             Interlocked.CompareExchange(ref _started, 0, 1);

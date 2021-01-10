@@ -33,12 +33,12 @@ namespace TasksCoordinator.Test
             ILoggerFactory loggerFactory, 
             int maxDegreeOfParallelism, 
             int maxReadParallelism = 4,
-            int? queueCapacity = null)
+            int? boundedCapacity = null)
         {
             this.Name = name;
             this._isStopped = true;
             this._logger = loggerFactory.CreateLogger<MessageService<TMsg>>();
-            if (queueCapacity == null)
+            if (boundedCapacity == null)
             {
                 this._channel = Channel.CreateUnbounded<TMsg>(new UnboundedChannelOptions
                 {
@@ -49,7 +49,7 @@ namespace TasksCoordinator.Test
             }
             else
             {
-                this._channel = Channel.CreateBounded<TMsg>(new BoundedChannelOptions(queueCapacity.Value)
+                this._channel = Channel.CreateBounded<TMsg>(new BoundedChannelOptions(boundedCapacity.Value)
                 {
                     FullMode = BoundedChannelFullMode.Wait,
                     SingleWriter = false,
@@ -138,6 +138,10 @@ namespace TasksCoordinator.Test
         {
             try
             {
+                if (this._isStopped)
+                {
+                    return;
+                }
                 lock (this)
                 {
                     _isStopped = true;

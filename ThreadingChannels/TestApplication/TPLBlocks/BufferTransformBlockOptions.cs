@@ -11,12 +11,12 @@ namespace TPLBlocks
         public BufferTransformBlockOptions(ILoggerFactory loggerFactory)
         {
             LoggerFactory = loggerFactory;
-            QueueCapacity = 100;
+            BoundedCapacity = 100;
         }
 
         public ILoggerFactory LoggerFactory { get; }
 
-        public int? QueueCapacity { get; set; }
+        public int? BoundedCapacity { get; set; }
 
         public CancellationToken? CancellationToken { get; set; }
     }

@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Shared;
+using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator;
 using TPLBlocks;
 
 namespace TestApplication
@@ -17,10 +17,70 @@ namespace TestApplication
 
         static async Task Main(string[] args)
         {
-            BlockType blockType = BlockType.Transform;
+            CancellationTokenSource cts = new CancellationTokenSource();
+            cts.CancelAfter(30000);
 
-            using (ITransformBlock<string, string> transformBlock1 = CreateBlock(blockType))
-            using (ITransformBlock<string, string> transformBlock2 = CreateBlock(blockType))
+            Console.WriteLine("Starting BlockType.Buffer (Single Threaded) test...");
+
+            await ExecuteBlock(BlockType.Buffer);
+
+            // *************************************************************    
+
+            Console.WriteLine("Starting BlockType.Transform (TaskCoordinator) test...");
+
+            await ExecuteBlock(BlockType.Transform, cts.Token);
+
+
+            Console.WriteLine("Press any key to continue ...");
+            Console.ReadKey();
+        }
+
+        private static  ITransformBlock<string, string> CreateBlock(BlockType blockType, Func<string, Task<string>> body = null, Func<string, Task> outputSink = null, CancellationToken? token= null)
+        {
+            body = body ?? new Func<string, Task<string>>((async (msg) =>
+               {
+                   await Task.CompletedTask;
+                // Console.WriteLine(msg);
+                char[] charArray = msg.ToCharArray();
+                   for (int i = 0; i < 500; ++i)
+                   {
+                       Array.Reverse(charArray);
+                   }
+                   return new string(charArray);
+               }));
+
+            ITransformBlock<string, string> block;
+
+            switch (blockType)
+            {
+                case BlockType.Transform:
+                    {
+                        block = new TransformBlock<string, string>(body, new TransformBlockOptions(LogFactory.Instance) { CancellationToken = token });
+                    }
+                    break;
+                case BlockType.Buffer:
+                    {
+                        CancellationTokenSource cts = new CancellationTokenSource();
+                        cts.CancelAfter(2500);
+                        block = new BufferTransformBlock<string, string>(body, new BufferTransformBlockOptions(LogFactory.Instance) { CancellationToken= token });
+                    }
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown BlockType {blockType}");
+            }
+
+            if (outputSink != null)
+            {
+                block.OutputSink += outputSink;
+            }
+
+            return block;
+        }
+
+        private static async Task ExecuteBlock(BlockType blockType = BlockType.Transform, CancellationToken? token = null)
+        {
+            using (ITransformBlock<string, string> transformBlock1 = CreateBlock(blockType: blockType, token: token))
+            using (ITransformBlock<string, string> transformBlock2 = CreateBlock(blockType: blockType, token: token))
             {
 
                 var lastBlock = transformBlock1.LinkTo(transformBlock2);
@@ -49,50 +109,9 @@ namespace TestApplication
 
                 Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: {transformBlock1.BatchInfo.BatchSize} Processed Count: {processedCount}");
             }
-
-            Console.WriteLine("Press any key to continue ...");
-            Console.ReadKey();
         }
 
-        private static  ITransformBlock<string, string> CreateBlock(BlockType blockType, Func<string, Task<string>> body = null, Func<string, Task> outputSink = null)
-        {
-            body = body ?? new Func<string, Task<string>>((async (msg) =>
-               {
-                   await Task.CompletedTask;
-                // Console.WriteLine(msg);
-                char[] charArray = msg.ToCharArray();
-                   for (int i = 0; i < 500; ++i)
-                   {
-                       Array.Reverse(charArray);
-                   }
-                   return new string(charArray);
-               }));
 
-            ITransformBlock<string, string> block;
-
-            switch (blockType)
-            {
-                case BlockType.Transform:
-                    {
-                        block = new TransformBlock<string, string>(body);
-                    }
-                    break;
-                case BlockType.Buffer:
-                    {
-                        block = new BufferTransformBlock<string, string>(body);
-                    }
-                    break;
-                default:
-                    throw new InvalidOperationException($"Unknown BlockType {blockType}");
-            }
-
-            if (outputSink != null)
-            {
-                block.OutputSink += outputSink;
-            }
-
-            return block;
-        }
     }
 
 }

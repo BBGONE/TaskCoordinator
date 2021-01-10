@@ -12,13 +12,13 @@ namespace TPLBlocks
         public TransformBlockOptions(ILoggerFactory loggerFactory)
         {
             LoggerFactory = loggerFactory;
-            QueueCapacity = 100;
+            BoundedCapacity = 100;
             MaxDegreeOfParallelism = Environment.ProcessorCount;
         }
 
         public ILoggerFactory LoggerFactory { get; }
 
-        public int? QueueCapacity { get; set; }
+        public int? BoundedCapacity { get; set; }
 
         public int MaxDegreeOfParallelism { get; set; }
 
