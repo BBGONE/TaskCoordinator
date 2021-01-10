@@ -60,8 +60,6 @@ namespace TestApplication
                     break;
                 case BlockType.Buffer:
                     {
-                        CancellationTokenSource cts = new CancellationTokenSource();
-                        cts.CancelAfter(2500);
                         block = new BufferTransformBlock<string, string>(body, new BufferTransformBlockOptions(LogFactory.Instance) { CancellationToken= token });
                     }
                     break;
