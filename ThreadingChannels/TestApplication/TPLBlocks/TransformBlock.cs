@@ -9,7 +9,6 @@ namespace TPLBlocks
     {
         private readonly MessageService<TInput> _svc;
         private volatile int _started = 0;
-        private volatile int _completed = 0;
 
         public TransformBlock(Func<TInput, Task<TOutput>> body, TransformBlockOptions blockOptions = null):
             base(body, (blockOptions?? TransformBlockOptions.Default).LoggerFactory, blockOptions?.CancellationToken)
@@ -20,7 +19,7 @@ namespace TPLBlocks
 
         public override async ValueTask<bool> Post(TInput msg)
         {
-            if (_completed == 0)
+            if (!this.IsCompleted)
             {
                 var oldStarted = Interlocked.CompareExchange(ref _started, 1, 0);
                 if (oldStarted == 0)
@@ -40,7 +39,6 @@ namespace TPLBlocks
 
         protected override void OnCompetion()
         {
-            Interlocked.CompareExchange(ref _completed, 0, 1);
             var oldStarted = Interlocked.CompareExchange(ref _started, 0, 1);
             if (oldStarted == 1)
             {

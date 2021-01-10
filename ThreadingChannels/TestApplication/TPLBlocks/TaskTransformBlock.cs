@@ -6,19 +6,19 @@ using TasksCoordinator.Test.Interface;
 
 namespace TPLBlocks
 {
-    public class BufferTransformBlock<TInput, TOutput> : BaseTransformBlock<TInput, TOutput>
+    public class TaskTransformBlock<TInput, TOutput> : BaseTransformBlock<TInput, TOutput>
     {
-        private Task _task;
+        private Task[] _tasks;
         private Channel<TInput> _channel;
         private ChannelWriter<TInput> _messageQueue;
         private volatile int _started = 0;
-        private volatile int _completed = 0;
+        private readonly TransformBlockOptions _blockOptions;
 
-        public BufferTransformBlock(Func<TInput, Task<TOutput>> body, BufferTransformBlockOptions blockOptions = null):
-            base(body, (blockOptions?? BufferTransformBlockOptions.Default).LoggerFactory, blockOptions?.CancellationToken)
+        public TaskTransformBlock(Func<TInput, Task<TOutput>> body, TransformBlockOptions blockOptions = null):
+            base(body, (blockOptions?? TransformBlockOptions.Default).LoggerFactory, blockOptions?.CancellationToken)
         {
-            blockOptions = blockOptions ?? BufferTransformBlockOptions.Default;
-            if (blockOptions.BoundedCapacity == null)
+            this._blockOptions = blockOptions ?? TransformBlockOptions.Default;
+            if (this._blockOptions.BoundedCapacity == null)
             {
                 this._channel = Channel.CreateUnbounded<TInput>(new UnboundedChannelOptions
                 {
@@ -29,7 +29,7 @@ namespace TPLBlocks
             }
             else
             {
-                this._channel = Channel.CreateBounded<TInput>(new BoundedChannelOptions(blockOptions.BoundedCapacity.Value)
+                this._channel = Channel.CreateBounded<TInput>(new BoundedChannelOptions(this._blockOptions.BoundedCapacity.Value)
                 {
                     FullMode = BoundedChannelFullMode.Wait,
                     SingleWriter = false,
@@ -44,30 +44,35 @@ namespace TPLBlocks
         {
             var reader = this._channel.Reader;
             var token = this.GetCancellationToken();
-            this._task = Task.Run(async () => {
-                try
+            Task[] tasks = new Task[this._blockOptions.MaxDegreeOfParallelism];
+            for (int i = 0; i < this._blockOptions.MaxDegreeOfParallelism; ++i)
+            {
+                tasks[i] = Task.Run(async () =>
                 {
-                    while (this._started == 1)
+                    try
                     {
-                        var msg = await reader.ReadAsync(token);
-                        await (this as IWorkLoad<TInput>).DispatchMessage(msg, 1, token);
+                        while (this._started == 1)
+                        {
+                            var msg = await reader.ReadAsync(token);
+                            await (this as IWorkLoad<TInput>).DispatchMessage(msg, 1, token);
+                        }
                     }
-                }
-                catch(OperationCanceledException)
-                { 
-                }
-            });
+                    catch (OperationCanceledException)
+                    {
+                    }
+                });
+            }
+            this._tasks = tasks;
         }
 
         protected override void OnCompetion()
         {
-            Interlocked.CompareExchange(ref _completed, 0, 1);
             Interlocked.CompareExchange(ref _started, 0, 1);
         }
 
         public override async ValueTask<bool> Post(TInput msg)
         {
-            if (_completed == 0)
+            if (!this.IsCompleted)
             {
                 var oldStarted = Interlocked.CompareExchange(ref _started, 1, 0);
                 if (oldStarted == 0)
@@ -85,6 +90,7 @@ namespace TPLBlocks
         {
             Interlocked.CompareExchange(ref _started, 0, 1);
             _messageQueue.TryComplete();
+            this._tasks = null;
             base.OnDispose();
         }
     }

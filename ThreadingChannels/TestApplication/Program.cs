@@ -12,6 +12,7 @@ namespace TestApplication
         public enum BlockType
         {
             Transform,
+            TaskTransform,
             Buffer
         }
 
@@ -25,6 +26,14 @@ namespace TestApplication
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Buffer (Single Threaded) test...");
 
                 await ExecuteBlock(BlockType.Buffer, cts.Token);
+
+                Console.WriteLine();
+                // *************************************************************    
+                // cts.CancelAfter(1000);
+
+                Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.TaskTransform (just several of Task.Run) test...");
+
+                await ExecuteBlock(BlockType.TaskTransform, cts.Token);
 
                 Console.WriteLine();
                 // *************************************************************    
@@ -83,9 +92,14 @@ namespace TestApplication
                         block = new TransformBlock<string, string>(body, new TransformBlockOptions(LogFactory.Instance) { CancellationToken = token });
                     }
                     break;
+                case BlockType.TaskTransform:
+                    {
+                        block = new TaskTransformBlock<string, string>(body, new TransformBlockOptions(LogFactory.Instance) { CancellationToken = token });
+                    }
+                    break;
                 case BlockType.Buffer:
                     {
-                        block = new BufferTransformBlock<string, string>(body, new BufferTransformBlockOptions(LogFactory.Instance) { CancellationToken= token });
+                        block = new BufferBlock<string, string>(body, new BufferBlockOptions(LogFactory.Instance) { CancellationToken= token });
                     }
                     break;
                 default:

@@ -4,11 +4,11 @@ using System.Threading;
 
 namespace TPLBlocks
 {
-    public class BufferTransformBlockOptions
+    public class BufferBlockOptions
     {
-        public static readonly BufferTransformBlockOptions Default = new BufferTransformBlockOptions(LogFactory.Instance);
+        public static readonly BufferBlockOptions Default = new BufferBlockOptions(LogFactory.Instance);
 
-        public BufferTransformBlockOptions(ILoggerFactory loggerFactory)
+        public BufferBlockOptions(ILoggerFactory loggerFactory)
         {
             LoggerFactory = loggerFactory;
             BoundedCapacity = 100;

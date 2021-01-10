@@ -21,6 +21,7 @@ namespace TPLBlocks
         private CancellationToken? _externalCancellationToken;
         private CancellationTokenSource _cts;
         private CancellationTokenSource _linkedCts;
+        private volatile int _completed = 0;
 
         public BaseTransformBlock(Func<TInput, Task<TOutput>> body, ILoggerFactory loggerFactory, CancellationToken? cancellationToken= null)
         {
@@ -35,10 +36,25 @@ namespace TPLBlocks
                 _linkedCts = _cts;
             _callBack = new TCallBack<TInput>(_loggerFactory.CreateLogger(this.GetType().Name));
             _callBack.ResultAsync.ContinueWith((antecedent) => {
-                _cts.Cancel();
-                this.OnCompetion();
+                try
+                {
+                    Interlocked.CompareExchange(ref this._completed, 1, 0);
+                    _cts.Cancel();
+                    this.OnCompetion();
+                }
+                finally
+                {
+                    // internal cleanup
+                    this._OnCompetion();
+                }
             }, TaskContinuationOptions.RunContinuationsAsynchronously);
             _callbackProxy = null;
+        }
+
+        private void  _OnCompetion()
+        {
+            // the output sink won't be needed after completion (so cleat it at once)
+            _outputSink = null;
         }
 
         /// <summary>
@@ -91,6 +107,7 @@ namespace TPLBlocks
 
         public BatchInfo BatchInfo { get => _callBack.BatchInfo; }
         public Guid Id { get => _id; set => _id = value; }
+        public bool IsCompleted { get => _completed == 1; }
 
         public long Complete(Exception exception = null)
         {
@@ -150,18 +167,22 @@ namespace TPLBlocks
             {
                 this.OnDispose();
 
-                _outputSink = null;
+                this._OnCompetion();
+
                 var oldCallbackProxy = Interlocked.Exchange(ref _callbackProxy, null);
                 if (oldCallbackProxy != null)
                 {
                     (oldCallbackProxy as IDisposable)?.Dispose();
                 }
 
-                _linkedCts.Dispose();
-                if (_linkedCts != _cts)
+                _linkedCts?.Dispose();
+                if (_linkedCts != _cts && _cts != null)
                 {
-                    _cts.Dispose();
+                    _cts?.Dispose();
                 }
+                _linkedCts = null;
+                _cts = null;
+
                 _isDisposed = true;
             }
         }
