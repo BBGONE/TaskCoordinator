@@ -1,6 +1,7 @@
 ﻿using Shared;
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TPLBlocks;
@@ -23,7 +24,7 @@ namespace TestApplication
 
             var task = Task.Run(async () =>
             {
-                Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.LinkMany (Two Blocks are linked to one) test...");
+                Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.LinkMany (Several (5) Blocks are linked to one) test...");
 
                 await ExecuteBlock(BlockType.LinkMany, cts.Token);
 
@@ -170,43 +171,49 @@ namespace TestApplication
             }
         }
 
-        private static async Task ExecuteLinkManyBlock(CancellationToken? token = null)
+        private static async Task ExecuteLinkManyBlock(CancellationToken? token = null, bool testException=false)
         {
             int processedCount = 0;
+            var inputs = Enumerable.Range(1, 5).Select((i) => CreateBlock(blockType: BlockType.TaskTransform, token: token)).ToList();
 
-            using (ITransformBlock<string, string> transformBlock1 = CreateBlock(blockType: BlockType.TaskTransform, token: token))
-            using (ITransformBlock<string, string> transformBlock2 = CreateBlock(blockType: BlockType.TaskTransform, token: token))
-            using (ITransformBlock<string, string> transformBlock3 = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => { Interlocked.Increment(ref processedCount); return Task.FromResult(msg); }))
+
+            using (var inputsDisposal = new CompositeDisposable(inputs))
+            using (ITransformBlock<string, string> bufferBlock = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => {
+                Interlocked.Increment(ref processedCount);
+                if (testException)
+                {
+                    if (processedCount == 1000000)
+                    {
+                        throw new ApplicationException("ApplicationException: Test that all dataflow is stopped");
+                    }
+                }
+                return Task.FromResult(msg); 
+            }))
             {
                 Stopwatch sw = new Stopwatch();
                 try
                 {
 
-                    var lastBlock = (new[] { transformBlock1, transformBlock2 }).LinkManyTo(transformBlock3);
+                    var lastBlock = inputs.LinkManyTo(bufferBlock);
 
 
                     sw.Start();
-
-                    var t1 = Task.Run(async () =>
+                    foreach(var input in inputs)
                     {
-                        for (int i = 0; i < 1000000; ++i)
+                        var dummy = input.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation": antecedent.Exception?.Message?? "No Error")}"));
+
+                        var t1 = Task.Run(async () =>
                         {
-                            await transformBlock1.Post(Guid.NewGuid().ToString());
-                        }
+                            for (int i = 0; i < 1000000; ++i)
+                            {
+                                await input.Post(Guid.NewGuid().ToString());
+                            }
 
-                        transformBlock1.Complete();
-                    });
+                            input.Complete();
+                        });
+                    }
 
-                    var t2 = Task.Run(async () =>
-                    {
-                        for (int i = 0; i < 1000000; ++i)
-                        {
-                            await transformBlock2.Post(Guid.NewGuid().ToString());
-                        }
-
-                        transformBlock2.Complete();
-                    });
-
+                    
 
                     await lastBlock.Completion;
 
@@ -219,7 +226,7 @@ namespace TestApplication
                 finally
                 {
                     sw.Stop();
-                    Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: {transformBlock1.BatchInfo.BatchSize} Processed Count: {processedCount}");
+                    Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: 1000000 Processed Count: {processedCount}");
                 }
             }
         }
