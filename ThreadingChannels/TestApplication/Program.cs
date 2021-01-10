@@ -13,7 +13,8 @@ namespace TestApplication
         {
             Transform,
             TaskTransform,
-            Buffer
+            Buffer,
+            LinkMany
         }
 
         static async Task Main(string[] args)
@@ -22,6 +23,14 @@ namespace TestApplication
 
             var task = Task.Run(async () =>
             {
+                Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.LinkMany (Two Blocks are linked to one) test...");
+
+                await ExecuteBlock(BlockType.LinkMany, cts.Token);
+
+                Console.WriteLine();
+             
+                // *************************************************************    
+
                 // cts.CancelAfter(3000);
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Buffer (Single Threaded) test...");
 
@@ -116,6 +125,12 @@ namespace TestApplication
 
         private static async Task ExecuteBlock(BlockType blockType = BlockType.Transform, CancellationToken? token = null)
         {
+            if (blockType== BlockType.LinkMany)
+            {
+                await ExecuteLinkManyBlock(token);
+                return;
+            }
+
             int processedCount = 0;
 
             using (ITransformBlock<string, string> transformBlock1 = CreateBlock(blockType: blockType, token: token))
@@ -137,6 +152,60 @@ namespace TestApplication
                     }
 
                     transformBlock1.Complete();
+
+
+                    await lastBlock.Completion;
+
+                    await Task.Yield();
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine($"Block execution was cancelled {DateTime.Now.ToString("hh:mm:ss")}");
+                }
+                finally
+                {
+                    sw.Stop();
+                    Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: {transformBlock1.BatchInfo.BatchSize} Processed Count: {processedCount}");
+                }
+            }
+        }
+
+        private static async Task ExecuteLinkManyBlock(CancellationToken? token = null)
+        {
+            int processedCount = 0;
+
+            using (ITransformBlock<string, string> transformBlock1 = CreateBlock(blockType: BlockType.TaskTransform, token: token))
+            using (ITransformBlock<string, string> transformBlock2 = CreateBlock(blockType: BlockType.TaskTransform, token: token))
+            using (ITransformBlock<string, string> transformBlock3 = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => { Interlocked.Increment(ref processedCount); return Task.FromResult(msg); }))
+            {
+                Stopwatch sw = new Stopwatch();
+                try
+                {
+
+                    var lastBlock = (new[] { transformBlock1, transformBlock2 }).LinkManyTo(transformBlock3);
+
+
+                    sw.Start();
+
+                    var t1 = Task.Run(async () =>
+                    {
+                        for (int i = 0; i < 1000000; ++i)
+                        {
+                            await transformBlock1.Post(Guid.NewGuid().ToString());
+                        }
+
+                        transformBlock1.Complete();
+                    });
+
+                    var t2 = Task.Run(async () =>
+                    {
+                        for (int i = 0; i < 1000000; ++i)
+                        {
+                            await transformBlock2.Post(Guid.NewGuid().ToString());
+                        }
+
+                        transformBlock2.Complete();
+                    });
 
 
                     await lastBlock.Completion;

@@ -1,4 +1,8 @@
-﻿namespace TPLBlocks
+﻿using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace TPLBlocks
 {
     public static class TransformBlockExtensions
     {
@@ -8,6 +12,24 @@
     
             inputBlock.Completion.ContinueWith((antecedent) => { 
                 outputBlock.Complete(antecedent.Exception); 
+            });
+
+            return outputBlock;
+        }
+
+        public static ITransformBlock<TOutput, TResult> LinkManyTo<TInput, TOutput, TResult>(this IEnumerable<ITransformBlock<TInput, TOutput>> inputBlocks, ITransformBlock<TOutput, TResult> outputBlock)
+        {
+            foreach (var inputBlock in inputBlocks)
+            {
+                inputBlock.OutputSink += (async (output) => { await outputBlock.Post(output); });
+            }
+
+            var inputBlocksCompletions = inputBlocks.Select(ib=> ib.Completion).ToArray();
+
+            var completeTask = Task.WhenAll(inputBlocksCompletions);
+
+            completeTask.ContinueWith((antecedent) => {
+                outputBlock.Complete(antecedent.Exception);
             });
 
             return outputBlock;
