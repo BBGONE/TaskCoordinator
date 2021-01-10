@@ -18,20 +18,45 @@ namespace TestApplication
         static async Task Main(string[] args)
         {
             CancellationTokenSource cts = new CancellationTokenSource();
-            cts.CancelAfter(30000);
 
-            Console.WriteLine("Starting BlockType.Buffer (Single Threaded) test...");
+            var task = Task.Run(async () =>
+            {
+                // cts.CancelAfter(3000);
+                Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Buffer (Single Threaded) test...");
 
-            await ExecuteBlock(BlockType.Buffer);
+                await ExecuteBlock(BlockType.Buffer, cts.Token);
 
-            // *************************************************************    
+                Console.WriteLine();
+                // *************************************************************    
+                // cts.CancelAfter(1000);
 
-            Console.WriteLine("Starting BlockType.Transform (TaskCoordinator) test...");
+                Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Transform (TaskCoordinator) test...");
 
-            await ExecuteBlock(BlockType.Transform, cts.Token);
+                await ExecuteBlock(BlockType.Transform, cts.Token);
 
+            });
 
-            Console.WriteLine("Press any key to continue ...");
+            /*
+            // Can be used to monitor execution (at needed intervals)
+            Task comletedTask = null;
+
+            while(comletedTask != task)
+            {
+                comletedTask = await Task.WhenAny(task, Task.Delay(1000));
+            }
+            */
+
+            try
+            {
+                await task;
+                Console.WriteLine();
+                Console.WriteLine($"Now: {DateTime.Now.ToString("hh:mm:ss")} Press any key to continue ...");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected exception: {ex.Message} Now: {DateTime.Now.ToString("hh:mm:ss")} Press any key to continue ...");
+            }
+
             Console.ReadKey();
         }
 
@@ -77,35 +102,42 @@ namespace TestApplication
 
         private static async Task ExecuteBlock(BlockType blockType = BlockType.Transform, CancellationToken? token = null)
         {
+            int processedCount = 0;
+
             using (ITransformBlock<string, string> transformBlock1 = CreateBlock(blockType: blockType, token: token))
             using (ITransformBlock<string, string> transformBlock2 = CreateBlock(blockType: blockType, token: token))
             {
-
-                var lastBlock = transformBlock1.LinkTo(transformBlock2);
-
-                int processedCount = 0;
-
-                lastBlock.OutputSink += (async (output) => { await Task.CompletedTask; Interlocked.Increment(ref processedCount); });
-
                 Stopwatch sw = new Stopwatch();
-
-                sw.Start();
-
-                for (int i = 0; i < 1000000; ++i)
+                try
                 {
-                    await transformBlock1.Post(Guid.NewGuid().ToString());
+
+                    var lastBlock = transformBlock1.LinkTo(transformBlock2);
+
+                    lastBlock.OutputSink += (async (output) => { await Task.CompletedTask; Interlocked.Increment(ref processedCount); });
+
+                    sw.Start();
+
+                    for (int i = 0; i < 1000000; ++i)
+                    {
+                        await transformBlock1.Post(Guid.NewGuid().ToString());
+                    }
+
+                    transformBlock1.Complete();
+
+
+                    await lastBlock.Completion;
+
+                    await Task.Yield();
                 }
-
-                transformBlock1.Complete();
-
-
-                await lastBlock.Completion;
-
-                sw.Stop();
-
-                await Task.Yield();
-
-                Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: {transformBlock1.BatchInfo.BatchSize} Processed Count: {processedCount}");
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine($"Block execution was cancelled {DateTime.Now.ToString("hh:mm:ss")}");
+                }
+                finally
+                {
+                    sw.Stop();
+                    Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: {transformBlock1.BatchInfo.BatchSize} Processed Count: {processedCount}");
+                }
             }
         }
 

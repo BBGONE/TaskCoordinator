@@ -37,7 +37,7 @@ namespace TPLBlocks
             _callBack.ResultAsync.ContinueWith((antecedent) => {
                 _cts.Cancel();
                 this.OnCompetion();
-            }, TaskContinuationOptions.ExecuteSynchronously);
+            }, TaskContinuationOptions.RunContinuationsAsynchronously);
             _callbackProxy = null;
         }
 
