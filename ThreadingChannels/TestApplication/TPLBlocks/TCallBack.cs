@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Shared.Errors;
 using System;
-using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Callbacks;
 

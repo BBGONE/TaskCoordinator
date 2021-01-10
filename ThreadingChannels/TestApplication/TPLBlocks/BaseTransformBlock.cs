@@ -137,20 +137,20 @@ namespace TPLBlocks
 
                     if (firstError != null)
                     {
-                        CallbackProxy.JobCompleted(firstError);
+                        CallbackProxy.JobCompleted(firstError).GetAwaiter().GetResult();
                     }
                     else
                     {
-                        CallbackProxy.JobCancelled();
+                        CallbackProxy.JobCancelled().GetAwaiter().GetResult();
                     }
                 }
                 else if (exception is OperationCanceledException)
                 {
-                    CallbackProxy.JobCancelled();
+                    CallbackProxy.JobCancelled().GetAwaiter().GetResult();
                 }
                 else
                 {
-                    CallbackProxy.JobCompleted(exception);
+                    CallbackProxy.JobCompleted(exception).GetAwaiter().GetResult();
                 }
 
                 return this.UpdateBatchSize(0, true);

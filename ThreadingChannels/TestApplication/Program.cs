@@ -128,7 +128,7 @@ namespace TestApplication
         {
             if (blockType== BlockType.LinkMany)
             {
-                await ExecuteLinkManyBlock(token);
+                await ExecuteLinkManyBlock(token, true);
                 return;
             }
 
@@ -180,13 +180,15 @@ namespace TestApplication
             using (var inputsDisposal = new CompositeDisposable(inputs))
             using (ITransformBlock<string, string> bufferBlock = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => {
                 Interlocked.Increment(ref processedCount);
+                /*
                 if (testException)
                 {
-                    if (processedCount == 1000000)
+                    if (processedCount == 4999999)
                     {
                         throw new ApplicationException("ApplicationException: Test that all dataflow is stopped");
                     }
                 }
+                */
                 return Task.FromResult(msg); 
             }))
             {

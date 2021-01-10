@@ -48,7 +48,7 @@ namespace TasksCoordinator.Callbacks
                     var batchInfo = this._callback.BatchInfo;
                     if (batchInfo.IsComplete && this._processedCount == batchInfo.BatchSize && !this._token.IsCancellationRequested)
                     {
-                        ((ICallbackProxy<T>)this).JobCompleted(null);
+                        ((ICallbackProxy<T>)this).JobCompleted(null).GetAwaiter().GetResult();
                     }
                 }
             }, TaskContinuationOptions.ExecuteSynchronously);
@@ -64,7 +64,7 @@ namespace TasksCoordinator.Callbacks
                 var batchInfo = this._callback.BatchInfo;
                 if (batchInfo.IsComplete && count == batchInfo.BatchSize)
                 {
-                    ((ICallbackProxy<T>)this).JobCompleted(null);
+                    await ((ICallbackProxy<T>)this).JobCompleted(null);
                 }
             }
             else if (error is AggregateException aggex)
@@ -86,12 +86,12 @@ namespace TasksCoordinator.Callbacks
                 }
                 else
                 {
-                    ((ICallbackProxy<T>)this).JobCancelled();
+                    await ((ICallbackProxy<T>)this).JobCancelled();
                 }
             }
             else if (error is OperationCanceledException)
             {
-                ((ICallbackProxy<T>)this).JobCancelled();
+                await ((ICallbackProxy<T>)this).JobCancelled();
             }
             else
             {
@@ -116,19 +116,19 @@ namespace TasksCoordinator.Callbacks
                 bool res = await this._callback.TaskError(message, error);
                 if (!res)
                 {
-                    ((ICallbackProxy<T>)this).JobCompleted(error);
+                    await ((ICallbackProxy<T>)this).JobCompleted(error);
                 }
             }
         }
 
-        void ICallbackProxy<T>.JobCancelled()
+        async Task ICallbackProxy<T>.JobCancelled()
         {
             var oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Cancelled, 0);
             if ((JobStatus)oldstatus == JobStatus.Running)
             {
                 try
                 {
-                    var task = Task.Run(() =>
+                    await Task.Run(() =>
                     {
                         try
                         {
@@ -150,7 +150,7 @@ namespace TasksCoordinator.Callbacks
             }
         }
 
-        void ICallbackProxy<T>.JobCompleted(Exception error)
+        async Task ICallbackProxy<T>.JobCompleted(Exception error)
         {
             var oldstatus = 0;
             if (error == null)
@@ -166,7 +166,7 @@ namespace TasksCoordinator.Callbacks
             {
                 try
                 {
-                    var task = Task.Run(() =>
+                    await Task.Run(() =>
                     {
                         try
                         {
@@ -200,7 +200,7 @@ namespace TasksCoordinator.Callbacks
             {
                 if (disposing)
                 {
-                    ((ICallbackProxy<T>)this).JobCancelled();
+                    var _task = ((ICallbackProxy<T>)this).JobCancelled();
                 }
 
                 _disposed = true;
