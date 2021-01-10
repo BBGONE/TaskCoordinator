@@ -13,8 +13,8 @@ namespace TasksCoordinator.Interface
     {
         void TaskSuccess(T message);
         Task<bool> TaskError(T message, Exception error);
-        Task JobCancelled();
-        Task JobCompleted(Exception error);
+        bool JobCancelled();
+        bool JobCompleted(Exception error);
         long UpdateBatchSize(long addValue, bool isComplete);
 
         Task ResultAsync { get; }

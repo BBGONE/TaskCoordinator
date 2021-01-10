@@ -23,7 +23,6 @@ namespace TasksCoordinator.Callbacks
         private CancellationTokenRegistration _register;
         private volatile int _processedCount;
         private volatile int _status;
-        private SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(1, 1);
 
         public CallbackProxy(ICallback<T> callback, ILoggerFactory loggerFactory, CancellationToken? token = null)
         {
@@ -43,21 +42,27 @@ namespace TasksCoordinator.Callbacks
             }, false);
 
             this._callback.CompleteAsync.ContinueWith((t) => {
+                
                 int oldstatus = this._status;
-                if (oldstatus == 0)
+
+                if (oldstatus == (int)JobStatus.Running)
                 {
                     var batchInfo = this._callback.BatchInfo;
 
-                    if (t.Exception != null)
+                    if (t.IsCanceled || this._token.IsCancellationRequested)
                     {
-                        ((ICallbackProxy<T>)this).JobCompleted(t.Exception).GetAwaiter().GetResult();
+                        ((ICallbackProxy<T>)this).JobCancelled();
                     }
-                    else if (batchInfo.IsComplete && this._processedCount == batchInfo.BatchSize && !this._token.IsCancellationRequested)
+                    else if (t.Exception != null)
                     {
-                        ((ICallbackProxy<T>)this).JobCompleted(null).GetAwaiter().GetResult();
+                        ((ICallbackProxy<T>)this).JobCompleted(t.Exception);
+                    }
+                    else if (batchInfo.IsComplete && this._processedCount == batchInfo.BatchSize)
+                    {
+                        ((ICallbackProxy<T>)this).JobCompleted(null);
                     }
                 }
-            }, TaskContinuationOptions.RunContinuationsAsynchronously);
+            }, TaskContinuationOptions.ExecuteSynchronously);
             
             this._status = 0;
         }
@@ -77,7 +82,7 @@ namespace TasksCoordinator.Callbacks
                 var batchInfo = this._callback.BatchInfo;
                 if (batchInfo.IsComplete && count == batchInfo.BatchSize)
                 {
-                    await ((ICallbackProxy<T>)this).JobCompleted(null);
+                    ((ICallbackProxy<T>)this).JobCompleted(null);
                 }
             }
             else if (error is AggregateException aggex)
@@ -100,12 +105,12 @@ namespace TasksCoordinator.Callbacks
                 }
                 else
                 {
-                    await ((ICallbackProxy<T>)this).JobCancelled();
+                    ((ICallbackProxy<T>)this).JobCancelled();
                 }
             }
             else if (error is OperationCanceledException)
             {
-                await ((ICallbackProxy<T>)this).JobCancelled();
+                ((ICallbackProxy<T>)this).JobCancelled();
             }
             else
             {
@@ -131,81 +136,73 @@ namespace TasksCoordinator.Callbacks
                 bool res = await this._callback.TaskError(message, error);
                 if (!res)
                 {
-                    await ((ICallbackProxy<T>)this).JobCompleted(error);
+                    ((ICallbackProxy<T>)this).JobCompleted(error);
                 }
             }
         }
 
-        async Task ICallbackProxy<T>.JobCancelled()
+        bool ICallbackProxy<T>.JobCancelled()
         {
-            await _semaphoreSlim.WaitAsync();
-            try
+            int oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Cancelled, 0);
+            bool res = false;
+
+            if ((JobStatus)oldstatus == JobStatus.Running)
             {
-                var oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Cancelled, 0);
-                if ((JobStatus)oldstatus == JobStatus.Running)
+                try
                 {
-                    try
+                    res = this._callback.JobCancelled();
+                }
+                catch (Exception ex)
+                {
+                    if (!(ex is OperationCanceledException))
                     {
-                        await this._callback.JobCancelled();
-                    }
-                    catch (Exception ex)
-                    {
-                        if (!(ex is OperationCanceledException))
-                        {
-                            _logger.LogError(ErrorHelper.GetFullMessage(ex));
-                        }
-                    }
-                    finally
-                    {
-                        this._register.Dispose();
+                        _logger.LogError(ErrorHelper.GetFullMessage(ex));
                     }
                 }
+                finally
+                {
+                    this._register.Dispose();
+                }
             }
-            finally
-            {
-                _semaphoreSlim.Release();
-            }
+
+            return res;
         }
 
-        async Task ICallbackProxy<T>.JobCompleted(Exception error)
+        bool ICallbackProxy<T>.JobCompleted(Exception error)
         {
-            await _semaphoreSlim.WaitAsync();
-            try
+            int oldstatus;
+
+            if (error == null)
             {
-                var oldstatus = (int)JobStatus.Running;
+                oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Success, 0);
+            }
+            else
+            {
+                oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Error, 0);
+            }
 
-                if (error == null)
-                {
-                    oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Success, 0);
-                }
-                else
-                {
-                    oldstatus = Interlocked.CompareExchange(ref this._status, (int)JobStatus.Error, 0);
-                }
+            bool res = false;
 
-                if ((JobStatus)oldstatus == JobStatus.Running)
+            if ((JobStatus)oldstatus == JobStatus.Running)
+            {
+                try
                 {
-                    try
+                     res = this._callback.JobCompleted(error);
+                }
+                catch (Exception ex)
+                {
+                    if (!(ex is OperationCanceledException))
                     {
-                        await this._callback.JobCompleted(error);
+                        _logger.LogError(ErrorHelper.GetFullMessage(ex));
                     }
-                    catch (Exception ex)
-                    {
-                        if (!(ex is OperationCanceledException))
-                        {
-                            _logger.LogError(ErrorHelper.GetFullMessage(ex));
-                        }
-                    }
-                    finally
-                    {
-                        this._register.Dispose();
-                    }
+                }
+                finally
+                {
+                    this._register.Dispose();
                 }
             }
-            finally
-            {
-                _semaphoreSlim.Release();
-            }
+
+            return res;
         }
 
         BatchInfo ICallbackProxy<T>.BatchInfo { get { return this._callback.BatchInfo; } }
@@ -220,7 +217,7 @@ namespace TasksCoordinator.Callbacks
             {
                 if (disposing)
                 {
-                    ((ICallbackProxy<T>)this).JobCancelled().GetAwaiter().GetResult();
+                    ((ICallbackProxy<T>)this).JobCancelled();
                 }
 
                 _disposed = true;

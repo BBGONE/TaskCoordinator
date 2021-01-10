@@ -7,7 +7,7 @@ namespace TasksCoordinator.Interface
     {
         BatchInfo BatchInfo { get; }
         Task TaskCompleted(T message, Exception error);
-        Task JobCancelled();
-        Task JobCompleted(Exception error);
+        bool JobCancelled();
+        bool JobCompleted(Exception error);
     }
 }
