@@ -23,7 +23,7 @@ namespace TPLBlocks
                 this._channel = Channel.CreateUnbounded<TInput>(new UnboundedChannelOptions
                 {
                     SingleWriter = false,
-                    SingleReader = true,
+                    SingleReader = false,
                     AllowSynchronousContinuations = true,
                 });
             }
@@ -33,7 +33,7 @@ namespace TPLBlocks
                 {
                     FullMode = BoundedChannelFullMode.Wait,
                     SingleWriter = false,
-                    SingleReader = true,
+                    SingleReader = false,
                     AllowSynchronousContinuations = true,
                 });
             }
