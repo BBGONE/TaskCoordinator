@@ -202,7 +202,7 @@ namespace TestApplication
                     sw.Start();
                     foreach(var input in inputs)
                     {
-                        var dummy = input.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation": antecedent.Exception?.Message?? "No Error")}"));
+                        var dummy1 = input.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation": antecedent.Exception?.Message?? "No Error")}"));
 
                         var t1 = Task.Run(async () =>
                         {
@@ -215,7 +215,7 @@ namespace TestApplication
                         });
                     }
 
-                    lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"Lastblock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
+                    var dummy2 = lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"Lastblock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
 
                     await lastBlock.Completion;
 

@@ -47,7 +47,7 @@ namespace TPLBlocks
                     // internal cleanup
                     this._OnCompetion();
                 }
-            }, TaskContinuationOptions.ExecuteSynchronously);
+            }, TaskContinuationOptions.RunContinuationsAsynchronously);
             _callbackProxy = null;
         }
 
