@@ -108,17 +108,17 @@ namespace TestApplication
             {
                 case BlockType.Transform:
                     {
-                        block = new TransformBlock<string, string>(body, new TransformBlockOptions(LogFactory.Instance) { CancellationToken = token });
+                        block = new TransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token });
                     }
                     break;
                 case BlockType.TaskTransform:
                     {
-                        block = new TaskTransformBlock<string, string>(body, new TransformBlockOptions(LogFactory.Instance) { CancellationToken = token });
+                        block = new TaskTransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token });
                     }
                     break;
                 case BlockType.Buffer:
                     {
-                        block = new BufferBlock<string, string>(body, new BufferBlockOptions(LogFactory.Instance) { CancellationToken= token });
+                        block = new BufferBlock<string, string>(body, new BufferBlockOptions() { CancellationToken= token });
                     }
                     break;
                 default:

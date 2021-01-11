@@ -1,22 +1,17 @@
-﻿using Microsoft.Extensions.Logging;
-using System;
+﻿using System;
 using System.Threading;
-using TestApplication;
 
 namespace TPLBlocks.Options
 {
     public class TransformBlockOptions
     {
-        public static readonly TransformBlockOptions Default = new TransformBlockOptions(LogFactory.Instance);
+        public static readonly TransformBlockOptions Default = new TransformBlockOptions();
 
-        public TransformBlockOptions(ILoggerFactory loggerFactory)
+        public TransformBlockOptions()
         {
-            LoggerFactory = loggerFactory;
             BoundedCapacity = 100;
             MaxDegreeOfParallelism = Environment.ProcessorCount;
         }
-
-        public ILoggerFactory LoggerFactory { get; }
 
         public int? BoundedCapacity { get; set; }
 

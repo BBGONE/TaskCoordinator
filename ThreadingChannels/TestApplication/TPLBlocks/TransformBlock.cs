@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Test;
+using TestApplication;
 using TPLBlocks.Core;
 using TPLBlocks.Options;
 
@@ -13,10 +14,11 @@ namespace TPLBlocks
         private volatile int _started = 0;
 
         public TransformBlock(Func<TInput, Task<TOutput>> body, TransformBlockOptions blockOptions = null):
-            base(body, (blockOptions?? TransformBlockOptions.Default).LoggerFactory, blockOptions?.CancellationToken)
+            base(body, LogFactory.Instance, blockOptions?.CancellationToken)
         {
+            
             blockOptions = blockOptions ?? TransformBlockOptions.Default;
-            _svc = new MessageService<TInput>(this.Id.ToString(), this, blockOptions.LoggerFactory, blockOptions.MaxDegreeOfParallelism, blockOptions.MaxDegreeOfParallelism, blockOptions.BoundedCapacity);
+            _svc = new MessageService<TInput>(this.Id.ToString(), this, LogFactory.Instance, blockOptions.MaxDegreeOfParallelism, blockOptions.MaxDegreeOfParallelism, blockOptions.BoundedCapacity);
         }
 
         public override async ValueTask<bool> Post(TInput msg)

@@ -1,20 +1,15 @@
-﻿using Microsoft.Extensions.Logging;
-using System.Threading;
-using TestApplication;
+﻿using System.Threading;
 
 namespace TPLBlocks.Options
 {
     public class BufferBlockOptions
     {
-        public static readonly BufferBlockOptions Default = new BufferBlockOptions(LogFactory.Instance);
+        public static readonly BufferBlockOptions Default = new BufferBlockOptions();
 
-        public BufferBlockOptions(ILoggerFactory loggerFactory)
+        public BufferBlockOptions()
         {
-            LoggerFactory = loggerFactory;
             BoundedCapacity = 100;
         }
-
-        public ILoggerFactory LoggerFactory { get; }
 
         public int? BoundedCapacity { get; set; }
 

@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using TasksCoordinator.Common;
+using TestApplication;
 using TPLBlocks.Core;
 using TPLBlocks.Options;
 
@@ -16,7 +17,7 @@ namespace TPLBlocks
         private volatile int _started = 0;
 
         public BufferBlock(Func<TInput, Task<TOutput>> body, BufferBlockOptions blockOptions = null):
-            base(body, (blockOptions?? BufferBlockOptions.Default).LoggerFactory, blockOptions?.CancellationToken)
+            base(body, LogFactory.Instance, blockOptions?.CancellationToken)
         {
             blockOptions = blockOptions ?? BufferBlockOptions.Default;
             if (blockOptions.BoundedCapacity == null)

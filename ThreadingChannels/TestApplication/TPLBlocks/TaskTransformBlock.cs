@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using TasksCoordinator.Common;
+using TestApplication;
 using TPLBlocks.Core;
 using TPLBlocks.Options;
 
@@ -17,7 +18,7 @@ namespace TPLBlocks
         private readonly TransformBlockOptions _blockOptions;
 
         public TaskTransformBlock(Func<TInput, Task<TOutput>> body, TransformBlockOptions blockOptions = null):
-            base(body, (blockOptions?? TransformBlockOptions.Default).LoggerFactory, blockOptions?.CancellationToken)
+            base(body, LogFactory.Instance, blockOptions?.CancellationToken)
         {
             this._blockOptions = blockOptions ?? TransformBlockOptions.Default;
             if (this._blockOptions.BoundedCapacity == null)
