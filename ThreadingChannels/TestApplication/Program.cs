@@ -15,7 +15,8 @@ namespace TestApplication
             Transform,
             TaskTransform,
             Buffer,
-            LinkMany
+            LinkMany,
+            Predicate
         }
 
         static async Task Main(string[] args)
@@ -24,6 +25,13 @@ namespace TestApplication
 
             var task = Task.Run(async () =>
             {
+                Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Predicate (Several (3) Blocks are linked with predicate) test...");
+
+                await ExecuteBlock(BlockType.Predicate, cts.Token);
+
+                Console.WriteLine();
+
+                // *************************************************************    
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.LinkMany (Several (5) Blocks are linked to one) test...");
 
                 await ExecuteBlock(BlockType.LinkMany, cts.Token);
@@ -124,11 +132,17 @@ namespace TestApplication
             return block;
         }
 
-        private static async Task ExecuteBlock(BlockType blockType = BlockType.Transform, CancellationToken? token = null)
+        private static async Task ExecuteBlock(BlockType blockType = BlockType.Transform, CancellationToken? token = null, bool testException = false)
         {
             if (blockType== BlockType.LinkMany)
             {
-                await ExecuteLinkManyBlock(token, true);
+                await ExecuteLinkManyBlock(token, testException: testException);
+                return;
+            }
+
+            if (blockType == BlockType.Predicate)
+            {
+                await ExecuteLinkPredicateBlock(token, testException: testException);
                 return;
             }
 
@@ -180,7 +194,7 @@ namespace TestApplication
             using (var inputsDisposal = new CompositeDisposable(inputs))
             using (ITransformBlock<string, string> bufferBlock = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => {
                 Interlocked.Increment(ref processedCount);
-               /*
+               
                 if (testException)
                 {
                     if (processedCount == 4999999)
@@ -188,7 +202,7 @@ namespace TestApplication
                         throw new ApplicationException("ApplicationException: Test that all dataflow is stopped");
                     }
                 }
-               */
+               
                 return Task.FromResult(msg); 
             }))
             {
@@ -215,7 +229,7 @@ namespace TestApplication
                         });
                     }
 
-                    var dummy2 = lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"Lastblock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
+                    var dummy2 = lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"LastBlock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
 
                     await lastBlock.Completion;
 
@@ -233,7 +247,70 @@ namespace TestApplication
             }
         }
 
+        private static async Task ExecuteLinkPredicateBlock(CancellationToken? token = null, bool testException = false)
+        {
+            int processedCount = 0;
+            var transforms = Enumerable.Range(1, 3).Select((i) => CreateBlock(blockType: BlockType.TaskTransform, token: token)).ToList();
 
+
+            using (ITransformBlock<string, string> inputBlock = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => {
+                return Task.FromResult(msg);
+            }))
+            using (var transformsDisposal = new CompositeDisposable(transforms))
+            using (ITransformBlock<string, string> outputBlock = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => {
+                Interlocked.Increment(ref processedCount);
+                return Task.FromResult(msg);
+            }))
+            {
+                Stopwatch sw = new Stopwatch();
+                try
+                {
+                    inputBlock.LinkWithPredicateTo(transforms.First(), (msg) => {
+                        return msg.GetHashCode() % 3 == 0;
+                    });
+                    inputBlock.LinkWithPredicateTo(transforms.Skip(1).First(), (msg) => {
+                        return msg.GetHashCode() % 3 == 1;
+                    });
+                    inputBlock.LinkWithPredicateTo(transforms.Skip(2).First(), (msg) => {
+                        return msg.GetHashCode() % 3 == 2;
+                    });
+                    
+                    var lastBlock = transforms.LinkManyTo(outputBlock);
+
+
+                    sw.Start();
+                    foreach (var input in transforms)
+                    {
+                       // var dummy1 = input.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
+
+                        var t1 = Task.Run(async () =>
+                        {
+                            for (int i = 0; i < 1000000; ++i)
+                            {
+                                await input.Post(Guid.NewGuid().ToString());
+                            }
+
+                            input.Complete();
+                        });
+                    }
+
+                    // var dummy2 = lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"LastBlock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
+
+                    await lastBlock.Completion;
+
+                    await Task.Yield();
+                }
+                catch (OperationCanceledException)
+                {
+                    Console.WriteLine($"Block execution was cancelled {DateTime.Now.ToString("hh:mm:ss")}");
+                }
+                finally
+                {
+                    sw.Stop();
+                    Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: 1000000 Processed Count: {processedCount}");
+                }
+            }
+        }
     }
 
 }

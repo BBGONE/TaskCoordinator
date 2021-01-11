@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -12,6 +13,22 @@ namespace TPLBlocks
     
             inputBlock.Completion.ContinueWith((antecedent) => { 
                 outputBlock.Complete(antecedent.Exception); 
+            });
+
+            return outputBlock;
+        }
+
+        public static ITransformBlock<TOutput, TResult> LinkWithPredicateTo<TInput, TOutput, TResult>(this ITransformBlock<TInput, TOutput> inputBlock, ITransformBlock<TOutput, TResult> outputBlock, Predicate<TOutput> predicate)
+        {
+            inputBlock.OutputSink += (async (output) => {
+                if (predicate(output))
+                {
+                    await outputBlock.Post(output);
+                }
+            });
+
+            inputBlock.Completion.ContinueWith((antecedent) => {
+                outputBlock.Complete(antecedent.Exception);
             });
 
             return outputBlock;
