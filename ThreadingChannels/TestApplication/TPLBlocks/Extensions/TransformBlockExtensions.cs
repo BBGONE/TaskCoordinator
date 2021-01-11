@@ -2,43 +2,60 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using TasksCoordinator.Common;
 
 namespace TPLBlocks
 {
     public static class TransformBlockExtensions
     {
-        public static ITargetBlock<TOutput> LinkTo<TOutput>(this ISourceBlock<TOutput> inputBlock, ITargetBlock<TOutput> outputBlock)
+        public static IDisposable LinkTo<TOutput>(this ISourceBlock<TOutput> inputBlock, ITargetBlock<TOutput> outputBlock)
         {
-            inputBlock.OutputSink += (async (output) => { await outputBlock.Post(output); });
+            Func<TOutput, Task> func = (async (output) => { await outputBlock.Post(output); });
+            inputBlock.OutputSink += func;
+            bool isDisposed = false;
 
             inputBlock.Completion.ContinueWith((antecedent) => {
-                outputBlock.Complete(antecedent.Exception);
+                if (!isDisposed)
+                {
+                    outputBlock.Complete(antecedent.IsCanceled ? (Exception)(new OperationCanceledException()) : antecedent.Exception);
+                }
             });
 
-            return outputBlock;
+            return new AnonymousDisposable(()=> { isDisposed = true; inputBlock.OutputSink -= func; });
         }
 
-        public static ITargetBlock<TOutput> LinkWithPredicateTo<TOutput>(this ISourceBlock<TOutput> inputBlock, ITargetBlock<TOutput> outputBlock, Predicate<TOutput> predicate)
+        public static IDisposable LinkWithPredicateTo<TOutput>(this ISourceBlock<TOutput> inputBlock, ITargetBlock<TOutput> outputBlock, Predicate<TOutput> predicate)
         {
-            inputBlock.OutputSink += (async (output) => {
+            Func<TOutput, Task> func = (async (output) => {
                 if (predicate(output))
                 {
                     await outputBlock.Post(output);
                 }
             });
+            inputBlock.OutputSink += func;
+            bool isDisposed = false;
+
+            inputBlock.OutputSink += func;
 
             inputBlock.Completion.ContinueWith((antecedent) => {
-                outputBlock.Complete(antecedent.Exception);
+                if (!isDisposed)
+                {
+                    outputBlock.Complete(antecedent.IsCanceled ? (Exception)(new OperationCanceledException()) : antecedent.Exception);
+                }
             });
 
-            return outputBlock;
+            return new AnonymousDisposable(() => { isDisposed = true; inputBlock.OutputSink -= func; });
         }
 
-        public static ITargetBlock<TOutput> LinkManyTo<TOutput>(this IEnumerable<ISourceBlock<TOutput>> inputBlocks, ITargetBlock<TOutput> outputBlock)
+        public static IDisposable LinkManyTo<TOutput>(this IEnumerable<ISourceBlock<TOutput>> inputBlocks, ITargetBlock<TOutput> outputBlock)
         {
+            bool isDisposed = false;
+
+            Func<TOutput, Task> func = (async (output) => { await outputBlock.Post(output); });
+
             foreach (var inputBlock in inputBlocks)
             {
-                inputBlock.OutputSink += (async (output) => { await outputBlock.Post(output); });
+                inputBlock.OutputSink += func;
             }
 
             var inputBlocksCompletions = inputBlocks.Select(ib => ib.Completion).ToArray();
@@ -46,25 +63,31 @@ namespace TPLBlocks
             var completeTask = Task.WhenAll(inputBlocksCompletions);
 
             completeTask.ContinueWith((antecedent) => {
-                outputBlock.Complete(antecedent.Exception);
+                if (!isDisposed)
+                {
+                    outputBlock.Complete(antecedent.IsCanceled ? (Exception)(new OperationCanceledException()) : antecedent.Exception);
+                }
             });
 
-            return outputBlock;
+            return new AnonymousDisposable(() => { isDisposed = true; foreach(var block in inputBlocks) block.OutputSink -= func; });
         }
 
         public static ITransformBlock<TOutput, TResult> LinkTo<TOutput, TResult>(this ISourceBlock<TOutput> inputBlock, ITransformBlock<TOutput, TResult> outputBlock)
         {
-            return (ITransformBlock<TOutput, TResult>)inputBlock.LinkTo<TOutput>(outputBlock);
+            inputBlock.LinkTo<TOutput>(outputBlock);
+            return outputBlock;
         }
 
         public static ITransformBlock<TOutput, TResult> LinkWithPredicateTo<TOutput, TResult>(this ISourceBlock<TOutput> inputBlock, ITransformBlock<TOutput, TResult> outputBlock, Predicate<TOutput> predicate)
         {
-            return (ITransformBlock<TOutput, TResult>)inputBlock.LinkWithPredicateTo<TOutput>(outputBlock, predicate);
+            inputBlock.LinkWithPredicateTo<TOutput>(outputBlock, predicate);
+            return outputBlock;
         }
 
         public static ITransformBlock<TOutput, TResult> LinkManyTo<TOutput, TResult>(this IEnumerable<ISourceBlock<TOutput>> inputBlocks, ITransformBlock<TOutput, TResult> outputBlock)
         {
-            return (ITransformBlock<TOutput, TResult>)inputBlocks.LinkManyTo<TOutput>(outputBlock);
+            inputBlocks.LinkManyTo<TOutput>(outputBlock);
+            return outputBlock;
         }
     }
 }
