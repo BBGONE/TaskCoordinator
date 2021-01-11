@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
+using TPLBlocks.Core;
 
-namespace TPLBlocks.Core
+namespace TPLBlocks
 {
     public interface ICallback<T>
     {

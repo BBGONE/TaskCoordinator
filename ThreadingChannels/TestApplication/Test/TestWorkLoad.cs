@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Schedulers;
 using TasksCoordinator.Common;
+using TPLBlocks;
 using TPLBlocks.Core;
 
 namespace TestApplication.Test
