@@ -1,12 +1,11 @@
 ﻿using Microsoft.Extensions.Logging;
-using Shared.Errors;
-using Shared.Threading;
+using Common.Errors;
+using Common.Threading;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Interface;
 
 namespace TasksCoordinator
 {

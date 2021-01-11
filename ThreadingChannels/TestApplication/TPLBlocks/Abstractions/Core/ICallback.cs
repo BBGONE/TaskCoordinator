@@ -1,14 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator.Interface
+namespace TPLBlocks.Core
 {
-    public struct BatchInfo
-    {
-        public long BatchSize;
-        public bool IsComplete;
-    }
-
     public interface ICallback<T>
     {
         void TaskSuccess(T message);

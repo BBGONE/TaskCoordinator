@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Interface;
 
-namespace TasksCoordinator.Callbacks
+namespace TPLBlocks.Core
 {
     public abstract class BaseCallback<T> : ICallback<T>
     {

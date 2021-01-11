@@ -7,7 +7,7 @@ namespace TPLBlocks
 {
     public static class TransformBlockExtensions
     {
-        public static ITransformBlock<TOutput, TResult> LinkTo<TInput, TOutput, TResult>(this ITransformBlock<TInput, TOutput> inputBlock, ITransformBlock<TOutput, TResult> outputBlock)
+        public static ITransformBlock<TInput, TResult> LinkTo<TInput, TResult>(this ISource<TInput> inputBlock, ITransformBlock<TInput, TResult> outputBlock)
         {
             inputBlock.OutputSink += (async (output) => { await outputBlock.Post(output); });
     
@@ -18,7 +18,7 @@ namespace TPLBlocks
             return outputBlock;
         }
 
-        public static ITransformBlock<TOutput, TResult> LinkWithPredicateTo<TInput, TOutput, TResult>(this ITransformBlock<TInput, TOutput> inputBlock, ITransformBlock<TOutput, TResult> outputBlock, Predicate<TOutput> predicate)
+        public static ITransformBlock<TInput, TResult> LinkWithPredicateTo<TInput, TResult>(this ISource<TInput> inputBlock, ITransformBlock<TInput, TResult> outputBlock, Predicate<TInput> predicate)
         {
             inputBlock.OutputSink += (async (output) => {
                 if (predicate(output))
@@ -34,7 +34,7 @@ namespace TPLBlocks
             return outputBlock;
         }
 
-        public static ITransformBlock<TOutput, TResult> LinkManyTo<TInput, TOutput, TResult>(this IEnumerable<ITransformBlock<TInput, TOutput>> inputBlocks, ITransformBlock<TOutput, TResult> outputBlock)
+        public static ITransformBlock<TInput, TResult> LinkManyTo<TInput, TResult>(this IEnumerable<ISource<TInput>> inputBlocks, ITransformBlock<TInput, TResult> outputBlock)
         {
             foreach (var inputBlock in inputBlocks)
             {

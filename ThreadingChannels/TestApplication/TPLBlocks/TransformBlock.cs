@@ -2,6 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Test;
+using TPLBlocks.Core;
 
 namespace TPLBlocks
 {

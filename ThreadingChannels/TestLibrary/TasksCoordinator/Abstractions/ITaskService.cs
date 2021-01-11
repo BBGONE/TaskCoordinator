@@ -1,4 +1,4 @@
-﻿namespace Shared.Services
+﻿namespace TasksCoordinator
 {
     public interface ITaskService
     {

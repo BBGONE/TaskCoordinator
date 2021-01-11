@@ -1,6 +1,6 @@
 using System;
 
-namespace Shared.Errors
+namespace Common.Errors
 {
 	public sealed class ErrorHelper
 	{

@@ -1,12 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
-using Shared.Errors;
-using Shared.Services;
+using Common.Errors;
 using System;
-using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using TasksCoordinator.Interface;
-using TasksCoordinator.Test.Interface;
+using Common.Common;
+//using TasksCoordinator.Test.Interface;
 
 namespace TasksCoordinator.Test
 {

@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Threading.Channels;
-using TasksCoordinator.Interface;
 
 namespace TasksCoordinator.Test
 {

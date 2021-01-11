@@ -2,11 +2,9 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Callbacks;
-using TasksCoordinator.Interface;
-using TasksCoordinator.Test.Interface;
+using Common.Common;
 
-namespace TPLBlocks
+namespace TPLBlocks.Core
 {
     public abstract class BaseTransformBlock<TInput, TOutput> : IWorkLoad<TInput>, IDisposable, ITransformBlock<TInput, TOutput>
     {

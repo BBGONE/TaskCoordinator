@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace TasksCoordinator.Interface
+namespace TasksCoordinator
 {
     public interface IMessageWorker<in M>
     {

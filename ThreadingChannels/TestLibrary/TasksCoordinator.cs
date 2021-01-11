@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using TasksCoordinator.Interface;
 
 namespace TasksCoordinator.Test
 {

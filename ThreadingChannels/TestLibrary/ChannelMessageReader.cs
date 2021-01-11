@@ -3,9 +3,8 @@ using System;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using TasksCoordinator.Interface;
 
-namespace TasksCoordinator
+namespace TasksCoordinator.Test
 {
     public class ChannelMessageReader<TMessage> : MessageReader<TMessage, object>
     {

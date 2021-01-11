@@ -1,11 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
-using Shared.Errors;
+using Common.Errors;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Interface;
 
-namespace TasksCoordinator.Callbacks
+namespace TPLBlocks.Core
 {
     public class CallbackProxy<T> : ICallbackProxy<T>, IDisposable
     {

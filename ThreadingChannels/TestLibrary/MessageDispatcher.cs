@@ -1,7 +1,6 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Interface;
-using TasksCoordinator.Test.Interface;
+using Common.Common;
 
 namespace TasksCoordinator.Test
 {

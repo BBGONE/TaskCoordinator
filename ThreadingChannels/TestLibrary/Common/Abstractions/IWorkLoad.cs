@@ -1,7 +1,7 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator.Test.Interface
+namespace Common.Common
 {
     public interface IWorkLoad<TMessage>
     {

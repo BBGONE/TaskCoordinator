@@ -1,8 +1,7 @@
-﻿using Shared.Services;
-using System;
+﻿using System;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator.Interface
+namespace TasksCoordinator
 {
     public interface ITaskCoordinatorAdvanced : ITaskCoordinator
     {

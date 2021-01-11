@@ -1,4 +1,4 @@
-﻿namespace TasksCoordinator.Interface
+﻿namespace TasksCoordinator
 {
     public interface IMessageReaderFactory
     {

@@ -1,10 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
-using Shared.Errors;
+using Common.Errors;
 using System;
 using System.Threading.Tasks;
-using TasksCoordinator.Callbacks;
 
-namespace TPLBlocks
+namespace TPLBlocks.Core
 {
     class TCallBack<TMsg> : BaseCallback<TMsg>
     {

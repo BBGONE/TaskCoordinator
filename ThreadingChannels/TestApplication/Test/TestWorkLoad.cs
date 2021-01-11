@@ -4,9 +4,8 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Schedulers;
-using TasksCoordinator.Callbacks;
-using TasksCoordinator.Interface;
-using TasksCoordinator.Test.Interface;
+using Common.Common;
+using TPLBlocks.Core;
 
 namespace TasksCoordinator.Test
 {

@@ -1,4 +1,4 @@
-﻿namespace TasksCoordinator.Test.Interface
+﻿namespace Common.Common
 {
     public interface ISerializer
     {

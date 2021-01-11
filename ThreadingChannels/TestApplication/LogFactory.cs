@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 
-namespace Shared
+namespace Common
 {
     public static class LogFactory
     {
