@@ -249,6 +249,9 @@ namespace TestApplication
 
         private static async Task ExecuteLinkPredicateBlock(CancellationToken? token = null, bool testException = false)
         {
+            int cnt1 = 0;
+            int cnt2 = 0;
+            int cnt3 = 0;
             int processedCount = 0;
             var transforms = Enumerable.Range(1, 3).Select((i) => CreateBlock(blockType: BlockType.TaskTransform, token: token)).ToList();
 
@@ -266,33 +269,56 @@ namespace TestApplication
                 try
                 {
                     inputBlock.LinkWithPredicateTo(transforms.First(), (msg) => {
-                        return msg.GetHashCode() % 3 == 0;
+                        return (msg.GetHashCode() % 3) == 0;
                     });
                     inputBlock.LinkWithPredicateTo(transforms.Skip(1).First(), (msg) => {
-                        return msg.GetHashCode() % 3 == 1;
+                        return (msg.GetHashCode() % 3) == 1;
                     });
                     inputBlock.LinkWithPredicateTo(transforms.Skip(2).First(), (msg) => {
-                        return msg.GetHashCode() % 3 == 2;
+                        var val = (msg.GetHashCode() % 3);
+                        return val != 0 && val != 1;
                     });
                     
                     var lastBlock = transforms.LinkManyTo(outputBlock);
 
 
-                    sw.Start();
-                    foreach (var input in transforms)
+                    int cnt = 0;
+                    foreach (var transform in transforms)
                     {
-                       // var dummy1 = input.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
 
-                        var t1 = Task.Run(async () =>
-                        {
-                            for (int i = 0; i < 1000000; ++i)
+                        ++cnt;
+                        int num = cnt;
+                        transform.OutputSink += (msg) =>{
+                            switch (num)
                             {
-                                await input.Post(Guid.NewGuid().ToString());
+                                case 1:
+                                    Interlocked.Increment(ref cnt1);
+                                    break;
+                                case 2:
+                                    Interlocked.Increment(ref cnt2);
+                                    break;
+                                case 3:
+                                    Interlocked.Increment(ref cnt3);
+                                    break;
                             }
-
-                            input.Complete();
-                        });
+                            return Task.CompletedTask; 
+                        };
                     }
+
+
+                    sw.Start();
+                    
+                    // var dummy1 = inputBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
+
+                    var t1 = Task.Run(async () =>
+                    {
+                        for (int i = 0; i < 1000000; ++i)
+                        {
+                            await inputBlock.Post(Guid.NewGuid().ToString());
+                        }
+
+                        inputBlock.Complete();
+                    });
 
                     // var dummy2 = lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"LastBlock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
 
@@ -307,7 +333,7 @@ namespace TestApplication
                 finally
                 {
                     sw.Stop();
-                    Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: 1000000 Processed Count: {processedCount}");
+                    Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: 1000000 Processed Count: {cnt1} {cnt2} {cnt3} result: {processedCount}");
                 }
             }
         }
