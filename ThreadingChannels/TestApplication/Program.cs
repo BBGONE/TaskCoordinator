@@ -269,14 +269,16 @@ namespace TestApplication
                 try
                 {
                     inputBlock.LinkWithPredicateTo(transforms.First(), (msg) => {
-                        return (msg.GetHashCode() % 3) == 0;
+                        var val = Math.Abs(GetDeterministicHashCode(msg)) % 3;
+                        return val == 0;
                     });
                     inputBlock.LinkWithPredicateTo(transforms.Skip(1).First(), (msg) => {
-                        return (msg.GetHashCode() % 3) == 1;
+                        var val = Math.Abs(GetDeterministicHashCode(msg)) % 3;
+                        return val == 1;
                     });
                     inputBlock.LinkWithPredicateTo(transforms.Skip(2).First(), (msg) => {
-                        var val = (msg.GetHashCode() % 3);
-                        return val != 0 && val != 1;
+                        var val = Math.Abs(GetDeterministicHashCode(msg)) % 3;
+                        return val == 2;
                     });
                     
                     var lastBlock = transforms.LinkManyTo(outputBlock);
@@ -335,6 +337,25 @@ namespace TestApplication
                     sw.Stop();
                     Console.WriteLine($"Elapsed time: {sw.ElapsedMilliseconds} Milliseconds, BatchSize: 1000000 Processed Count: {cnt1} {cnt2} {cnt3} result: {processedCount}");
                 }
+            }
+        }
+
+        static int GetDeterministicHashCode(ReadOnlySpan<char> str)
+        {
+            unchecked
+            {
+                int hash1 = (5381 << 16) + 5381;
+                int hash2 = hash1;
+
+                for (int i = 0; i < str.Length; i += 2)
+                {
+                    hash1 = ((hash1 << 5) + hash1) ^ str[i];
+                    if (i == str.Length - 1)
+                        break;
+                    hash2 = ((hash2 << 5) + hash2) ^ str[i + 1];
+                }
+
+                return hash1 + (hash2 * 1566083941);
             }
         }
     }
