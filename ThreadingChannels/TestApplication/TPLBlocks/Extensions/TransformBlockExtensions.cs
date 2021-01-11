@@ -35,8 +35,6 @@ namespace TPLBlocks
             inputBlock.OutputSink += func;
             bool isDisposed = false;
 
-            inputBlock.OutputSink += func;
-
             inputBlock.Completion.ContinueWith((antecedent) => {
                 if (!isDisposed)
                 {
