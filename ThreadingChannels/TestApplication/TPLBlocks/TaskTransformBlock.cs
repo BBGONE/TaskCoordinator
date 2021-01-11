@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using TasksCoordinator.Common;
 using TPLBlocks.Core;
+using TPLBlocks.Options;
 
 namespace TPLBlocks
 {
