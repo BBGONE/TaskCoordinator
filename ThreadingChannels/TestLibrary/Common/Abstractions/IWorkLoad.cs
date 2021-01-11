@@ -1,7 +1,7 @@
 ﻿using System.Threading;
 using System.Threading.Tasks;
 
-namespace Common.Common
+namespace TasksCoordinator.Common
 {
     public interface IWorkLoad<TMessage>
     {

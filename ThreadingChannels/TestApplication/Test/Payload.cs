@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace TasksCoordinator.Test
+namespace TestApplication.Test
 {
     public class Payload
     {

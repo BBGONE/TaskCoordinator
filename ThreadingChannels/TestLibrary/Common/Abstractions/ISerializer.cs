@@ -1,4 +1,4 @@
-﻿namespace Common.Common
+﻿namespace TasksCoordinator.Common
 {
     public interface ISerializer
     {

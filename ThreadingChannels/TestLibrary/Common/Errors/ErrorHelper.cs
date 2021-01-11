@@ -1,6 +1,6 @@
 using System;
 
-namespace Common.Errors
+namespace TasksCoordinator.Errors
 {
 	public sealed class ErrorHelper
 	{

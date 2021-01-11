@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 
-namespace Common
+namespace TestApplication
 {
     public static class LogFactory
     {

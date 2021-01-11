@@ -4,10 +4,10 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Schedulers;
-using Common.Common;
+using TasksCoordinator.Common;
 using TPLBlocks.Core;
 
-namespace TasksCoordinator.Test
+namespace TestApplication.Test
 {
     public class TestWorkLoad : IWorkLoad<Payload>, IDisposable
     {

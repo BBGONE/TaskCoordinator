@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
-namespace Common
+namespace TasksCoordinator.Common
 {
     public sealed class AnonymousDisposable : IDisposable
     {

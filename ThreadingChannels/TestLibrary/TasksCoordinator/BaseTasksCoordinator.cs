@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
-using Common.Errors;
-using Common.Threading;
+using TasksCoordinator.Errors;
+using TasksCoordinator.Threading;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;

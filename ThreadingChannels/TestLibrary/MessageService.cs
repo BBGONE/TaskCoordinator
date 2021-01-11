@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
-using Common.Errors;
+using TasksCoordinator.Errors;
 using System;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Common.Common;
+using TasksCoordinator.Common;
 //using TasksCoordinator.Test.Interface;
 
 namespace TasksCoordinator.Test

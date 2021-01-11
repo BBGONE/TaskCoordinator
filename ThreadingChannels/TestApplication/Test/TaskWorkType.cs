@@ -1,4 +1,4 @@
-﻿namespace TasksCoordinator.Test
+﻿namespace TestApplication.Test
 {
     public enum TaskWorkType
     {

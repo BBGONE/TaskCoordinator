@@ -2,7 +2,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Common.Common;
+using TasksCoordinator.Common;
 
 namespace TPLBlocks.Core
 {

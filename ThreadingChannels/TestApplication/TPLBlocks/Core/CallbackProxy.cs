@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
-using Common.Errors;
+using TasksCoordinator.Errors;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
