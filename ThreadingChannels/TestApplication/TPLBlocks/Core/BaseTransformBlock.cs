@@ -6,7 +6,7 @@ using TasksCoordinator.Common;
 
 namespace TPLBlocks.Core
 {
-    public abstract class BaseTransformBlock<TInput, TOutput> : IWorkLoad<TInput>, IDisposable, ITransformBlock<TInput, TOutput>
+    public abstract class BaseTransformBlock<TInput, TOutput> : IWorkLoad<TInput>, ITransformBlock<TInput, TOutput>
     {
         private ICallbackProxy<TInput> _callbackProxy;
         private bool _isDisposed = false;

@@ -1,10 +1,8 @@
 ﻿using System;
-using TPLBlocks.Core;
 
 namespace TPLBlocks
 {
-    public interface ITransformBlock<TInput, TOutput>:  ISource<TOutput>, ITarget<TInput>, IDisposable
+    public interface ITransformBlock<TInput, TOutput>: ISourceBlock<TOutput>, ITargetBlock<TInput>, IDisposable
     {
-        BatchInfo BatchInfo { get; }
     }
 }

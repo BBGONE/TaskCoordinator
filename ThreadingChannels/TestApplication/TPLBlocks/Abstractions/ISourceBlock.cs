@@ -3,10 +3,8 @@ using System.Threading.Tasks;
 
 namespace TPLBlocks
 {
-    public interface ISource<TOutput>
+    public interface ISourceBlock<TOutput>: IDataflowBlock
     {
-        Task Completion { get; }
-
         event Func<TOutput, Task> OutputSink;
     }
 }
