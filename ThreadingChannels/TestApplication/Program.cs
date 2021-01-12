@@ -217,7 +217,7 @@ namespace TestApplication
                     sw.Start();
                     foreach(var input in inputs)
                     {
-                        var dummy1 = input.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation": antecedent.Exception?.Message?? "No Error")}"));
+                        _ = input.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation": antecedent.Exception?.Message?? "No Error")}"));
 
                         var t1 = Task.Run(async () =>
                         {
@@ -230,7 +230,7 @@ namespace TestApplication
                         });
                     }
 
-                    var dummy2 = lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"LastBlock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
+                    _ = lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"LastBlock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
 
                     await lastBlock.Completion;
 
@@ -311,7 +311,7 @@ namespace TestApplication
 
                     sw.Start();
                     
-                    // var dummy1 = inputBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
+                    // _ = inputBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"Input completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
 
                     var t1 = Task.Run(async () =>
                     {
@@ -323,7 +323,7 @@ namespace TestApplication
                         inputBlock.Complete();
                     });
 
-                    // var dummy2 = lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"LastBlock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
+                    // _ = lastBlock.Completion.ContinueWith((antecedent) => Console.WriteLine($"LastBlock completed at {DateTime.Now.ToString("hh:mm:ss")} with {(antecedent.IsCanceled ? "Cancellation" : antecedent.Exception?.Message ?? "No Error")}"));
 
                     await lastBlock.Completion;
 

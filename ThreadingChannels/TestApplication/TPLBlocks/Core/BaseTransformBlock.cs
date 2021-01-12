@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Common;
@@ -8,14 +9,14 @@ namespace TPLBlocks.Core
 {
     public abstract class BaseTransformBlock<TInput, TOutput> : IWorkLoad<TInput>, ITransformBlock<TInput, TOutput>
     {
+        private Object _SyncLock = new Object();
         private ICallbackProxy<TInput> _callbackProxy;
         private bool _isDisposed = false;
         private readonly ILoggerFactory _loggerFactory;
         private readonly TCallBack<TInput> _callBack;
         private Func<TInput, Task<TOutput>> _body;
-        private Func<TOutput, Task> _outputSink;
+        private Func<TOutput, Task>[] _outputSinks;
         private Guid _id = new Guid();
-        private Object _SyncLock = new Object();
         private CancellationToken? _externalCancellationToken;
         private CancellationTokenSource _cts;
         private CancellationTokenSource _linkedCts;
@@ -23,7 +24,7 @@ namespace TPLBlocks.Core
         public BaseTransformBlock(Func<TInput, Task<TOutput>> body, ILoggerFactory loggerFactory, CancellationToken? cancellationToken= null)
         {
             _body = body;
-            _outputSink = null;
+            _outputSinks = null;
             _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             _externalCancellationToken = cancellationToken;
             _cts = new CancellationTokenSource();
@@ -52,7 +53,7 @@ namespace TPLBlocks.Core
         private void  _OnCompetion()
         {
             // the output sink won't be needed after completion (so cleat it at once)
-            _outputSink = null;
+            _outputSinks = null;
         }
 
         /// <summary>
@@ -101,7 +102,49 @@ namespace TPLBlocks.Core
             }
         }
 
-        public event Func<TOutput, Task> OutputSink { add => _outputSink+= value; remove => _outputSink -= value; }
+        public event Func<TOutput, Task> OutputSink
+        {
+            add {
+                if (_isDisposed)
+                {
+                    throw new ObjectDisposedException(this.GetType().Name);
+                }
+
+                lock (this._SyncLock)
+                {
+                    var oldSinks = _outputSinks;
+                    
+                    if (oldSinks == null)
+                    {
+                        _outputSinks = new[] { value };
+                    }
+                    else
+                    {
+                        int len = oldSinks.Length;
+                        var sinks = new Func<TOutput, Task>[len + 1];
+                        Array.Copy(oldSinks, sinks, len);
+                        sinks[len] = value;
+                        _outputSinks = sinks;
+                    }
+                }
+               
+            }
+            remove
+            {
+                lock (this._SyncLock)
+                {
+                    var oldSinks = _outputSinks;
+                    if (oldSinks == null)
+                    {
+                        return;
+                    }
+                    else
+                    {
+                        _outputSinks = oldSinks.Where((val) => val != value).ToArray();
+                    }
+                }
+            }
+        }
 
         public BatchInfo BatchInfo { get => _callBack.BatchInfo; }
         public Guid Id { get => _id; set => _id = value; }
@@ -191,12 +234,13 @@ namespace TPLBlocks.Core
             {
                 var output = await _body(message);
 
-                var sinkDelegates = _outputSink?.GetInvocationList();
-                if (sinkDelegates != null)
+                var sinks = _outputSinks;
+
+                if (sinks != null)
                 {
-                    foreach (var sinkDelegate in sinkDelegates)
+                    for(int i=0; i< sinks.Length;++i)
                     {
-                        await ((Func<TOutput, Task>)sinkDelegate)(output);
+                        await sinks[i](output);
                     }
                 }
 

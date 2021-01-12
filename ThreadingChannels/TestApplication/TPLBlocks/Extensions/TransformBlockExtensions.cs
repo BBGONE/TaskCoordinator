@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using TasksCoordinator.Common;
 
@@ -12,16 +13,13 @@ namespace TPLBlocks
         {
             Func<TOutput, Task> func = (async (output) => { await outputBlock.Post(output); });
             inputBlock.OutputSink += func;
-            bool isDisposed = false;
+            CancellationTokenSource cts = new CancellationTokenSource();
 
             inputBlock.Completion.ContinueWith((antecedent) => {
-                if (!isDisposed)
-                {
-                    outputBlock.Complete(antecedent.IsCanceled ? (Exception)(new OperationCanceledException()) : antecedent.Exception);
-                }
-            });
+                outputBlock.Complete(antecedent.IsCanceled ? (Exception)(new OperationCanceledException()) : antecedent.Exception);
+            }, cts.Token);
 
-            return new AnonymousDisposable(()=> { isDisposed = true; inputBlock.OutputSink -= func; });
+            return new AnonymousDisposable(()=> { cts.Cancel(); inputBlock.OutputSink -= func; });
         }
 
         public static IDisposable LinkWithPredicateTo<TOutput>(this ISourceBlock<TOutput> inputBlock, ITargetBlock<TOutput> outputBlock, Predicate<TOutput> predicate)
@@ -33,22 +31,17 @@ namespace TPLBlocks
                 }
             });
             inputBlock.OutputSink += func;
-            bool isDisposed = false;
+            CancellationTokenSource cts = new CancellationTokenSource();
 
             inputBlock.Completion.ContinueWith((antecedent) => {
-                if (!isDisposed)
-                {
-                    outputBlock.Complete(antecedent.IsCanceled ? (Exception)(new OperationCanceledException()) : antecedent.Exception);
-                }
-            });
+                outputBlock.Complete(antecedent.IsCanceled ? (Exception)(new OperationCanceledException()) : antecedent.Exception);
+            }, cts.Token);
 
-            return new AnonymousDisposable(() => { isDisposed = true; inputBlock.OutputSink -= func; });
+            return new AnonymousDisposable(() => { cts.Cancel(); inputBlock.OutputSink -= func; });
         }
 
         public static IDisposable LinkManyTo<TOutput>(this IEnumerable<ISourceBlock<TOutput>> inputBlocks, ITargetBlock<TOutput> outputBlock)
         {
-            bool isDisposed = false;
-
             Func<TOutput, Task> func = (async (output) => { await outputBlock.Post(output); });
 
             foreach (var inputBlock in inputBlocks)
@@ -56,18 +49,16 @@ namespace TPLBlocks
                 inputBlock.OutputSink += func;
             }
 
+            CancellationTokenSource cts = new CancellationTokenSource();
             var inputBlocksCompletions = inputBlocks.Select(ib => ib.Completion).ToArray();
 
             var completeTask = Task.WhenAll(inputBlocksCompletions);
 
             completeTask.ContinueWith((antecedent) => {
-                if (!isDisposed)
-                {
-                    outputBlock.Complete(antecedent.IsCanceled ? (Exception)(new OperationCanceledException()) : antecedent.Exception);
-                }
-            });
+                outputBlock.Complete(antecedent.IsCanceled ? (Exception)(new OperationCanceledException()) : antecedent.Exception);
+            }, cts.Token);
 
-            return new AnonymousDisposable(() => { isDisposed = true; foreach(var block in inputBlocks) block.OutputSink -= func; });
+            return new AnonymousDisposable(() => { cts.Cancel(); foreach(var block in inputBlocks) block.OutputSink -= func; });
         }
 
         public static ITransformBlock<TOutput, TResult> LinkTo<TOutput, TResult>(this ISourceBlock<TOutput> inputBlock, ITransformBlock<TOutput, TResult> outputBlock)
