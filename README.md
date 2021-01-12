@@ -31,9 +31,8 @@ The repository contains a console application which uses the TaskCoordinator.
 It can be used as a lab and a testing ground for usage of the TaskCoordinator.
 <br/>
 <i><b>
-For example, the testing application implemented a TransformBlock (acts like the one from the TPL Dataflow library - simplified and made for fun), and used it
-to test the TaskCoordinator. But it (TaskCoordinator) really shines for transactional message processing. Sql Server Service Broker and
-optionally Oracle Advanced Queuing uses transactional message processing. So I used the TaskCoordinator for my TaskBroker implementation which uses Sql Server Service Broker to provide the messages.
+For example, the testing application implemented a TransformBlock (and some other TPL blocks that act like ones from the official TPL Dataflow library) which was made for testing the TaskCoordinator in a simplified setup. But it (TaskCoordinator) really shines for the transactional message processing. Sql Server Service Broker and
+optionally Oracle Advanced Queuing uses transactional message processing. So I used the TaskCoordinator for my TaskBroker implementation which uses Sql Server Service Broker to provide the messages. And it saves resources by using only one connection to message queue while idle (when currently no messages in the queue).
 </b></i>
 <br/><br/>
 LICENSE: MIT LICENSE
