@@ -11,7 +11,7 @@ namespace TestApplication
 {
     class Program
     {
-        public enum BlockType
+        public enum TestType
         {
             Transform,
             TaskTransform,
@@ -20,12 +20,16 @@ namespace TestApplication
             Predicate
         }
 
+        private static TaskScheduler CurrentScheduler;
+
         static async Task Main(string[] args)
         {
-            // using var scheduler = new Threading.Schedulers.WorkStealingTaskScheduler();
-            var scheduler = TaskScheduler.Default;
+            using var scheduler = new Threading.Schedulers.WorkStealingTaskScheduler();
+            // var scheduler = TaskScheduler.Default;
 
-            TaskFactory factory = new TaskFactory(scheduler);
+            CurrentScheduler = scheduler;
+
+            TaskFactory factory = new TaskFactory(TaskScheduler.Default);
 
             CancellationTokenSource cts = new CancellationTokenSource();
 
@@ -35,7 +39,7 @@ namespace TestApplication
 
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Transform (TaskCoordinator) test...");
 
-                await ExecuteBlock(BlockType.Transform, cts.Token);
+                await ExecuteBlock(TestType.Transform, cts.Token);
 
                 Console.WriteLine();
                 
@@ -43,7 +47,7 @@ namespace TestApplication
 
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Predicate (Several (3) Blocks are linked with predicate) test...");
 
-                await ExecuteBlock(BlockType.Predicate, cts.Token);
+                await ExecuteBlock(TestType.Predicate, cts.Token);
 
                 Console.WriteLine();
                 
@@ -51,7 +55,7 @@ namespace TestApplication
                 
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.LinkMany (Several (5) Blocks are linked to one) test...");
 
-                await ExecuteBlock(BlockType.LinkMany, cts.Token);
+                await ExecuteBlock(TestType.LinkMany, cts.Token);
 
                 Console.WriteLine();
 
@@ -60,7 +64,7 @@ namespace TestApplication
                 // cts.CancelAfter(3000);
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Buffer (Single Threaded) test...");
 
-                await ExecuteBlock(BlockType.Buffer, cts.Token);
+                await ExecuteBlock(TestType.Buffer, cts.Token);
 
                 Console.WriteLine();
                 
@@ -69,7 +73,7 @@ namespace TestApplication
 
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.TaskTransform (just several of Task.Run) test...");
 
-                await ExecuteBlock(BlockType.TaskTransform, cts.Token);
+                await ExecuteBlock(TestType.TaskTransform, cts.Token);
 
                 Console.WriteLine();
             }).Unwrap();
@@ -98,7 +102,7 @@ namespace TestApplication
         }
 
         #region Helpers
-        private static  ITransformBlock<string, string> CreateBlock(BlockType blockType, Func<string, Task<string>> body = null, Func<string, Task> outputSink = null, CancellationToken? token= null)
+        private static  ITransformBlock<string, string> CreateBlock(TestType blockType, Func<string, Task<string>> body = null, Func<string, Task> outputSink = null, CancellationToken? token= null)
         {
             body = body ?? new Func<string, Task<string>>((async (msg) =>
             {
@@ -116,19 +120,19 @@ namespace TestApplication
 
             switch (blockType)
             {
-                case BlockType.Transform:
+                case TestType.Transform:
                     {
-                        block = new TransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler= TaskScheduler.Current });
+                        block = new TransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler= CurrentScheduler });
                     }
                     break;
-                case BlockType.TaskTransform:
+                case TestType.TaskTransform:
                     {
-                        block = new TaskTransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler = TaskScheduler.Current });
+                        block = new TaskTransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler = CurrentScheduler });
                     }
                     break;
-                case BlockType.Buffer:
+                case TestType.Buffer:
                     {
-                        block = new BufferBlock<string, string>(body, new BufferBlockOptions() { CancellationToken= token, TaskScheduler = TaskScheduler.Current });
+                        block = new BufferBlock<string, string>(body, new BufferBlockOptions() { CancellationToken= token, TaskScheduler = CurrentScheduler });
                     }
                     break;
                 default:
@@ -143,15 +147,15 @@ namespace TestApplication
             return block;
         }
 
-        private static async Task ExecuteBlock(BlockType blockType = BlockType.Transform, CancellationToken? token = null, bool testException = false)
+        private static async Task ExecuteBlock(TestType blockType = TestType.Transform, CancellationToken? token = null, bool testException = false)
         {
-            if (blockType== BlockType.LinkMany)
+            if (blockType== TestType.LinkMany)
             {
                 await ExecuteLinkManyBlock(token, testException: testException);
                 return;
             }
 
-            if (blockType == BlockType.Predicate)
+            if (blockType == TestType.Predicate)
             {
                 await ExecuteLinkPredicateBlock(token, testException: testException);
                 return;
@@ -199,11 +203,11 @@ namespace TestApplication
         private static async Task ExecuteLinkManyBlock(CancellationToken? token = null, bool testException=false)
         {
             int processedCount = 0;
-            var inputs = Enumerable.Range(1, 5).Select((i) => CreateBlock(blockType: BlockType.TaskTransform, token: token)).ToList();
+            var inputs = Enumerable.Range(1, 5).Select((i) => CreateBlock(blockType: TestType.TaskTransform, token: token)).ToList();
 
 
             using (var inputsDisposal = new CompositeDisposable(inputs))
-            using (ITransformBlock<string, string> bufferBlock = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => {
+            using (ITransformBlock<string, string> bufferBlock = CreateBlock(blockType: TestType.Buffer, token: token, body: (msg) => {
                 Interlocked.Increment(ref processedCount);
                
                 if (testException)
@@ -264,14 +268,14 @@ namespace TestApplication
             int cnt2 = 0;
             int cnt3 = 0;
             int processedCount = 0;
-            var transforms = Enumerable.Range(1, 3).Select((i) => CreateBlock(blockType: BlockType.TaskTransform, token: token)).ToList();
+            var transforms = Enumerable.Range(1, 3).Select((i) => CreateBlock(blockType: TestType.TaskTransform, token: token)).ToList();
 
 
-            using (ITransformBlock<string, string> inputBlock = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => {
+            using (ITransformBlock<string, string> inputBlock = CreateBlock(blockType: TestType.Buffer, token: token, body: (msg) => {
                 return Task.FromResult(msg);
             }))
             using (var transformsDisposal = new CompositeDisposable(transforms))
-            using (ITransformBlock<string, string> outputBlock = CreateBlock(blockType: BlockType.Buffer, token: token, body: (msg) => {
+            using (ITransformBlock<string, string> outputBlock = CreateBlock(blockType: TestType.Buffer, token: token, body: (msg) => {
                 Interlocked.Increment(ref processedCount);
                 return Task.FromResult(msg);
             }))
