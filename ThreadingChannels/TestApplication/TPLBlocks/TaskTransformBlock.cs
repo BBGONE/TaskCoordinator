@@ -66,7 +66,7 @@ namespace TPLBlocks
                     catch (OperationCanceledException)
                     {
                     }
-                }, this.GetCancellationToken()).Unwrap();
+                }, token).Unwrap();
             }
 
             this._tasks = tasks;

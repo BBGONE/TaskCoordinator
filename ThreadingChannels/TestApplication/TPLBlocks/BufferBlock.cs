@@ -61,7 +61,7 @@ namespace TPLBlocks
                 catch (OperationCanceledException)
                 {
                 }
-            }, this.GetCancellationToken()).Unwrap();
+            }, token).Unwrap();
         }
 
         protected override void OnCompetion()
