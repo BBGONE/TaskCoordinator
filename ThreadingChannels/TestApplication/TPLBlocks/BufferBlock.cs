@@ -14,6 +14,7 @@ namespace TPLBlocks
         private Task _task;
         private Channel<TInput> _channel;
         private ChannelWriter<TInput> _messageQueue;
+        private readonly TaskFactory _taskFactory;
         private volatile int _started = 0;
 
         public BufferBlock(Func<TInput, Task<TOutput>> body, BufferBlockOptions blockOptions = null):
@@ -40,13 +41,15 @@ namespace TPLBlocks
                 });
             }
             this._messageQueue = this._channel.Writer;
+            this._taskFactory = new TaskFactory(CancellationToken.None, TaskCreationOptions.DenyChildAttach, TaskContinuationOptions.None, blockOptions.TaskScheduler);
         }
 
         private void Start()
         {
             var reader = this._channel.Reader;
             var token = this.GetCancellationToken();
-            this._task = Task.Run(async () => {
+            this._task = _taskFactory.StartNew(async () =>
+            {
                 try
                 {
                     while (this._started == 1)
@@ -55,10 +58,10 @@ namespace TPLBlocks
                         await (this as IWorkLoad<TInput>).DispatchMessage(msg, 1, token);
                     }
                 }
-                catch(OperationCanceledException)
-                { 
+                catch (OperationCanceledException)
+                {
                 }
-            });
+            }, this.GetCancellationToken()).Unwrap();
         }
 
         protected override void OnCompetion()

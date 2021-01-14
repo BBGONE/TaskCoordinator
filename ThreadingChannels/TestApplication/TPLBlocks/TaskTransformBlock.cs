@@ -16,6 +16,7 @@ namespace TPLBlocks
         private ChannelWriter<TInput> _messageQueue;
         private volatile int _started = 0;
         private readonly TransformBlockOptions _blockOptions;
+        private readonly TaskFactory _taskFactory;
 
         public TaskTransformBlock(Func<TInput, Task<TOutput>> body, TransformBlockOptions blockOptions = null):
             base(body, LogFactory.Instance, blockOptions?.CancellationToken)
@@ -41,6 +42,7 @@ namespace TPLBlocks
                 });
             }
             this._messageQueue = this._channel.Writer;
+            this._taskFactory = new TaskFactory(CancellationToken.None, TaskCreationOptions.DenyChildAttach, TaskContinuationOptions.None, blockOptions.TaskScheduler);
         }
 
         private void Start()
@@ -48,9 +50,10 @@ namespace TPLBlocks
             var reader = this._channel.Reader;
             var token = this.GetCancellationToken();
             Task[] tasks = new Task[this._blockOptions.MaxDegreeOfParallelism];
+
             for (int i = 0; i < this._blockOptions.MaxDegreeOfParallelism; ++i)
             {
-                tasks[i] = Task.Run(async () =>
+                tasks[i] = _taskFactory.StartNew(async () =>
                 {
                     try
                     {
@@ -63,8 +66,9 @@ namespace TPLBlocks
                     catch (OperationCanceledException)
                     {
                     }
-                });
+                }, this.GetCancellationToken()).Unwrap();
             }
+
             this._tasks = tasks;
         }
 

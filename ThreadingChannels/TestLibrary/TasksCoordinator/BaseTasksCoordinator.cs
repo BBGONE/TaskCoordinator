@@ -25,9 +25,11 @@ namespace TasksCoordinator
         private readonly IMessageReaderFactory _readerFactory;
         private volatile IMessageReader _primaryReader;
         private readonly Bottleneck _readBottleNeck;
+        private readonly TaskScheduler _taskScheduler = null;
+        private readonly TaskFactory _taskFactory;
 
         public BaseTasksCoordinator(IMessageReaderFactory messageReaderFactory, ILoggerFactory loggerFactory,
-            int maxTasksCount, int maxReadParallelism = 4)
+            int maxTasksCount, int maxReadParallelism = 4, TaskScheduler taskScheduler = null)
         {
             this.Logger = loggerFactory.CreateLogger<BaseTasksCoordinator>();
             // the current PrimaryReader does not use BottleNeck hence: maxReadParallelism - 1
@@ -41,6 +43,8 @@ namespace TasksCoordinator
             this._tasks = new ConcurrentDictionary<long, Task>();
             this._isStarted = 0;
             this._readBottleNeck = new Bottleneck(throttleCount);
+            this._taskScheduler = taskScheduler ?? TaskScheduler.Default;
+            this._taskFactory = new TaskFactory(CancellationToken.None, TaskCreationOptions.DenyChildAttach, TaskContinuationOptions.None, this._taskScheduler);
         }
 
         public bool Start()
@@ -130,7 +134,7 @@ namespace TasksCoordinator
                     }
 
                     var token = this._stopTokenSource.Token;
-                    Task<long> task = Task.Run(() => JobRunner(token, taskId), token);
+                    Task<long> task = _taskFactory.StartNew(() => JobRunner(token, taskId), token).Unwrap();
                     this._tasks.TryUpdate(taskId, task, NOOP);
                     task.ContinueWith((antecedent, id) => {
                         this._ExitTask((long)id);

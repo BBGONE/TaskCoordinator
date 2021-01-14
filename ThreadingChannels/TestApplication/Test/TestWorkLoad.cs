@@ -3,8 +3,8 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Threading.Tasks.Schedulers;
 using TasksCoordinator.Common;
+using Threading.Schedulers;
 using TPLBlocks;
 using TPLBlocks.Core;
 

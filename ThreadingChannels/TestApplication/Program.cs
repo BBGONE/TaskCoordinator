@@ -22,23 +22,39 @@ namespace TestApplication
 
         static async Task Main(string[] args)
         {
+            // using var scheduler = new Threading.Schedulers.WorkStealingTaskScheduler();
+            var scheduler = TaskScheduler.Default;
+
+            TaskFactory factory = new TaskFactory(scheduler);
+
             CancellationTokenSource cts = new CancellationTokenSource();
 
-            var task = Task.Run(async () =>
+            var task = factory.StartNew(async () =>
             {
+                // cts.CancelAfter(1000);
+
+                Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Transform (TaskCoordinator) test...");
+
+                await ExecuteBlock(BlockType.Transform, cts.Token);
+
+                Console.WriteLine();
+                
+                // *************************************************************    
+
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Predicate (Several (3) Blocks are linked with predicate) test...");
 
                 await ExecuteBlock(BlockType.Predicate, cts.Token);
 
                 Console.WriteLine();
-
+                
                 // *************************************************************    
+                
                 Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.LinkMany (Several (5) Blocks are linked to one) test...");
 
                 await ExecuteBlock(BlockType.LinkMany, cts.Token);
 
                 Console.WriteLine();
-             
+
                 // *************************************************************    
 
                 // cts.CancelAfter(3000);
@@ -47,6 +63,7 @@ namespace TestApplication
                 await ExecuteBlock(BlockType.Buffer, cts.Token);
 
                 Console.WriteLine();
+                
                 // *************************************************************    
                 // cts.CancelAfter(1000);
 
@@ -55,14 +72,7 @@ namespace TestApplication
                 await ExecuteBlock(BlockType.TaskTransform, cts.Token);
 
                 Console.WriteLine();
-                // *************************************************************    
-                // cts.CancelAfter(1000);
-
-                Console.WriteLine($"Starting {DateTime.Now.ToString("hh:mm:ss")} BlockType.Transform (TaskCoordinator) test...");
-
-                await ExecuteBlock(BlockType.Transform, cts.Token);
-
-            });
+            }).Unwrap();
 
             /*
             // Can be used to monitor execution (at needed intervals)
@@ -77,7 +87,6 @@ namespace TestApplication
             try
             {
                 await task;
-                Console.WriteLine();
                 Console.WriteLine($"Now: {DateTime.Now.ToString("hh:mm:ss")} Press any key to continue ...");
             }
             catch (Exception ex)
@@ -88,19 +97,20 @@ namespace TestApplication
             Console.ReadKey();
         }
 
+        #region Helpers
         private static  ITransformBlock<string, string> CreateBlock(BlockType blockType, Func<string, Task<string>> body = null, Func<string, Task> outputSink = null, CancellationToken? token= null)
         {
             body = body ?? new Func<string, Task<string>>((async (msg) =>
-               {
-                   await Task.CompletedTask;
+            {
+                await Task.CompletedTask;
                 // Console.WriteLine(msg);
                 char[] charArray = msg.ToCharArray();
-                   for (int i = 0; i < 100; ++i)
-                   {
-                       Array.Reverse(charArray);
-                   }
-                   return new string(charArray);
-               }));
+                for (int i = 0; i < 100; ++i)
+                {
+                    Array.Reverse(charArray);
+                }
+                return new string(charArray);
+            }));
 
             ITransformBlock<string, string> block;
 
@@ -108,17 +118,17 @@ namespace TestApplication
             {
                 case BlockType.Transform:
                     {
-                        block = new TransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token });
+                        block = new TransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler= TaskScheduler.Current });
                     }
                     break;
                 case BlockType.TaskTransform:
                     {
-                        block = new TaskTransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token });
+                        block = new TaskTransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler = TaskScheduler.Current });
                     }
                     break;
                 case BlockType.Buffer:
                     {
-                        block = new BufferBlock<string, string>(body, new BufferBlockOptions() { CancellationToken= token });
+                        block = new BufferBlock<string, string>(body, new BufferBlockOptions() { CancellationToken= token, TaskScheduler = TaskScheduler.Current });
                     }
                     break;
                 default:
@@ -340,6 +350,7 @@ namespace TestApplication
                 }
             }
         }
+        #endregion
 
         static int GetDeterministicHashCode(ReadOnlySpan<char> str)
         {

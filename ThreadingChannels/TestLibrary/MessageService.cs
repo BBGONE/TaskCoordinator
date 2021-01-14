@@ -31,7 +31,8 @@ namespace TasksCoordinator.Test
             ILoggerFactory loggerFactory, 
             int maxDegreeOfParallelism, 
             int maxReadParallelism = 4,
-            int? boundedCapacity = null)
+            int? boundedCapacity = null,
+            TaskScheduler taskScheduler = null)
         {
             this.Name = name;
             this._isStopped = true;

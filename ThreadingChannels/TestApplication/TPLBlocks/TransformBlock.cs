@@ -18,7 +18,8 @@ namespace TPLBlocks
         {
             
             blockOptions = blockOptions ?? TransformBlockOptions.Default;
-            _svc = new MessageService<TInput>(this.Id.ToString(), this, LogFactory.Instance, blockOptions.MaxDegreeOfParallelism, blockOptions.MaxDegreeOfParallelism, blockOptions.BoundedCapacity);
+            _svc = new MessageService<TInput>(this.Id.ToString(), this, LogFactory.Instance, blockOptions.MaxDegreeOfParallelism,
+                blockOptions.MaxDegreeOfParallelism, blockOptions.BoundedCapacity, blockOptions.TaskScheduler);
         }
 
         public override async ValueTask<bool> Post(TInput msg)

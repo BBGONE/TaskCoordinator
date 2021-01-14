@@ -1,12 +1,13 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Threading.Tasks;
 
 namespace TasksCoordinator.Test
 {
     public class TasksCoordinator: BaseTasksCoordinator
     {
         public TasksCoordinator(IMessageReaderFactory readerFactory, ILoggerFactory loggerFactory,
-            int maxReadersCount, int maxReadParallelism = 4) :
-            base(readerFactory, loggerFactory, maxReadersCount,  maxReadParallelism)
+            int maxReadersCount, int maxReadParallelism = 4, TaskScheduler taskScheduler = null) :
+            base(readerFactory, loggerFactory, maxReadersCount,  maxReadParallelism, taskScheduler)
         {
         }
     }

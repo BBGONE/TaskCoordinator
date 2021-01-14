@@ -1,4 +1,5 @@
 ﻿using System.Threading;
+using System.Threading.Tasks;
 
 namespace TPLBlocks.Options
 {
@@ -9,11 +10,14 @@ namespace TPLBlocks.Options
         public BufferBlockOptions()
         {
             BoundedCapacity = 100;
+            this.TaskScheduler = TaskScheduler.Default;
         }
 
         public int? BoundedCapacity { get; set; }
 
         public CancellationToken? CancellationToken { get; set; }
+
+        public TaskScheduler TaskScheduler { get; set; }
     }
 
 }
