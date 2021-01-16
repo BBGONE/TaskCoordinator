@@ -1,9 +1,9 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Common;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Common;
 
 namespace TPLBlocks.Core
 {

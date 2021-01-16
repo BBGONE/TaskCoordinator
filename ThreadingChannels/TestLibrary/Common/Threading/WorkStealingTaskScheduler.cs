@@ -11,7 +11,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Threading.Schedulers
+namespace Common.Threading
 {
     /// <summary>Provides a work-stealing scheduler.</summary>
     public class WorkStealingTaskScheduler : TaskScheduler, IDisposable

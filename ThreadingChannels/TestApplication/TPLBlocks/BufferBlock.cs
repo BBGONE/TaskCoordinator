@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using TasksCoordinator.Common;
 using TestApplication;
 using TPLBlocks.Core;
 using TPLBlocks.Options;

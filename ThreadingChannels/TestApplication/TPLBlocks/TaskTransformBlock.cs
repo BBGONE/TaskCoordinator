@@ -1,8 +1,8 @@
-﻿using System;
+﻿using Common;
+using System;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using TasksCoordinator.Common;
 using TestApplication;
 using TPLBlocks.Core;
 using TPLBlocks.Options;
@@ -60,7 +60,7 @@ namespace TPLBlocks
                         while (this._started == 1)
                         {
                             var msg = await reader.ReadAsync(token);
-                            await (this as IWorkLoad<TInput>).DispatchMessage(msg, 1, token);
+                            await (this as IWorkLoad<TInput>).DispatchMessage(msg, i+1, token);
                         }
                     }
                     catch (OperationCanceledException)

@@ -1,11 +1,12 @@
-﻿using System;
+﻿using Common.Disposal;
+using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Common;
 using TPLBlocks;
 using TPLBlocks.Options;
+using Common.Threading;
 
 namespace TestApplication
 {
@@ -24,8 +25,8 @@ namespace TestApplication
 
         static async Task Main(string[] args)
         {
-            using var scheduler = new Threading.Schedulers.WorkStealingTaskScheduler();
-            // var scheduler = TaskScheduler.Default;
+            // using var scheduler = new Threading.Schedulers.WorkStealingTaskScheduler();
+            var scheduler = TaskScheduler.Default;
 
             CurrentScheduler = scheduler;
 
@@ -107,7 +108,7 @@ namespace TestApplication
             body = body ?? new Func<string, Task<string>>((async (msg) =>
             {
                 await Task.CompletedTask;
-                // Console.WriteLine(msg);
+
                 char[] charArray = msg.ToCharArray();
                 for (int i = 0; i < 100; ++i)
                 {
@@ -122,12 +123,12 @@ namespace TestApplication
             {
                 case TestType.Transform:
                     {
-                        block = new TransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler= CurrentScheduler });
+                        block = new TransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler= CurrentScheduler, MaxDegreeOfParallelism=4 });
                     }
                     break;
                 case TestType.TaskTransform:
                     {
-                        block = new TaskTransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler = CurrentScheduler });
+                        block = new TaskTransformBlock<string, string>(body, new TransformBlockOptions() { CancellationToken = token, TaskScheduler = CurrentScheduler, MaxDegreeOfParallelism=4 });
                     }
                     break;
                 case TestType.Buffer:
