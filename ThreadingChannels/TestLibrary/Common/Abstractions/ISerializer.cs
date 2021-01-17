@@ -1,4 +1,4 @@
-﻿namespace TasksCoordinator.Common
+﻿namespace TSM.Common
 {
     public interface ISerializer
     {

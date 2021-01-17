@@ -1,12 +1,12 @@
-﻿using Common.Disposal;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using TPLBlocks;
 using TPLBlocks.Options;
-using Common.Threading;
+using TSM.Common.Disposal;
+using TSM.Common.Threading;
 
 namespace TestApplication
 {
@@ -25,7 +25,7 @@ namespace TestApplication
 
         static async Task Main(string[] args)
         {
-            // using var scheduler = new Threading.Schedulers.WorkStealingTaskScheduler();
+            // using var scheduler = new WorkStealingTaskScheduler();
             var scheduler = TaskScheduler.Default;
 
             CurrentScheduler = scheduler;

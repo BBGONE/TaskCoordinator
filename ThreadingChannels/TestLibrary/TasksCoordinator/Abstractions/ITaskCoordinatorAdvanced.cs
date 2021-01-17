@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator
+namespace TSM.TasksCoordinator
 {
     public interface ITaskCoordinatorAdvanced : ITaskCoordinator
     {

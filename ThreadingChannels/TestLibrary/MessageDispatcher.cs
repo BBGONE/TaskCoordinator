@@ -1,8 +1,8 @@
-﻿using Common;
+﻿using TSM.Common;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator.Test
+namespace TSM.TasksCoordinator.Test
 {
     public class MessageDispatcher<TMessage>: IMessageDispatcher<TMessage, object>
     {

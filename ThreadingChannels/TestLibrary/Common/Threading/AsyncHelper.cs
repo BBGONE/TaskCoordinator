@@ -6,7 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Common.Threading
+namespace TSM.Common.Threading
 {
     public static class AsyncHelper
     {

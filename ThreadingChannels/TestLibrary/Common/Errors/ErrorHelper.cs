@@ -1,6 +1,6 @@
 using System;
 
-namespace Common.Errors
+namespace TSM.Common.Errors
 {
 	public sealed class ErrorHelper
 	{

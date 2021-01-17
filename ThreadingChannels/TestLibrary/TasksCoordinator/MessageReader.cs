@@ -3,7 +3,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator
+namespace TSM.TasksCoordinator
 {
     public abstract class MessageReader<TMessage, TState> : IMessageReader
     {
@@ -28,7 +28,7 @@ namespace TasksCoordinator
 
         protected virtual Task OnRollback(TMessage msg, CancellationToken token)
         {
-            return Task.FromResult(0);
+            return Task.CompletedTask;
         }
     
         protected virtual void OnProcessMessageException(Exception ex, TMessage message)
@@ -41,7 +41,7 @@ namespace TasksCoordinator
             if (this._coordinator.IsPaused)
             {
                 await Task.Delay(1000, token);
-                return new MessageReaderResult() { IsWorkDone = true, IsRemoved = false };
+                return new MessageReaderResult(isWorkDone: false, isRemoved: false);
             }
             token.ThrowIfCancellationRequested();
             bool isDidWork = await this.DoWork(this.IsPrimaryReader, token) > 0;
@@ -52,7 +52,7 @@ namespace TasksCoordinator
         protected MessageReaderResult AfterProcessedMessage(bool workDone, CancellationToken token)
         {
             bool isRemoved = token.IsCancellationRequested || this._coordinator.IsSafeToRemoveReader(this, workDone);
-            return new MessageReaderResult() { IsRemoved = isRemoved, IsWorkDone = workDone };
+            return new MessageReaderResult(isWorkDone: workDone, isRemoved: isRemoved);
         }
 
         protected ILogger Logger

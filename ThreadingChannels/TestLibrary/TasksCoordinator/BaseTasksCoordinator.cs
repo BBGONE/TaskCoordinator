@@ -1,5 +1,5 @@
-﻿using Common.Errors;
-using Common.Threading;
+﻿using TSM.Common.Errors;
+using TSM.Common.Threading;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator
+namespace TSM.TasksCoordinator
 {
     public class BaseTasksCoordinator : ITaskCoordinatorAdvanced
     {
@@ -172,15 +172,17 @@ namespace TasksCoordinator
                 Interlocked.CompareExchange(ref this._primaryReader, reader, null);
                 try
                 {
-                    MessageReaderResult readerResult = new MessageReaderResult() { IsRemoved = false, IsWorkDone = false };
+                 //   MessageReaderResult readerResult = new MessageReaderResult() { IsRemoved = false, IsWorkDone = false };
                     bool loopAgain = false;
                     do
                     {
-                        readerResult = await reader.TryProcessMessage(token);
+                        MessageReaderResult readerResult = await reader.TryProcessMessage(token);
                         loopAgain = !readerResult.IsRemoved && !token.IsCancellationRequested;
+                        /*
                         // the task is rescheduled to the threadpool which allows other scheduled tasks to be processed
                         // otherwise it could use exclusively the threadpool thread
                         if (loopAgain) await Task.Yield();
+                        */
                     } while (loopAgain);
                 }
                 finally

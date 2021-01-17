@@ -1,4 +1,4 @@
-﻿namespace TasksCoordinator
+﻿namespace TSM.TasksCoordinator
 {
     public struct MessageProcessingResult
     {

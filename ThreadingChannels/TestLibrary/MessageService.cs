@@ -1,11 +1,11 @@
-﻿using Common;
-using Common.Errors;
+﻿using TSM.Common;
+using TSM.Common.Errors;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator.Test
+namespace TSM.TasksCoordinator.Test
 {
     /// <summary>
     /// The service which takes messages from the queue and processes them

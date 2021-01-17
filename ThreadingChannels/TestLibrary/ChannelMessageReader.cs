@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 
-namespace TasksCoordinator.Test
+namespace TSM.TasksCoordinator.Test
 {
     public class ChannelMessageReader<TMessage> : MessageReader<TMessage, object>
     {

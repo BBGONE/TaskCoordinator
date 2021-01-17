@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Common.Threading
+namespace TSM.Common.Threading
 {
     public class Bottleneck
     {

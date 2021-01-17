@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Threading.Channels;
 
-namespace TasksCoordinator.Test
+namespace TSM.TasksCoordinator.Test
 {
     public class MessageReaderFactory<TMessage>: IMessageReaderFactory
     {

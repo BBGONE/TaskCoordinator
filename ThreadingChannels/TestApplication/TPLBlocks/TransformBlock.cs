@@ -1,10 +1,10 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using TasksCoordinator.Test;
 using TestApplication;
 using TPLBlocks.Core;
 using TPLBlocks.Options;
+using TSM.TasksCoordinator.Test;
 
 namespace TPLBlocks
 {
